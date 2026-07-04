@@ -193,6 +193,9 @@ importers:
       '@workspace/task-queue':
         specifier: workspace:*
         version: link:../../lib/task-queue
+      '@workspace/tool-manager':
+        specifier: workspace:*
+        version: link:../../lib/tool-manager
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
@@ -757,6 +760,22 @@ importers:
         version: 4.22.4
 
   lib/task-queue:
+    dependencies:
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/pg@8.20.0)(pg@8.22.0)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.4
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
+
+  lib/tool-manager:
     dependencies:
       '@workspace/db':
         specifier: workspace:*

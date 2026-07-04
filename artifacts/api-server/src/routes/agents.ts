@@ -1,5 +1,6 @@
 import { Router, type IRouter } from "express";
 import { agentManager } from "../lib/agent-manager.js";
+import { toolManager } from "../lib/tool-manager.js";
 import { AgentExecutorNotConfiguredError, AgentNotInvocableError } from "@workspace/agent-manager";
 import { NoDefaultProviderError, UnknownProviderTypeError } from "@workspace/ai-provider-manager";
 import type { AgentStatus, CreateAgentInput, UpdateAgentInput } from "@workspace/agent-manager";
@@ -65,6 +66,23 @@ function validateUpdateInput(body: unknown): { error: string } | { input: Update
 }
 
 /**
+ * Confirms every referenced capability name is a registered, active tool.
+ * Reuses `toolManager.list()` rather than duplicating any lookup logic —
+ * an agent's `capabilities` are just names until this checks them against
+ * the Tool Manager's own registry.
+ */
+async function validateCapabilitiesExist(capabilities: string[] | undefined): Promise<string | null> {
+  if (!capabilities || capabilities.length === 0) return null;
+  const activeTools = await toolManager.list({ status: "active" });
+  const activeNames = new Set(activeTools.map((t) => t.name));
+  const unknown = capabilities.filter((c) => !activeNames.has(c));
+  if (unknown.length > 0) {
+    return `Unknown or inactive capabilities: ${unknown.join(", ")}`;
+  }
+  return null;
+}
+
+/**
  * Agent registration, lifecycle, and run history. Mutating endpoints are
  * admin-only, same rationale as the Rule Engine's routes: an agent is a
  * system-wide capability, not per-user data. `POST /:id/invoke` is open to
@@ -80,6 +98,11 @@ router.post("/agents", requireAuth, async (req: AuthRequest, res) => {
     const validated = validateCreateInput(req.body);
     if ("error" in validated) {
       res.status(400).json({ error: "Bad Request", message: validated.error });
+      return;
+    }
+    const capabilitiesError = await validateCapabilitiesExist(validated.input.capabilities);
+    if (capabilitiesError) {
+      res.status(400).json({ error: "Bad Request", message: capabilitiesError });
       return;
     }
     const agent = await agentManager.create({ ...validated.input, userId: req.user!.userId });
@@ -142,6 +165,11 @@ router.put("/agents/:id", requireAuth, async (req: AuthRequest, res) => {
     const validated = validateUpdateInput(req.body);
     if ("error" in validated) {
       res.status(400).json({ error: "Bad Request", message: validated.error });
+      return;
+    }
+    const capabilitiesError = await validateCapabilitiesExist(validated.input.capabilities);
+    if (capabilitiesError) {
+      res.status(400).json({ error: "Bad Request", message: capabilitiesError });
       return;
     }
     const agent = await agentManager.update(id, validated.input);

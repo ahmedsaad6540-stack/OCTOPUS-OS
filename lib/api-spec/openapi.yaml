@@ -25,6 +25,8 @@ tags:
       AI Provider Manager — provider configurations powering the Agent
       Manager's AgentExecutor. Distinct from the legacy /providers
       endpoints, which predate OS Core.
+  - name: tools
+    description: Tool Manager — tool registration, schema-validated invocation, and handler registry
 paths:
   /system/events:
     get:
@@ -998,6 +1000,237 @@ paths:
           description: Only admins can delete provider configs
         "404":
           description: Not found
+  /tools:
+    post:
+      operationId: createTool
+      tags: [tools]
+      summary: Register a new tool
+      description: Admin-only. `handlerName` is not validated to have a registered handler at this point — only at invoke time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateToolRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tool]
+                properties:
+                  tool:
+                    $ref: "#/components/schemas/Tool"
+        "400":
+          description: Invalid tool definition
+        "403":
+          description: Only admins can register tools
+    get:
+      operationId: listTools
+      tags: [tools]
+      summary: List tools
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ToolStatus"
+        - name: handlerName
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Tools
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tools]
+                properties:
+                  tools:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Tool"
+  /tools/{id}:
+    get:
+      operationId: getTool
+      tags: [tools]
+      summary: Get a single tool
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The tool
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tool]
+                properties:
+                  tool:
+                    $ref: "#/components/schemas/Tool"
+        "404":
+          description: Not found
+    put:
+      operationId: updateTool
+      tags: [tools]
+      summary: Update a tool
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateToolRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tool]
+                properties:
+                  tool:
+                    $ref: "#/components/schemas/Tool"
+        "400":
+          description: Invalid update
+        "403":
+          description: Only admins can update tools
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteTool
+      tags: [tools]
+      summary: Delete a tool
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete tools
+        "404":
+          description: Not found
+  /tools/{id}/enable:
+    post:
+      operationId: enableTool
+      tags: [tools]
+      summary: Enable a tool
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tool]
+                properties:
+                  tool:
+                    $ref: "#/components/schemas/Tool"
+        "403":
+          description: Only admins can enable tools
+        "404":
+          description: Not found
+  /tools/{id}/disable:
+    post:
+      operationId: disableTool
+      tags: [tools]
+      summary: Disable a tool
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tool]
+                properties:
+                  tool:
+                    $ref: "#/components/schemas/Tool"
+        "403":
+          description: Only admins can disable tools
+        "404":
+          description: Not found
+  /tools/{name}/invoke:
+    post:
+      operationId: invokeTool
+      tags: [tools]
+      summary: Invoke a tool by name
+      description: >
+        Any authenticated user may invoke an existing, enabled tool. Input
+        is validated against the tool's `inputSchema` before its handler
+        runs. Returns 501 if the tool's `handlerName` has no handler
+        registered in this process.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: Tool output
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [output]
+                properties:
+                  output: {}
+        "400":
+          description: Input failed schema validation
+        "404":
+          description: Tool not found
+        "409":
+          description: Tool is disabled
+        "501":
+          description: No handler registered for this tool
   /healthz:
     get:
       operationId: healthCheck
@@ -1555,3 +1788,86 @@ components:
           type: boolean
         status:
           $ref: "#/components/schemas/ProviderStatus"
+
+    ToolStatus:
+      type: string
+      enum: [active, disabled]
+    JsonSchemaDefinition:
+      type: object
+      description: >
+        A minimal JSON-Schema-like structure: type, optional enum,
+        properties/required for objects, items for arrays. Recursive via
+        `properties` and `items`.
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [string, number, boolean, object, array]
+        description:
+          type: string
+        enum:
+          type: array
+          items: {}
+        properties:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/JsonSchemaDefinition"
+        required:
+          type: array
+          items:
+            type: string
+        items:
+          $ref: "#/components/schemas/JsonSchemaDefinition"
+    Tool:
+      type: object
+      required: [id, name, description, inputSchema, handlerName, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        inputSchema:
+          $ref: "#/components/schemas/JsonSchemaDefinition"
+        handlerName:
+          type: string
+        status:
+          $ref: "#/components/schemas/ToolStatus"
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateToolRequest:
+      type: object
+      required: [name, description, inputSchema, handlerName]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        inputSchema:
+          $ref: "#/components/schemas/JsonSchemaDefinition"
+        handlerName:
+          type: string
+        status:
+          $ref: "#/components/schemas/ToolStatus"
+    UpdateToolRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        inputSchema:
+          $ref: "#/components/schemas/JsonSchemaDefinition"
+        handlerName:
+          type: string
+        status:
+          $ref: "#/components/schemas/ToolStatus"

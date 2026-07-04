@@ -19,6 +19,7 @@
     "@workspace/event-bus": "workspace:*",
     "@workspace/rule-engine": "workspace:*",
     "@workspace/task-queue": "workspace:*",
+    "@workspace/tool-manager": "workspace:*",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",

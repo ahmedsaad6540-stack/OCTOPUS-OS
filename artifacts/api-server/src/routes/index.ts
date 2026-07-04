@@ -11,6 +11,7 @@ import brainRouter from "./brain.js";
 import rulesRouter from "./rules.js";
 import agentsRouter from "./agents.js";
 import providerConfigsRouter from "./provider-configs.js";
+import toolsRouter from "./tools.js";
 
 const router: IRouter = Router();
 
@@ -26,5 +27,6 @@ router.use(brainRouter);
 router.use(rulesRouter);
 router.use(agentsRouter);
 router.use(providerConfigsRouter);
+router.use(toolsRouter);
 
 export default router;

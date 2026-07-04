@@ -35,6 +35,9 @@
     },
     {
       "path": "../../lib/ai-provider-manager"
+    },
+    {
+      "path": "../../lib/tool-manager"
     }
   ]
 }
