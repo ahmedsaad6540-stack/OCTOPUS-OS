@@ -26,6 +26,9 @@
     },
     {
       "path": "./lib/rule-engine"
+    },
+    {
+      "path": "./lib/agent-manager"
     }
   ]
 }

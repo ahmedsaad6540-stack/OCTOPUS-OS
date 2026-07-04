@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
+    "@workspace/agent-manager": "workspace:*",
     "@workspace/brain": "workspace:*",
     "@workspace/db": "workspace:*",
     "@workspace/decision-engine": "workspace:*",

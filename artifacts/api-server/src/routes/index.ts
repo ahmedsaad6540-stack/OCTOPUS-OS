@@ -9,6 +9,7 @@ import systemEventsRouter from "./system-events.js";
 import tasksRouter from "./tasks.js";
 import brainRouter from "./brain.js";
 import rulesRouter from "./rules.js";
+import agentsRouter from "./agents.js";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(systemEventsRouter);
 router.use(tasksRouter);
 router.use(brainRouter);
 router.use(rulesRouter);
+router.use(agentsRouter);
 
 export default router;

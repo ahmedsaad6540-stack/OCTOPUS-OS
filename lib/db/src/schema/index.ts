@@ -7,3 +7,4 @@ export * from "./events";
 export * from "./tasks";
 export * from "./brain-decisions";
 export * from "./rule-definitions";
+export * from "./agents";

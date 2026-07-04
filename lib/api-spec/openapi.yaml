@@ -18,6 +18,8 @@ tags:
     description: OS Core Brain (decision maker) observability
   - name: rules
     description: Rule Engine — data-defined rules on top of the Brain
+  - name: agents
+    description: Agent Manager — agent registration, lifecycle, and run history
 paths:
   /system/events:
     get:
@@ -593,6 +595,259 @@ paths:
           description: Only admins can disable rules
         "404":
           description: Not found
+  /agents:
+    post:
+      operationId: createAgent
+      tags: [agents]
+      summary: Register a new agent
+      description: Admin-only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgentRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agent]
+                properties:
+                  agent:
+                    $ref: "#/components/schemas/Agent"
+        "400":
+          description: Invalid agent definition
+        "403":
+          description: Only admins can create agents
+    get:
+      operationId: listAgents
+      tags: [agents]
+      summary: List agents
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/AgentStatus"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Agents
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agents]
+                properties:
+                  agents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Agent"
+  /agents/{id}:
+    get:
+      operationId: getAgent
+      tags: [agents]
+      summary: Get a single agent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The agent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agent]
+                properties:
+                  agent:
+                    $ref: "#/components/schemas/Agent"
+        "404":
+          description: Not found
+    put:
+      operationId: updateAgent
+      tags: [agents]
+      summary: Update an agent
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agent]
+                properties:
+                  agent:
+                    $ref: "#/components/schemas/Agent"
+        "400":
+          description: Invalid update
+        "403":
+          description: Only admins can update agents
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteAgent
+      tags: [agents]
+      summary: Delete an agent
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete agents
+        "404":
+          description: Not found
+  /agents/{id}/enable:
+    post:
+      operationId: enableAgent
+      tags: [agents]
+      summary: Enable an agent
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agent]
+                properties:
+                  agent:
+                    $ref: "#/components/schemas/Agent"
+        "403":
+          description: Only admins can enable agents
+        "404":
+          description: Not found
+  /agents/{id}/disable:
+    post:
+      operationId: disableAgent
+      tags: [agents]
+      summary: Disable an agent
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agent]
+                properties:
+                  agent:
+                    $ref: "#/components/schemas/Agent"
+        "403":
+          description: Only admins can disable agents
+        "404":
+          description: Not found
+  /agents/{id}/invoke:
+    post:
+      operationId: invokeAgent
+      tags: [agents]
+      summary: Invoke an agent synchronously
+      description: >
+        Any authenticated user may invoke an existing, enabled agent.
+        Returns 501 if no `AgentExecutor` is configured yet (the AI
+        Provider Manager supplies one).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "202":
+          description: Run recorded (check `run.status` for the outcome)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [run]
+                properties:
+                  run:
+                    $ref: "#/components/schemas/AgentRun"
+        "404":
+          description: Agent not found or disabled
+        "501":
+          description: No AgentExecutor configured yet
+  /agents/{id}/runs:
+    get:
+      operationId: listAgentRuns
+      tags: [agents]
+      summary: List an agent's run history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Run history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runs]
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AgentRun"
   /healthz:
     get:
       operationId: healthCheck
@@ -984,3 +1239,98 @@ components:
           type: integer
         enabled:
           type: boolean
+
+    AgentStatus:
+      type: string
+      enum: [active, disabled]
+    AgentRunStatus:
+      type: string
+      enum: [running, completed, failed]
+    Agent:
+      type: object
+      required: [id, name, instructions, capabilities, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        instructions:
+          type: string
+          description: System prompt / operating instructions.
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: Names of tools/capabilities this agent may use.
+        status:
+          $ref: "#/components/schemas/AgentStatus"
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateAgentRequest:
+      type: object
+      required: [name, instructions]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        instructions:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: "#/components/schemas/AgentStatus"
+    UpdateAgentRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        instructions:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: "#/components/schemas/AgentStatus"
+    AgentRun:
+      type: object
+      required: [id, agentId, status, input, output, error, startedAt, completedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        agentId:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/AgentRunStatus"
+        input: {}
+        output: {}
+        error:
+          type: string
+          nullable: true
+        userId:
+          type: string
+          format: uuid
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
