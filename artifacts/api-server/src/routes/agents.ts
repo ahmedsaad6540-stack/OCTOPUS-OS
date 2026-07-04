@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { agentManager } from "../lib/agent-manager.js";
 import { AgentExecutorNotConfiguredError, AgentNotInvocableError } from "@workspace/agent-manager";
+import { NoDefaultProviderError, UnknownProviderTypeError } from "@workspace/ai-provider-manager";
 import type { AgentStatus, CreateAgentInput, UpdateAgentInput } from "@workspace/agent-manager";
 import { requireAuth, type AuthRequest } from "../middleware/auth.js";
 
@@ -240,6 +241,10 @@ router.post("/agents/:id/invoke", requireAuth, async (req: AuthRequest, res) => 
     }
     if (err instanceof AgentExecutorNotConfiguredError) {
       res.status(501).json({ error: "Not Implemented", message: err.message });
+      return;
+    }
+    if (err instanceof NoDefaultProviderError || err instanceof UnknownProviderTypeError) {
+      res.status(503).json({ error: "Service Unavailable", message: err.message });
       return;
     }
     req.log.error(err);

@@ -20,6 +20,11 @@ tags:
     description: Rule Engine — data-defined rules on top of the Brain
   - name: agents
     description: Agent Manager — agent registration, lifecycle, and run history
+  - name: provider-configs
+    description: >
+      AI Provider Manager — provider configurations powering the Agent
+      Manager's AgentExecutor. Distinct from the legacy /providers
+      endpoints, which predate OS Core.
 paths:
   /system/events:
     get:
@@ -848,6 +853,151 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/AgentRun"
+  /provider-configs:
+    post:
+      operationId: createProviderConfig
+      tags: [provider-configs]
+      summary: Register an AI provider configuration
+      description: >
+        Admin-only. `apiKeyEnvVar` must be the NAME of an environment
+        variable holding the credential, never the credential itself —
+        this table never stores a raw key.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProviderConfigRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [config]
+                properties:
+                  config:
+                    $ref: "#/components/schemas/ProviderConfig"
+        "400":
+          description: Invalid provider config
+        "403":
+          description: Only admins can create provider configs
+    get:
+      operationId: listProviderConfigs
+      tags: [provider-configs]
+      summary: List provider configurations
+      description: Admin-only.
+      parameters:
+        - name: providerType
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ProviderStatus"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Provider configs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [configs]
+                properties:
+                  configs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProviderConfig"
+        "403":
+          description: Only admins can view provider configs
+  /provider-configs/{id}:
+    get:
+      operationId: getProviderConfig
+      tags: [provider-configs]
+      summary: Get a single provider config
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The config
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [config]
+                properties:
+                  config:
+                    $ref: "#/components/schemas/ProviderConfig"
+        "403":
+          description: Only admins can view provider configs
+        "404":
+          description: Not found
+    put:
+      operationId: updateProviderConfig
+      tags: [provider-configs]
+      summary: Update a provider config
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProviderConfigRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [config]
+                properties:
+                  config:
+                    $ref: "#/components/schemas/ProviderConfig"
+        "400":
+          description: Invalid update
+        "403":
+          description: Only admins can update provider configs
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteProviderConfig
+      tags: [provider-configs]
+      summary: Delete a provider config
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete provider configs
+        "404":
+          description: Not found
   /healthz:
     get:
       operationId: healthCheck
@@ -1334,3 +1484,74 @@ components:
           type: string
           format: date-time
           nullable: true
+
+    ProviderStatus:
+      type: string
+      enum: [active, disabled]
+    ProviderConfig:
+      type: object
+      required: [id, name, providerType, model, apiKeyEnvVar, isDefault, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        providerType:
+          type: string
+          description: e.g. "anthropic". Determines which ProviderClient factory handles this config.
+        model:
+          type: string
+        apiKeyEnvVar:
+          type: string
+          description: Name of the environment variable holding the API key. The key itself is never stored or returned.
+        baseUrl:
+          type: string
+        isDefault:
+          type: boolean
+        status:
+          $ref: "#/components/schemas/ProviderStatus"
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateProviderConfigRequest:
+      type: object
+      required: [name, providerType, model, apiKeyEnvVar]
+      properties:
+        name:
+          type: string
+        providerType:
+          type: string
+        model:
+          type: string
+        apiKeyEnvVar:
+          type: string
+        baseUrl:
+          type: string
+        isDefault:
+          type: boolean
+        status:
+          $ref: "#/components/schemas/ProviderStatus"
+    UpdateProviderConfigRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        providerType:
+          type: string
+        model:
+          type: string
+        apiKeyEnvVar:
+          type: string
+        baseUrl:
+          type: string
+        isDefault:
+          type: boolean
+        status:
+          $ref: "#/components/schemas/ProviderStatus"

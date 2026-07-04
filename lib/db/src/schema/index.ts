@@ -8,3 +8,4 @@ export * from "./tasks";
 export * from "./brain-decisions";
 export * from "./rule-definitions";
 export * from "./agents";
+export * from "./provider-configs";

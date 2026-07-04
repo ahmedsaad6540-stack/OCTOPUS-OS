@@ -29,6 +29,9 @@
     },
     {
       "path": "./lib/agent-manager"
+    },
+    {
+      "path": "./lib/ai-provider-manager"
     }
   ]
 }
