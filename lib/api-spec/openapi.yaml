@@ -1,0 +1,986 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: system
+    description: OS Core observability (Event Bus history)
+  - name: tasks
+    description: OS Core Task Manager + Queue Manager
+  - name: brain
+    description: OS Core Brain (decision maker) observability
+  - name: rules
+    description: Rule Engine — data-defined rules on top of the Brain
+paths:
+  /system/events:
+    get:
+      operationId: listSystemEvents
+      tags: [system]
+      summary: List event history
+      description: >
+        Read-only view over the Event Bus's durable event history. Non-admin
+        callers only see events scoped to their own account.
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: correlationId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: before
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event history page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OctopusEvent"
+  /system/events/{id}:
+    get:
+      operationId: getSystemEvent
+      tags: [system]
+      summary: Get a single event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The event
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [event]
+                properties:
+                  event:
+                    $ref: "#/components/schemas/OctopusEvent"
+        "404":
+          description: Not found
+  /tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: List tasks
+      description: >
+        Query the Task Manager's task history. Non-admin callers only see
+        tasks scoped to their own account.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/TaskStatus"
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: queue
+          in: query
+          schema:
+            type: string
+        - name: correlationId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tasks]
+                properties:
+                  tasks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OctopusTask"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: Enqueue a task
+      description: >
+        Creates a new task in the `queued` state and publishes a
+        `task.created` event. The task is not executed by this call — a
+        worker claims it via POST /tasks/claim.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: The created task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task]
+                properties:
+                  task:
+                    $ref: "#/components/schemas/OctopusTask"
+        "400":
+          description: Invalid request body
+  /tasks/{id}:
+    get:
+      operationId: getTask
+      tags: [tasks]
+      summary: Get a single task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task]
+                properties:
+                  task:
+                    $ref: "#/components/schemas/OctopusTask"
+        "404":
+          description: Not found
+  /tasks/{id}/cancel:
+    post:
+      operationId: cancelTask
+      tags: [tasks]
+      summary: Cancel a task
+      description: >
+        Cancels a task that is still `queued` or `running`, and publishes a
+        `task.cancelled` event. No-op error if the task is already in a
+        terminal state.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The cancelled task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task]
+                properties:
+                  task:
+                    $ref: "#/components/schemas/OctopusTask"
+        "404":
+          description: Not found
+        "409":
+          description: Task is already in a terminal state
+  /tasks/claim:
+    post:
+      operationId: claimTask
+      tags: [tasks]
+      summary: Claim the next available task
+      description: >
+        Queue Manager operation: atomically claims the next eligible queued
+        task for the caller, marks it `running`, and publishes a
+        `task.started` event. Intended for worker/agent clients. Returns 204
+        (no body) if no task is currently eligible.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                queue:
+                  type: string
+                  description: Defaults to "default"
+      responses:
+        "200":
+          description: The claimed task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task]
+                properties:
+                  task:
+                    $ref: "#/components/schemas/OctopusTask"
+        "204":
+          description: No eligible task to claim
+  /tasks/{id}/complete:
+    post:
+      operationId: completeTask
+      tags: [tasks]
+      summary: Mark a claimed task completed
+      description: >
+        Queue Manager operation: marks a task this caller currently holds
+        the claim on as `completed`, and publishes a `task.completed` event.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                result: {}
+      responses:
+        "200":
+          description: The completed task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task]
+                properties:
+                  task:
+                    $ref: "#/components/schemas/OctopusTask"
+        "404":
+          description: Not found
+        "409":
+          description: Task is not currently claimed by this caller
+  /tasks/{id}/fail:
+    post:
+      operationId: failTask
+      tags: [tasks]
+      summary: Report a claimed task as failed
+      description: >
+        Queue Manager operation: reports failure for a task this caller
+        currently holds the claim on. If retries remain (and `retry` isn't
+        `false`), reschedules the task with exponential backoff and
+        publishes `task.retrying`; otherwise marks it permanently `failed`
+        and publishes `task.failed`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [error]
+              properties:
+                error:
+                  type: string
+                retry:
+                  type: boolean
+                  description: Defaults to true
+      responses:
+        "200":
+          description: The failed or retry-scheduled task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task]
+                properties:
+                  task:
+                    $ref: "#/components/schemas/OctopusTask"
+        "400":
+          description: Invalid request body
+        "404":
+          description: Not found
+        "409":
+          description: Task is not currently claimed by this caller
+  /brain/decisions:
+    get:
+      operationId: listBrainDecisions
+      tags: [brain]
+      summary: List the Brain's decisions
+      description: >
+        Read-only view over OS Core's decision trail: every event a
+        registered decision rule matched, whether or not it led to an
+        action. Non-admin callers only see decisions scoped to their own
+        account.
+      parameters:
+        - name: ruleName
+          in: query
+          schema:
+            type: string
+        - name: eventType
+          in: query
+          schema:
+            type: string
+        - name: outcome
+          in: query
+          schema:
+            $ref: "#/components/schemas/DecisionOutcome"
+        - name: correlationId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Decision history page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [decisions]
+                properties:
+                  decisions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BrainDecision"
+        "400":
+          description: Invalid query parameter
+  /brain/decisions/{id}:
+    get:
+      operationId: getBrainDecision
+      tags: [brain]
+      summary: Get a single decision
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The decision
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [decision]
+                properties:
+                  decision:
+                    $ref: "#/components/schemas/BrainDecision"
+        "404":
+          description: Not found
+  /rules:
+    post:
+      operationId: createRule
+      tags: [rules]
+      summary: Create a data-defined rule
+      description: Admin-only. Compiles immediately and registers against the Brain if `enabled` (default true).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRuleRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rule]
+                properties:
+                  rule:
+                    $ref: "#/components/schemas/RuleDefinition"
+        "400":
+          description: Invalid rule definition
+        "403":
+          description: Only admins can create rules
+    get:
+      operationId: listRules
+      tags: [rules]
+      summary: List rule definitions
+      parameters:
+        - name: eventPattern
+          in: query
+          schema:
+            type: string
+        - name: enabled
+          in: query
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rule definitions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rules]
+                properties:
+                  rules:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RuleDefinition"
+  /rules/{id}:
+    get:
+      operationId: getRule
+      tags: [rules]
+      summary: Get a single rule definition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The rule
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rule]
+                properties:
+                  rule:
+                    $ref: "#/components/schemas/RuleDefinition"
+        "404":
+          description: Not found
+    put:
+      operationId: updateRule
+      tags: [rules]
+      summary: Update a rule definition
+      description: Admin-only. Always re-registers the compiled rule against the Brain.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRuleRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rule]
+                properties:
+                  rule:
+                    $ref: "#/components/schemas/RuleDefinition"
+        "400":
+          description: Invalid update
+        "403":
+          description: Only admins can update rules
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteRule
+      tags: [rules]
+      summary: Delete a rule definition
+      description: Admin-only. Unregisters from the Brain first.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete rules
+        "404":
+          description: Not found
+  /rules/{id}/enable:
+    post:
+      operationId: enableRule
+      tags: [rules]
+      summary: Enable a rule
+      description: Admin-only. Registers the compiled rule against the Brain.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rule]
+                properties:
+                  rule:
+                    $ref: "#/components/schemas/RuleDefinition"
+        "403":
+          description: Only admins can enable rules
+        "404":
+          description: Not found
+  /rules/{id}/disable:
+    post:
+      operationId: disableRule
+      tags: [rules]
+      summary: Disable a rule
+      description: Admin-only. Unregisters the compiled rule from the Brain without deleting the definition.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rule]
+                properties:
+                  rule:
+                    $ref: "#/components/schemas/RuleDefinition"
+        "403":
+          description: Only admins can disable rules
+        "404":
+          description: Not found
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    OctopusEvent:
+      type: object
+      description: >
+        Envelope for every event published on the OS Core Event Bus. This is
+        the only shape any client ever sees when observing system activity.
+      required: [id, type, version, source, payload, metadata, occurredAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          description: Dot-namespaced event type, e.g. "campaign.created"
+        version:
+          type: integer
+        source:
+          type: string
+          description: Identity of the publisher, e.g. "os-core", "agent:prophet"
+        payload:
+          description: Event-type-specific payload
+        metadata:
+          type: object
+          required: [correlationId]
+          properties:
+            correlationId:
+              type: string
+              format: uuid
+            causationId:
+              type: string
+              format: uuid
+            userId:
+              type: string
+              format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+    TaskStatus:
+      type: string
+      enum: [queued, running, completed, failed, cancelled]
+    OctopusTask:
+      type: object
+      description: >
+        A unit of work tracked by OS Core's Task Manager + Queue Manager.
+        This is the shape every client sees; none of them ever touch the
+        `tasks` table directly.
+      required:
+        - id
+        - type
+        - queue
+        - status
+        - priority
+        - payload
+        - attempts
+        - maxAttempts
+        - availableAt
+        - source
+        - correlationId
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          description: Dot-namespaced task type, e.g. "campaign.publish"
+        queue:
+          type: string
+        status:
+          $ref: "#/components/schemas/TaskStatus"
+        priority:
+          type: integer
+        payload:
+          description: Task-type-specific input
+        result:
+          description: Task-type-specific output, set once completed
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        attempts:
+          type: integer
+        maxAttempts:
+          type: integer
+        availableAt:
+          type: string
+          format: date-time
+        lockedBy:
+          type: string
+          nullable: true
+        lockedAt:
+          type: string
+          format: date-time
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        source:
+          type: string
+          description: Identity of the enqueuer, e.g. "api-server", "os-core"
+        correlationId:
+          type: string
+          format: uuid
+        causationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateTaskRequest:
+      type: object
+      required: [type, payload]
+      properties:
+        type:
+          type: string
+          description: Dot-namespaced task type, e.g. "campaign.publish"
+        payload:
+          description: Task-type-specific input
+        queue:
+          type: string
+          description: Defaults to "default"
+        priority:
+          type: integer
+          description: Higher is claimed first. Defaults to 0.
+        maxAttempts:
+          type: integer
+          description: Defaults to 3
+        delayMs:
+          type: integer
+          description: Delay before the task becomes claimable. Defaults to 0.
+        correlationId:
+          type: string
+          format: uuid
+
+    DecisionAction:
+      type: string
+      enum: [enqueue_task, publish_event, noop]
+    DecisionOutcome:
+      type: string
+      enum: [actioned, noop, action_failed, superseded]
+    BrainDecision:
+      type: object
+      description: >
+        A durable record of one decision the Brain made about one event on
+        the Event Bus, and what happened when it acted on it. This is OS
+        Core's "why did this happen" trail.
+      required:
+        - id
+        - ruleName
+        - eventId
+        - eventType
+        - action
+        - reason
+        - outcome
+        - correlationId
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        ruleName:
+          type: string
+          description: Name of the DecisionRule that produced this decision
+        eventId:
+          type: string
+          format: uuid
+          description: The event this decision is about
+        eventType:
+          type: string
+        action:
+          $ref: "#/components/schemas/DecisionAction"
+        reason:
+          type: string
+        actionPayload:
+          description: >
+            Action-specific payload: the task enqueued, or the event
+            published. Absent for "noop" decisions.
+        outcome:
+          $ref: "#/components/schemas/DecisionOutcome"
+        outcomeDetail:
+          description: >
+            Result of carrying out the action, e.g. { taskId } or
+            { error }.
+        correlationId:
+          type: string
+          format: uuid
+        causationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+
+
+    Condition:
+      description: >
+        A node in the Rule Engine's condition tree. Recursive: `and`/`or`
+        contain nested conditions, `not` wraps one.
+      oneOf:
+        - $ref: "#/components/schemas/ComparisonCondition"
+        - $ref: "#/components/schemas/ExistsCondition"
+        - $ref: "#/components/schemas/AndCondition"
+        - $ref: "#/components/schemas/OrCondition"
+        - $ref: "#/components/schemas/NotCondition"
+    ComparisonCondition:
+      type: object
+      required: [op, field, value]
+      properties:
+        op:
+          type: string
+          enum: [eq, neq, gt, gte, lt, lte, contains]
+        field:
+          type: string
+          description: Dot-path into the event, e.g. "payload.taskId"
+        value: {}
+    ExistsCondition:
+      type: object
+      required: [op, field]
+      properties:
+        op:
+          type: string
+          enum: [exists]
+        field:
+          type: string
+    AndCondition:
+      type: object
+      required: [op, conditions]
+      properties:
+        op:
+          type: string
+          enum: [and]
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Condition"
+    OrCondition:
+      type: object
+      required: [op, conditions]
+      properties:
+        op:
+          type: string
+          enum: [or]
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Condition"
+    NotCondition:
+      type: object
+      required: [op, condition]
+      properties:
+        op:
+          type: string
+          enum: [not]
+        condition:
+          $ref: "#/components/schemas/Condition"
+
+    ActionTemplate:
+      oneOf:
+        - $ref: "#/components/schemas/EnqueueTaskTemplate"
+        - $ref: "#/components/schemas/PublishEventTemplate"
+    EnqueueTaskTemplate:
+      type: object
+      required: [kind, taskType, payload]
+      properties:
+        kind:
+          type: string
+          enum: [enqueue_task]
+        taskType:
+          type: string
+        payload:
+          description: >
+            Any string exactly matching "{{dot.path}}" is replaced with the
+            value resolved from that path against the triggering event.
+        queue:
+          type: string
+        priority:
+          type: integer
+        maxAttempts:
+          type: integer
+    PublishEventTemplate:
+      type: object
+      required: [kind, eventType, payload]
+      properties:
+        kind:
+          type: string
+          enum: [publish_event]
+        eventType:
+          type: string
+        payload: {}
+
+    RuleDefinition:
+      type: object
+      required: [id, name, eventPattern, condition, action, priority, enabled, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        eventPattern:
+          type: string
+        condition:
+          $ref: "#/components/schemas/Condition"
+        action:
+          $ref: "#/components/schemas/ActionTemplate"
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateRuleRequest:
+      type: object
+      required: [name, eventPattern, condition, action]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        eventPattern:
+          type: string
+        condition:
+          $ref: "#/components/schemas/Condition"
+        action:
+          $ref: "#/components/schemas/ActionTemplate"
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+    UpdateRuleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        eventPattern:
+          type: string
+        condition:
+          $ref: "#/components/schemas/Condition"
+        action:
+          $ref: "#/components/schemas/ActionTemplate"
+        priority:
+          type: integer
+        enabled:
+          type: boolean

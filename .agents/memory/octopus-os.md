@@ -1,0 +1,46 @@
+---
+name: OCTOPUS NEXUS OS Architecture
+description: Core decisions and structure for the OCTOPUS Business Operating System project
+---
+
+## Architecture
+
+- **Frontend**: `artifacts/mockup-sandbox` (React + Vite + Tailwind) — serves the full OS dashboard at `/__mockup/`
+- **Backend**: `artifacts/api-server` (Express + TypeScript) — serves at `/api/`
+- **DB**: PostgreSQL via Drizzle ORM in `lib/db`
+
+## Auth
+
+- JWT-based (jsonwebtoken + bcryptjs), 7-day token expiry
+- Token stored in localStorage under `octopus_token` / `octopus_user`
+- `JWT_SECRET` defaults to hardcoded string — must set env var in production
+- `requireAuth` middleware in `artifacts/api-server/src/middleware/auth.ts`
+
+## DB Tables
+
+- `users` — id, email, password (bcrypt), name, role
+- `ai_providers` — per-user AI provider configs (openai/gemini/claude/etc)
+- `social_accounts` — per-user social platform connections
+- `affiliate_networks` — per-user affiliate network configs
+- `campaigns` — per-user campaign tracking
+- `events` — durable store for `@workspace/event-bus`; every published event, persisted before dispatch (audit trail + replay source)
+- `tasks` — durable store for `@workspace/task-queue`; doubles as Task Manager lifecycle record and Queue Manager claim/lock state (see OS Core Modules below)
+
+## OS Core Modules
+
+- **Event Bus** (`lib/event-bus`, `@workspace/event-bus`) — the only inter-module communication channel. `EventBus.publish(type, source, payload, options)` persists then fans out to subscribers, isolating handler failures per-subscriber. Wired as a singleton in `artifacts/api-server/src/lib/event-bus.ts`, exposed read-only via `GET /api/system/events`.
+- **Task Manager + Queue Manager** (`lib/task-queue`, `@workspace/task-queue`) — durable async work handoff, built on the Event Bus. `TaskQueue.enqueue()` creates a task and publishes `task.created`; a worker `claim()`s it (atomic via Postgres `SELECT ... FOR UPDATE SKIP LOCKED`, safe across processes), then `complete()`s or `fail()`s it — failures retry with exponential backoff up to `maxAttempts`, then move to `failed`. Every transition (`task.started`/`completed`/`failed`/`retrying`/`cancelled`/`reclaimed`) is a published event. Platform-independent: depends only on a `TaskStore` interface (`DrizzleTaskStore` in production, `InMemoryTaskStore` for tests) and a local `EventPublisher` interface, not on Express or `@workspace/event-bus` directly. Wired as a singleton in `artifacts/api-server/src/lib/task-queue.ts`, exposed via `POST/GET /api/tasks`, `GET/POST /api/tasks/:id`, `/api/tasks/:id/cancel`, `/api/tasks/claim`, `/api/tasks/:id/complete`, `/api/tasks/:id/fail`. A periodic `reclaimStale()` sweep in `index.ts` requeues tasks abandoned by crashed workers.
+- **Brain** (`lib/brain`, `@workspace/brain`) — OS Core's decision maker. `Brain.registerRule(rule)` registers a `DecisionRule` (name + event pattern + optional `priority` + `evaluate()`); a single Event Bus subscription (`"*"`, handler name `"os-core:brain-dispatch"`) feeds every incoming event through local pattern matching against all registered rules, so every rule interested in an event is evaluated together, not in isolation. Every matching rule durably records a `BrainDecision` via `BrainStore` (`DrizzleBrainStore` in production, `InMemoryBrainStore` for tests): `noop` if the rule declined, `action_failed` if it threw or its action failed, `superseded` if the `DecisionEngine` picked a different rule's candidate for the same event, `actioned` once the winner's action succeeds. Actions go through local `TaskEnqueuer`/`EventPublisher` interfaces, satisfied structurally by `TaskQueue`/`EventBus` with no compile-time dependency on either package. The Brain never re-evaluates rules against events it authored itself (source `"brain:*"`/`"os-core:brain"`), which prevents `publish_event` rules and its own `brain.decision.made` broadcast from looping. Ships with one core rule today: `task-failure-alert` (`artifacts/api-server/src/lib/brain-rules.ts`), which publishes `brain.alert.task_failed` whenever a task exhausts its retries. Wired as a singleton in `artifacts/api-server/src/lib/brain.ts` (constructed with a `DecisionEngine`), rules registered at startup in `index.ts`, exposed read-only via `GET /api/brain/decisions` and `GET /api/brain/decisions/:id`.
+- **Decision Engine** (`lib/decision-engine`, `@workspace/decision-engine`) — pure arbitration library, zero dependency on events/tasks/the Event Bus. `DecisionEngine.arbitrate(candidates: ArbitrationCandidate[])` delegates to a swappable `ArbitrationStrategy` (`setStrategy()` for runtime reconfiguration) and defensively drops anything a misbehaving strategy fabricates that wasn't in its input. Ships `allMatchStrategy` (every candidate acts — the Brain's default), `firstMatchStrategy` (first-registered wins), and `priorityStrategy` (highest `priority` wins, ties go to first-registered). `Brain` is the only consumer so far, constructed with `new DecisionEngine(allMatchStrategy)` in `artifacts/api-server/src/lib/brain.ts`.
+- **Rule Engine** (`lib/rule-engine`, `@workspace/rule-engine`) — data-defined rules on top of the Brain, decoupled from `@workspace/brain` at compile time the same way `Brain` is decoupled from `@workspace/event-bus` (`RuleEvent`/`RuleOutcome` mirror `BrainEvent`/`RuleDecision` structurally; `RuleRegistrar` is the minimal `{ registerRule }` capability `Brain` satisfies). A `RuleDefinition` (name, event pattern, JSON `Condition` tree, `ActionTemplate`, priority, enabled) is stored in the `rule_definitions` table and compiled via the pure function `compileRule()` into a `CompiledRule`; `RuleEngine.create/update/enable/disable/delete` keep a running `Brain`'s registered rules in sync automatically (register/unregister, never in-place mutation, since `Brain` doesn't support that). `Condition` supports `eq`/`neq`/`gt`/`gte`/`lt`/`lte`/`contains`/`exists` leaf nodes composed with `and`/`or`/`not`, evaluated via dot-path field resolution (`resolveField`) against the triggering event. `ActionTemplate` payloads support whole-token templating only (`renderTemplate`: a string that is *exactly* `"{{dot.path}}"` is replaced with that resolved value; everything else is left as a literal) — intentionally not a general expression language. Wired as a singleton in `artifacts/api-server/src/lib/rule-engine.ts` (constructed with the `brain` singleton as its `RuleRegistrar`), `loadAndSync()` called at startup in `index.ts` after `registerCoreRules(brain)`, exposed via full CRUD at `/api/rules*` (`routes/rules.ts`) — mutating endpoints admin-only, reads open to any authenticated user.
+- **Agents** (10, referenced in Frontend Pages below) — not yet implemented as OS Core modules; currently frontend-only placeholders.
+
+## Frontend Pages (state-based routing, no URL changes)
+
+- Command Center, Agents (10), AI Providers, Social Accounts, Affiliate Networks, Campaigns, Analytics, Prompt Studio, Settings
+
+**Why state router:** avoids conflict with existing `/preview/*` path system used by the canvas mockup system.
+
+## Test Credentials
+
+- Email: admin@octopus.ai / Password: octopus123 (created during dev)

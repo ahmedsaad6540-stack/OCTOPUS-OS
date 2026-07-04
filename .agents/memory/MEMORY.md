@@ -1,0 +1,1 @@
+- [OCTOPUS NEXUS OS Architecture](octopus-os.md) — Full-stack Business OS; frontend in mockup-sandbox, backend in api-server; JWT auth + 9 DB tables; OS Core modules: Event Bus, Task/Queue Manager, Brain (decision maker), Decision Engine (arbitration), Rule Engine (data-defined rules).

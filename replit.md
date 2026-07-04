@@ -1,0 +1,69 @@
+# [Project name]
+
+_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+
+## Run & Operate
+
+- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm run typecheck` — full typecheck across all packages
+- `pnpm run build` — typecheck + build all packages
+- `pnpm run test` — run all package-level test suites (currently: `@workspace/task-queue`)
+- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
+- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
+- Required env: `DATABASE_URL` — Postgres connection string
+
+## Stack
+
+- pnpm workspaces, Node.js 24, TypeScript 5.9
+- API: Express 5
+- DB: PostgreSQL + Drizzle ORM
+- Validation: Zod (`zod/v4`), `drizzle-zod`
+- API codegen: Orval (from OpenAPI spec)
+- Build: esbuild (CJS bundle)
+
+## Where things live
+
+- `lib/db` — Postgres schema (Drizzle), source of truth for all persisted state, including the `events` table (the Event Bus's durable store), the `tasks` table (the Task/Queue Manager's durable store), the `brain_decisions` table (the Brain's decision trail), and the `rule_definitions` table (the Rule Engine's data-defined rules).
+- `lib/event-bus` — `@workspace/event-bus`: the OS Core Event Bus. The only inter-module communication channel in the system.
+- `lib/task-queue` — `@workspace/task-queue`: OS Core's Task Manager + Queue Manager. Platform-independent (`TaskQueue` depends only on a `TaskStore` interface and a minimal local `EventPublisher` interface — no compile-time dependency on `@workspace/event-bus` itself). `DrizzleTaskStore` claims work via `SELECT ... FOR UPDATE SKIP LOCKED` so multiple worker processes can safely pull from the same queue.
+- `lib/brain` — `@workspace/brain`: OS Core's Brain, the only decision maker. Platform-independent, same as `lib/task-queue` — `Brain` depends only on a `BrainStore` interface and minimal local `EventSubscriber`/`EventPublisher`/`TaskEnqueuer` interfaces, with no compile-time dependency on `@workspace/event-bus` or `@workspace/task-queue`. Rules (`DecisionRule`) are evaluated against every event they match; when more than one rule matches the same event, `@workspace/decision-engine` arbitrates which candidate(s) actually act. The Brain records every decision — `noop`, `superseded`, `actioned`, or `action_failed` — and, for the winning rule(s), enqueues a task or publishes a follow-up event.
+- `lib/decision-engine` — `@workspace/decision-engine`: a small, pure arbitration library with no knowledge of events, tasks, or the Event Bus. Given a set of candidate actions competing for the same event, an `ArbitrationStrategy` picks which one(s) win. Ships `allMatchStrategy` (every candidate acts — the Brain's default, so adding arbitration never silently changes a deployment that only ever had one rule per event type), `firstMatchStrategy`, and `priorityStrategy`. `Brain` is its only consumer today; the Rule Engine reuses the same `DecisionRule.priority` field for its own compiled rules.
+- `lib/rule-engine` — `@workspace/rule-engine`: data-defined rules on top of the Brain. A `RuleDefinition` (event pattern + JSON `Condition` tree + `ActionTemplate`, stored in the `rule_definitions` table) compiles into a `CompiledRule` and is hot-registered/unregistered against a running `Brain` as it's created, updated, enabled, disabled, or deleted through `/api/rules` — no restart required. Decoupled from `@workspace/brain` at compile time the same way `Brain` is decoupled from `@workspace/event-bus`: `RuleEvent`/`RuleOutcome` mirror `BrainEvent`/`RuleDecision`'s shapes exactly, and `RuleRegistrar` is the minimal registration capability `Brain` satisfies structurally.
+- `lib/api-spec/openapi.yaml` — source of truth for the HTTP API contract. Run `pnpm --filter @workspace/api-spec run codegen` after editing it to regenerate `lib/api-zod` and `lib/api-client-react`.
+- `artifacts/api-server` — Express entrypoint. Wires the Event Bus singleton (`src/lib/event-bus.ts`) and exposes it read-only via `GET /api/system/events`. Wires the Task Queue singleton (`src/lib/task-queue.ts`, built on the same Event Bus instance) and exposes it via `/api/tasks*`; also runs a periodic `reclaimStale()` sweep so tasks abandoned by crashed workers get requeued. Wires the Brain singleton (`src/lib/brain.ts`), registers its core decision rules at startup (`src/lib/brain-rules.ts`), and exposes its decision trail read-only via `/api/brain/decisions*`.
+- `artifacts/octopus-os` — presentation-only web client. Business logic does not belong here.
+
+## Architecture decisions
+
+- **Brain-centric, event-driven core.** OS Core (Event Bus, Task/Queue Manager, and the Brain are all implemented) is the only decision maker. Agents and modules never call each other directly — every interaction is a published event on `@workspace/event-bus`, persisted to the `events` table before dispatch, so the event log is both the audit trail and the replay source.
+- **Event Bus is in-process today, durable by design.** `EventBus` persists every event via `EventStore` (Postgres in production, in-memory for tests) before fanning it out to subscribers, and isolates handler failures per-subscriber so one bad handler can't break others or the publisher.
+- **Task/Queue Manager is the durable work-handoff substrate built on the Event Bus.** `TaskQueue` (`lib/task-queue`) is how any module or agent hands off asynchronous work: `enqueue()` persists a task and publishes `task.created`; a worker `claim()`s it (atomic, exclusive, safe across processes), then `complete()`s or `fail()`s it. Failures retry with exponential backoff up to `maxAttempts`, then move to `failed`; every transition publishes an event (`task.started`/`completed`/`failed`/`retrying`/`cancelled`/`reclaimed`). This is intentionally decoupled from `@workspace/event-bus` at compile time via a local `EventPublisher` interface — `EventBus` satisfies it structurally — so the module stays testable and swappable in isolation.
+- **The Brain reacts, it never polls.** `Brain` (`lib/brain`) evaluates every registered `DecisionRule` whose pattern matches an incoming event (exact type, `"namespace.*"`, or `"*"`) through a single Event Bus subscription — not one subscription per rule — so it always sees every rule interested in a given event before acting on any of them. For every matching rule it records a `BrainDecision` before doing anything else: `noop` if the rule declined, `action_failed` if the rule threw or its action failed, `superseded` if the rule wanted to act but the Decision Engine picked a different rule's candidate for the same event, or `actioned` once the winning rule's action (enqueue a task via `TaskQueue`, or publish a follow-up event via `EventBus`) succeeds. The Brain never re-evaluates rules against events it authored itself (source `"brain:*"` or `"os-core:brain"`), which is what keeps `publish_event` rules and the `brain.decision.made` broadcast from looping. Decoupled from `@workspace/event-bus`/`@workspace/task-queue` at compile time the same way `TaskQueue` is decoupled from `@workspace/event-bus`.
+- **Arbitration is a separate, pure concern from decision-making.** `DecisionEngine` (`lib/decision-engine`) knows nothing about events, rules, tasks, or the Brain — it takes a list of `{ ruleName, action, priority, reason }` candidates and returns the subset that should act, per whichever `ArbitrationStrategy` it's configured with. The Brain is constructed with one (`allMatchStrategy` by default) and can be reconfigured at runtime via `DecisionEngine.setStrategy()`. Keeping this out of `Brain` itself means the same strategies are reusable wherever else "more than one thing wants to happen, pick the winner(s)" comes up.
+- **Rules can be data, not just code.** `RuleEngine` (`lib/rule-engine`) lets a `RuleDefinition` — an event pattern, a JSON `Condition` tree (`eq`/`neq`/`gt`/`gte`/`lt`/`lte`/`contains`/`exists`, composed with `and`/`or`/`not`), and an `ActionTemplate` — be created through `/api/rules` and compiled into a `CompiledRule` the Brain registers, with no code deploy and no restart. `RuleEngine.update()`/`.enable()`/`.disable()`/`.delete()` always unregister the old compiled rule from the Brain before registering the new one (or not re-registering at all), since `Brain` only exposes register/unregister, never in-place mutation. Action payloads support whole-token templating only (a string that is *exactly* `"{{dot.path}}"` gets replaced with that field from the triggering event) — deliberately not a general expression language, so a rule definition can never be used to construct or evaluate arbitrary code.
+- **API-first.** All HTTP contracts are defined in `lib/api-spec/openapi.yaml` first; `lib/api-zod`/`lib/api-client-react` are generated, not hand-written. The current exceptions are `system-events.ts`'s, `tasks.ts`'s, `brain.ts`'s, and `rules.ts`'s request validation, all hand-rolled until codegen is re-run in an environment with network access — see Gotchas.
+- **UI is presentation only.** `artifacts/octopus-os` must never contain business logic; it consumes OS Core exclusively through the generated API client so the same Core serves web, mobile, desktop and future AI clients identically.
+
+## Product
+
+_Describe the high-level user-facing capabilities of this app once they exist._
+
+## User preferences
+
+_Populate as you build — explicit user instructions worth remembering across sessions._
+
+## Gotchas
+
+- After editing `lib/api-spec/openapi.yaml`, run `pnpm --filter @workspace/api-spec run codegen` before relying on `@workspace/api-zod`/`@workspace/api-client-react` — they're generated output, not hand-written. As of the Task/Queue Manager module, the `/tasks*` paths are in the spec but codegen hasn't been re-run (no network access in the environment that built this), so `routes/tasks.ts` hand-rolls its own request validation, same as `routes/system-events.ts` already did. `routes/brain.ts` and `routes/rules.ts` add `/brain/decisions*` and `/rules*` the same way. Re-run codegen and switch all four routes to the generated Zod schemas when network access is available.
+- After adding/changing a `lib/db` schema file, run `pnpm --filter @workspace/db run push` against a real `DATABASE_URL` to apply it. This includes the `tasks`, `brain_decisions`, and `rule_definitions` tables — none have been pushed to any live database yet.
+- A `RuleDefinition`'s `ActionTemplate.payload` supports whole-token templating (`"{{payload.taskId}}"` → that field's value) but nothing more — no arithmetic, no string concatenation, no arbitrary expressions. This is a deliberate security boundary, not a missing feature: it's what keeps `/api/rules` (admin-only, but still a runtime-configurable surface that shapes what tasks get enqueued and what events get published) from becoming a way to execute arbitrary logic.
+- `EventBus.publish()` never throws on a subscriber failure — failures are isolated per-handler and recorded on the event row (`handlerErrors`). If you need to know a side effect landed, don't await it via `publish`; subscribe to the relevant follow-up event instead.
+- Any new OS Core module must go through `@workspace/event-bus` to talk to anything else — no direct imports between agent/module implementations.
+- `TaskQueue.claim`/`complete`/`fail` in `routes/tasks.ts` currently authenticate workers the same way as any other API caller (`requireAuth`, any role) — there is no separate service/worker credential yet. Fine for now since nothing but the api-server itself and manual testing calls these; revisit before letting untrusted or third-party agents claim tasks.
+- Any `DecisionRule` registered on the Brain must never subscribe to `"brain.decision.made"` or a pattern (`"*"`, `"brain.*"`) that could match it without being aware the Brain already filters out events it authored itself (source `"brain:*"`/`"os-core:brain"`) — that's what prevents `publish_event` rules and the decision broadcast from looping, not anything the rule itself needs to do.
+- `pnpm run build` requires `PORT`, `BASE_PATH`, and `DATABASE_URL` to be set (Replit-style runtime config, checked at Vite/build-config load time for `mockup-sandbox`/`octopus-os` and at import time for `@workspace/db`) — set them (even to placeholder values for a typecheck-only pass) before running `pnpm run build` outside Replit.
+- The periodic `reclaimStale()` sweep in `artifacts/api-server/src/index.ts` runs every 60s per process. If you ever run multiple api-server replicas, that's fine — `reclaimStale`'s requeue is a plain `UPDATE ... WHERE status = 'running' AND locked_at < ...`, safe to run concurrently — but it means stale-task detection latency is bounded by whichever replica's timer fires next, not exactly 60s.
+
+## Pointers
+
+- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
