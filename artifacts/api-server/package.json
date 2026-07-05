@@ -18,6 +18,7 @@
     "@workspace/decision-engine": "workspace:*",
     "@workspace/event-bus": "workspace:*",
     "@workspace/rule-engine": "workspace:*",
+    "@workspace/scheduler": "workspace:*",
     "@workspace/task-queue": "workspace:*",
     "@workspace/tool-manager": "workspace:*",
     "@workspace/workflow-engine": "workspace:*",

@@ -13,6 +13,7 @@ import agentsRouter from "./agents.js";
 import providerConfigsRouter from "./provider-configs.js";
 import toolsRouter from "./tools.js";
 import workflowsRouter from "./workflows.js";
+import scheduledJobsRouter from "./scheduled-jobs.js";
 
 const router: IRouter = Router();
 
@@ -30,5 +31,6 @@ router.use(agentsRouter);
 router.use(providerConfigsRouter);
 router.use(toolsRouter);
 router.use(workflowsRouter);
+router.use(scheduledJobsRouter);
 
 export default router;

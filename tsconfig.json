@@ -38,6 +38,9 @@
     },
     {
       "path": "./lib/workflow-engine"
+    },
+    {
+      "path": "./lib/scheduler"
     }
   ]
 }

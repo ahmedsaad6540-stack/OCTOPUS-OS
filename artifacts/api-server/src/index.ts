@@ -5,6 +5,7 @@ import { taskQueue } from "./lib/task-queue";
 import { brain } from "./lib/brain";
 import { registerCoreRules } from "./lib/brain-rules";
 import { ruleEngine } from "./lib/rule-engine";
+import { scheduler } from "./lib/scheduler";
 
 // Register the Brain's code-defined decision rules before anything is
 // published, so day-one events (system.startup included) are visible to it.
@@ -14,6 +15,10 @@ registerCoreRules(brain);
 // top of the code-defined ones above — the Brain doesn't distinguish where
 // a registered rule came from.
 await ruleEngine.loadAndSync();
+
+// Start ticking the Scheduler once everything it can dispatch to (the
+// Workflow Engine, the Task Queue) is already wired up above.
+scheduler.start();
 
 const rawPort = process.env["PORT"];
 
@@ -63,6 +68,7 @@ async function shutdown(signal: string): Promise<void> {
   logger.info({ signal }, "Shutdown signal received, draining");
 
   clearInterval(reclaimStaleInterval);
+  scheduler.stop();
 
   await eventBus.publish("system.shutdown", "api-server", { signal });
   // Give the shutdown event a moment to be persisted/dispatched before we

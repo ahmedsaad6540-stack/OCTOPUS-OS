@@ -29,6 +29,8 @@ tags:
     description: Tool Manager — tool registration, schema-validated invocation, and handler registry
   - name: workflows
     description: Workflow Engine — ordered multi-step orchestration across tools, agents, tasks, and events
+  - name: scheduled-jobs
+    description: Scheduler — cron/interval-triggered workflow runs and task enqueues
 paths:
   /system/events:
     get:
@@ -1487,6 +1489,232 @@ paths:
                     type: array
                     items:
                       $ref: "#/components/schemas/WorkflowRun"
+  /scheduled-jobs:
+    post:
+      operationId: createScheduledJob
+      tags: [scheduled-jobs]
+      summary: Create a scheduled job
+      description: Admin-only. `nextRunAt` is computed automatically from `schedule`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScheduledJobRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job]
+                properties:
+                  job:
+                    $ref: "#/components/schemas/ScheduledJob"
+        "400":
+          description: Invalid job definition
+        "403":
+          description: Only admins can create scheduled jobs
+    get:
+      operationId: listScheduledJobs
+      tags: [scheduled-jobs]
+      summary: List scheduled jobs
+      description: Admin-only.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ScheduledJobStatus"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Scheduled jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [jobs]
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ScheduledJob"
+        "403":
+          description: Only admins can view scheduled jobs
+  /scheduled-jobs/{id}:
+    get:
+      operationId: getScheduledJob
+      tags: [scheduled-jobs]
+      summary: Get a single scheduled job
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The job
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job]
+                properties:
+                  job:
+                    $ref: "#/components/schemas/ScheduledJob"
+        "403":
+          description: Only admins can view scheduled jobs
+        "404":
+          description: Not found
+    put:
+      operationId: updateScheduledJob
+      tags: [scheduled-jobs]
+      summary: Update a scheduled job
+      description: Admin-only. `nextRunAt` is recomputed if `schedule` changes.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateScheduledJobRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job]
+                properties:
+                  job:
+                    $ref: "#/components/schemas/ScheduledJob"
+        "400":
+          description: Invalid update
+        "403":
+          description: Only admins can update scheduled jobs
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteScheduledJob
+      tags: [scheduled-jobs]
+      summary: Delete a scheduled job
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete scheduled jobs
+        "404":
+          description: Not found
+  /scheduled-jobs/{id}/enable:
+    post:
+      operationId: enableScheduledJob
+      tags: [scheduled-jobs]
+      summary: Enable a scheduled job
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job]
+                properties:
+                  job:
+                    $ref: "#/components/schemas/ScheduledJob"
+        "403":
+          description: Only admins can enable scheduled jobs
+        "404":
+          description: Not found
+  /scheduled-jobs/{id}/disable:
+    post:
+      operationId: disableScheduledJob
+      tags: [scheduled-jobs]
+      summary: Disable a scheduled job
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job]
+                properties:
+                  job:
+                    $ref: "#/components/schemas/ScheduledJob"
+        "403":
+          description: Only admins can disable scheduled jobs
+        "404":
+          description: Not found
+  /scheduled-jobs/{id}/runs:
+    get:
+      operationId: listScheduledJobRuns
+      tags: [scheduled-jobs]
+      summary: List a scheduled job's run history
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Run history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runs]
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ScheduledJobRun"
+        "403":
+          description: Only admins can view scheduled job runs
   /healthz:
     get:
       operationId: healthCheck
@@ -2265,3 +2493,127 @@ components:
           type: string
           format: date-time
           nullable: true
+
+    ScheduledJobStatus:
+      type: string
+      enum: [active, disabled]
+    ScheduleSpec:
+      type: object
+      description: >
+        Either `{ type: "interval", intervalMs }` or
+        `{ type: "cron", expression }` (standard 5-field cron:
+        minute hour day-of-month month day-of-week).
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [interval, cron]
+        intervalMs:
+          type: integer
+        expression:
+          type: string
+    ScheduledJobTarget:
+      type: object
+      description: >
+        Either `{ type: "workflow", workflowId, input }` or
+        `{ type: "task", taskType, payload, queue?, priority?, maxAttempts? }`.
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [workflow, task]
+        workflowId:
+          type: string
+          format: uuid
+        input: {}
+        taskType:
+          type: string
+        payload: {}
+        queue:
+          type: string
+        priority:
+          type: integer
+        maxAttempts:
+          type: integer
+    ScheduledJob:
+      type: object
+      required: [id, name, schedule, target, status, nextRunAt, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        schedule:
+          $ref: "#/components/schemas/ScheduleSpec"
+        target:
+          $ref: "#/components/schemas/ScheduledJobTarget"
+        status:
+          $ref: "#/components/schemas/ScheduledJobStatus"
+        nextRunAt:
+          type: string
+          format: date-time
+        lastRunAt:
+          type: string
+          format: date-time
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateScheduledJobRequest:
+      type: object
+      required: [name, schedule, target]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        schedule:
+          $ref: "#/components/schemas/ScheduleSpec"
+        target:
+          $ref: "#/components/schemas/ScheduledJobTarget"
+        status:
+          $ref: "#/components/schemas/ScheduledJobStatus"
+    UpdateScheduledJobRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        schedule:
+          $ref: "#/components/schemas/ScheduleSpec"
+        target:
+          $ref: "#/components/schemas/ScheduledJobTarget"
+        status:
+          $ref: "#/components/schemas/ScheduledJobStatus"
+    ScheduledJobRun:
+      type: object
+      required: [id, jobId, status, output, error, startedAt, completedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        jobId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [completed, failed]
+        output: {}
+        error:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
