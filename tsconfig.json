@@ -41,6 +41,9 @@
     },
     {
       "path": "./lib/scheduler"
+    },
+    {
+      "path": "./lib/notification-system"
     }
   ]
 }

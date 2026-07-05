@@ -17,6 +17,7 @@
     "@workspace/db": "workspace:*",
     "@workspace/decision-engine": "workspace:*",
     "@workspace/event-bus": "workspace:*",
+    "@workspace/notification-system": "workspace:*",
     "@workspace/rule-engine": "workspace:*",
     "@workspace/scheduler": "workspace:*",
     "@workspace/task-queue": "workspace:*",

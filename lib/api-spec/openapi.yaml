@@ -31,6 +31,8 @@ tags:
     description: Workflow Engine — ordered multi-step orchestration across tools, agents, tasks, and events
   - name: scheduled-jobs
     description: Scheduler — cron/interval-triggered workflow runs and task enqueues
+  - name: notifications
+    description: Notification System — channel configuration, delivery, and in-app inbox
 paths:
   /system/events:
     get:
@@ -1715,6 +1717,238 @@ paths:
                       $ref: "#/components/schemas/ScheduledJobRun"
         "403":
           description: Only admins can view scheduled job runs
+  /notification-channels:
+    post:
+      operationId: createNotificationChannel
+      tags: [notifications]
+      summary: Register a notification channel
+      description: Admin-only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNotificationChannelRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [channel]
+                properties:
+                  channel:
+                    $ref: "#/components/schemas/NotificationChannel"
+        "400":
+          description: Invalid channel definition
+        "403":
+          description: Only admins can create notification channels
+    get:
+      operationId: listNotificationChannels
+      tags: [notifications]
+      summary: List notification channels
+      description: Admin-only.
+      parameters:
+        - name: channelType
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/NotificationChannelStatus"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Channels
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [channels]
+                properties:
+                  channels:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NotificationChannel"
+        "403":
+          description: Only admins can view notification channels
+  /notification-channels/{id}:
+    get:
+      operationId: getNotificationChannel
+      tags: [notifications]
+      summary: Get a single notification channel
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The channel
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [channel]
+                properties:
+                  channel:
+                    $ref: "#/components/schemas/NotificationChannel"
+        "403":
+          description: Only admins can view notification channels
+        "404":
+          description: Not found
+    put:
+      operationId: updateNotificationChannel
+      tags: [notifications]
+      summary: Update a notification channel
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationChannelRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [channel]
+                properties:
+                  channel:
+                    $ref: "#/components/schemas/NotificationChannel"
+        "400":
+          description: Invalid update
+        "403":
+          description: Only admins can update notification channels
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteNotificationChannel
+      tags: [notifications]
+      summary: Delete a notification channel
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete notification channels
+        "404":
+          description: Not found
+  /notifications/send:
+    post:
+      operationId: sendNotification
+      tags: [notifications]
+      summary: Send a notification through a channel
+      description: >
+        Any authenticated user may call this. Non-admins can only target
+        their own `recipientUserId` (or omit it, which defaults to
+        themselves); admins may target any user or omit it entirely for a
+        broadcast-style channel like a shared webhook.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendNotificationRequest"
+      responses:
+        "202":
+          description: Delivery recorded (check `delivery.status` for the outcome)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [delivery]
+                properties:
+                  delivery:
+                    $ref: "#/components/schemas/NotificationDelivery"
+        "400":
+          description: Invalid request
+        "403":
+          description: Non-admins can only send to themselves
+        "404":
+          description: Channel not found
+        "409":
+          description: Channel is disabled
+        "501":
+          description: No factory registered for the channel's type
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications (the caller's inbox, or all deliveries for admins)
+      parameters:
+        - name: read
+          in: query
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deliveries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deliveries]
+                properties:
+                  deliveries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NotificationDelivery"
+  /notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification read
+      description: Non-admins may only mark their own notifications read.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [delivery]
+                properties:
+                  delivery:
+                    $ref: "#/components/schemas/NotificationDelivery"
+        "404":
+          description: Not found
   /healthz:
     get:
       operationId: healthCheck
@@ -2615,5 +2849,104 @@ components:
           type: string
           format: date-time
         completedAt:
+          type: string
+          format: date-time
+
+    NotificationChannelStatus:
+      type: string
+      enum: [active, disabled]
+    NotificationChannel:
+      type: object
+      required: [id, name, channelType, config, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        channelType:
+          type: string
+          description: "\"in_app\", \"webhook\", or a custom registered type"
+        config:
+          description: 'Channel-specific settings, e.g. { "webhookUrl": "..." } for webhook'
+        status:
+          $ref: "#/components/schemas/NotificationChannelStatus"
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateNotificationChannelRequest:
+      type: object
+      required: [name, channelType, config]
+      properties:
+        name:
+          type: string
+        channelType:
+          type: string
+        config: {}
+        status:
+          $ref: "#/components/schemas/NotificationChannelStatus"
+    UpdateNotificationChannelRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        channelType:
+          type: string
+        config: {}
+        status:
+          $ref: "#/components/schemas/NotificationChannelStatus"
+    NotificationMessage:
+      type: object
+      required: [title, body]
+      properties:
+        title:
+          type: string
+        body:
+          type: string
+        data: {}
+    SendNotificationRequest:
+      type: object
+      required: [channelConfigId, message]
+      properties:
+        channelConfigId:
+          type: string
+          format: uuid
+        message:
+          $ref: "#/components/schemas/NotificationMessage"
+        recipientUserId:
+          type: string
+          format: uuid
+    NotificationDelivery:
+      type: object
+      required: [id, channelConfigId, channelType, message, status, error, read, sentAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        channelConfigId:
+          type: string
+          format: uuid
+        channelType:
+          type: string
+        message:
+          $ref: "#/components/schemas/NotificationMessage"
+        recipientUserId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [sent, failed]
+        error:
+          type: string
+          nullable: true
+        read:
+          type: boolean
+        sentAt:
           type: string
           format: date-time

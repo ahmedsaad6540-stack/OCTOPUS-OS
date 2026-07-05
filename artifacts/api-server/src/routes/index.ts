@@ -14,6 +14,7 @@ import providerConfigsRouter from "./provider-configs.js";
 import toolsRouter from "./tools.js";
 import workflowsRouter from "./workflows.js";
 import scheduledJobsRouter from "./scheduled-jobs.js";
+import notificationsRouter from "./notifications.js";
 
 const router: IRouter = Router();
 
@@ -32,5 +33,6 @@ router.use(providerConfigsRouter);
 router.use(toolsRouter);
 router.use(workflowsRouter);
 router.use(scheduledJobsRouter);
+router.use(notificationsRouter);
 
 export default router;

@@ -6,6 +6,7 @@ import { brain } from "./lib/brain";
 import { registerCoreRules } from "./lib/brain-rules";
 import { ruleEngine } from "./lib/rule-engine";
 import { scheduler } from "./lib/scheduler";
+import "./lib/notification-manager";
 
 // Register the Brain's code-defined decision rules before anything is
 // published, so day-one events (system.startup included) are visible to it.
