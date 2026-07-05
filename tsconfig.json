@@ -35,6 +35,9 @@
     },
     {
       "path": "./lib/tool-manager"
+    },
+    {
+      "path": "./lib/workflow-engine"
     }
   ]
 }

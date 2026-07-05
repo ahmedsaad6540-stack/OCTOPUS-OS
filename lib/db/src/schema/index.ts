@@ -10,3 +10,4 @@ export * from "./rule-definitions";
 export * from "./agents";
 export * from "./provider-configs";
 export * from "./tools";
+export * from "./workflows";

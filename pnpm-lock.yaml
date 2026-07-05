@@ -196,6 +196,9 @@ importers:
       '@workspace/tool-manager':
         specifier: workspace:*
         version: link:../../lib/tool-manager
+      '@workspace/workflow-engine':
+        specifier: workspace:*
+        version: link:../../lib/workflow-engine
       bcryptjs:
         specifier: ^3.0.3
         version: 3.0.3
@@ -776,6 +779,22 @@ importers:
         version: 4.22.4
 
   lib/tool-manager:
+    dependencies:
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/pg@8.20.0)(pg@8.22.0)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.4
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
+
+  lib/workflow-engine:
     dependencies:
       '@workspace/db':
         specifier: workspace:*

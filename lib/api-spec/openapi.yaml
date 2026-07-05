@@ -27,6 +27,8 @@ tags:
       endpoints, which predate OS Core.
   - name: tools
     description: Tool Manager — tool registration, schema-validated invocation, and handler registry
+  - name: workflows
+    description: Workflow Engine — ordered multi-step orchestration across tools, agents, tasks, and events
 paths:
   /system/events:
     get:
@@ -1231,6 +1233,260 @@ paths:
           description: Tool is disabled
         "501":
           description: No handler registered for this tool
+  /workflows:
+    post:
+      operationId: createWorkflow
+      tags: [workflows]
+      summary: Register a new workflow
+      description: Admin-only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workflow]
+                properties:
+                  workflow:
+                    $ref: "#/components/schemas/Workflow"
+        "400":
+          description: Invalid workflow definition
+        "403":
+          description: Only admins can create workflows
+    get:
+      operationId: listWorkflows
+      tags: [workflows]
+      summary: List workflows
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/WorkflowStatus"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Workflows
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workflows]
+                properties:
+                  workflows:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Workflow"
+  /workflows/{id}:
+    get:
+      operationId: getWorkflow
+      tags: [workflows]
+      summary: Get a single workflow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The workflow
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workflow]
+                properties:
+                  workflow:
+                    $ref: "#/components/schemas/Workflow"
+        "404":
+          description: Not found
+    put:
+      operationId: updateWorkflow
+      tags: [workflows]
+      summary: Update a workflow
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workflow]
+                properties:
+                  workflow:
+                    $ref: "#/components/schemas/Workflow"
+        "400":
+          description: Invalid update
+        "403":
+          description: Only admins can update workflows
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteWorkflow
+      tags: [workflows]
+      summary: Delete a workflow
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete workflows
+        "404":
+          description: Not found
+  /workflows/{id}/enable:
+    post:
+      operationId: enableWorkflow
+      tags: [workflows]
+      summary: Enable a workflow
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workflow]
+                properties:
+                  workflow:
+                    $ref: "#/components/schemas/Workflow"
+        "403":
+          description: Only admins can enable workflows
+        "404":
+          description: Not found
+  /workflows/{id}/disable:
+    post:
+      operationId: disableWorkflow
+      tags: [workflows]
+      summary: Disable a workflow
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workflow]
+                properties:
+                  workflow:
+                    $ref: "#/components/schemas/Workflow"
+        "403":
+          description: Only admins can disable workflows
+        "404":
+          description: Not found
+  /workflows/{id}/run:
+    post:
+      operationId: runWorkflow
+      tags: [workflows]
+      summary: Run a workflow synchronously
+      description: >
+        Any authenticated user may run an existing, enabled workflow. Steps
+        execute in order; the response reflects the final run state
+        (`completed` or `failed`) regardless of HTTP status, which is 202
+        as long as the workflow itself was found and enabled.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "202":
+          description: Run recorded (check `run.status` for the outcome)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [run]
+                properties:
+                  run:
+                    $ref: "#/components/schemas/WorkflowRun"
+        "404":
+          description: Workflow not found
+        "409":
+          description: Workflow is disabled
+  /workflows/{id}/runs:
+    get:
+      operationId: listWorkflowRuns
+      tags: [workflows]
+      summary: List a workflow's run history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Run history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runs]
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WorkflowRun"
   /healthz:
     get:
       operationId: healthCheck
@@ -1871,3 +2127,141 @@ components:
           type: string
         status:
           $ref: "#/components/schemas/ToolStatus"
+
+    WorkflowStatus:
+      type: string
+      enum: [active, disabled]
+    WorkflowStepType:
+      type: string
+      enum: [tool, agent, task, event]
+    WorkflowStep:
+      type: object
+      description: >
+        A single workflow step. Shape depends on `type`: `tool` needs
+        `toolName`+`input`; `agent` needs `agentId`+`input`; `task` needs
+        `taskType`+`payload` (+optional queue/priority/maxAttempts); `event`
+        needs `eventType`+`payload`. Any string value anywhere in
+        `input`/`payload` that is exactly `"{{dot.path}}"` is resolved
+        against `{ input, steps: { <name>: { output } } }` from earlier
+        steps in the same run.
+      required: [type, name]
+      properties:
+        type:
+          $ref: "#/components/schemas/WorkflowStepType"
+        name:
+          type: string
+          description: Unique within the workflow — how later steps reference this one's output.
+        toolName:
+          type: string
+        agentId:
+          type: string
+          format: uuid
+        taskType:
+          type: string
+        eventType:
+          type: string
+        input: {}
+        payload: {}
+        queue:
+          type: string
+        priority:
+          type: integer
+        maxAttempts:
+          type: integer
+    Workflow:
+      type: object
+      required: [id, name, steps, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowStep"
+        status:
+          $ref: "#/components/schemas/WorkflowStatus"
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateWorkflowRequest:
+      type: object
+      required: [name, steps]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowStep"
+        status:
+          $ref: "#/components/schemas/WorkflowStatus"
+    UpdateWorkflowRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowStep"
+        status:
+          $ref: "#/components/schemas/WorkflowStatus"
+    StepResult:
+      type: object
+      required: [stepName, status, output, error]
+      properties:
+        stepName:
+          type: string
+        status:
+          type: string
+          enum: [completed, failed]
+        output: {}
+        error:
+          type: string
+          nullable: true
+    WorkflowRun:
+      type: object
+      required: [id, workflowId, status, input, stepResults, error, startedAt, completedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [running, completed, failed]
+        input: {}
+        stepResults:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepResult"
+        error:
+          type: string
+          nullable: true
+        userId:
+          type: string
+          format: uuid
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
