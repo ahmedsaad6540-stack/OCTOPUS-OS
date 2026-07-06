@@ -21,6 +21,7 @@
     "@workspace/notification-system": "workspace:*",
     "@workspace/rule-engine": "workspace:*",
     "@workspace/scheduler": "workspace:*",
+    "@workspace/settings": "workspace:*",
     "@workspace/task-queue": "workspace:*",
     "@workspace/tool-manager": "workspace:*",
     "@workspace/workflow-engine": "workspace:*",

@@ -35,6 +35,8 @@ tags:
     description: Notification System — channel configuration, delivery, and in-app inbox
   - name: observability
     description: Audit & Observability — cross-cutting audit trail and aggregated system health
+  - name: settings
+    description: Settings — generic key-value settings at system and per-user scope
 paths:
   /system/events:
     get:
@@ -2049,6 +2051,192 @@ paths:
           description: Only admins can view the audit log
         "404":
           description: Not found
+  /settings/system:
+    get:
+      operationId: listSystemSettings
+      tags: [settings]
+      summary: List system-wide settings
+      description: Readable by any authenticated user (e.g. feature flags).
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [settings]
+                properties:
+                  settings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Setting"
+  /settings/system/{key}:
+    get:
+      operationId: getSystemSetting
+      tags: [settings]
+      summary: Get a single system setting
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The setting
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [setting]
+                properties:
+                  setting:
+                    $ref: "#/components/schemas/Setting"
+        "404":
+          description: Not found
+    put:
+      operationId: setSystemSetting
+      tags: [settings]
+      summary: Set a system setting
+      description: Admin-only. Upserts.
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: {}
+      responses:
+        "200":
+          description: Set
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [setting]
+                properties:
+                  setting:
+                    $ref: "#/components/schemas/Setting"
+        "400":
+          description: Invalid body
+        "403":
+          description: Only admins can set system settings
+    delete:
+      operationId: deleteSystemSetting
+      tags: [settings]
+      summary: Delete a system setting
+      description: Admin-only.
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete system settings
+        "404":
+          description: Not found
+  /settings/me:
+    get:
+      operationId: listMySettings
+      tags: [settings]
+      summary: List the caller's own settings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [settings]
+                properties:
+                  settings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Setting"
+  /settings/me/{key}:
+    get:
+      operationId: getMySetting
+      tags: [settings]
+      summary: Get one of the caller's own settings
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The setting
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [setting]
+                properties:
+                  setting:
+                    $ref: "#/components/schemas/Setting"
+        "404":
+          description: Not found
+    put:
+      operationId: setMySetting
+      tags: [settings]
+      summary: Set one of the caller's own settings
+      description: Upserts.
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: {}
+      responses:
+        "200":
+          description: Set
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [setting]
+                properties:
+                  setting:
+                    $ref: "#/components/schemas/Setting"
+        "400":
+          description: Invalid body
+    delete:
+      operationId: deleteMySetting
+      tags: [settings]
+      summary: Delete one of the caller's own settings
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
   /healthz:
     get:
       operationId: healthCheck
@@ -3095,3 +3283,26 @@ components:
           description: One entry per probe that threw, keyed by probe name, mapping to its error message.
           additionalProperties:
             type: string
+
+    Setting:
+      type: object
+      required: [id, scope, key, value, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        scope:
+          type: string
+          enum: [system, user]
+        key:
+          type: string
+        userId:
+          type: string
+          format: uuid
+        value: {}
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
