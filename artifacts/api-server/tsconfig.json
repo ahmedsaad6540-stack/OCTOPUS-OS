@@ -47,6 +47,9 @@
     },
     {
       "path": "../../lib/notification-system"
+    },
+    {
+      "path": "../../lib/audit-observability"
     }
   ]
 }

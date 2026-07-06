@@ -33,6 +33,8 @@ tags:
     description: Scheduler — cron/interval-triggered workflow runs and task enqueues
   - name: notifications
     description: Notification System — channel configuration, delivery, and in-app inbox
+  - name: observability
+    description: Audit & Observability — cross-cutting audit trail and aggregated system health
 paths:
   /system/events:
     get:
@@ -1949,6 +1951,104 @@ paths:
                     $ref: "#/components/schemas/NotificationDelivery"
         "404":
           description: Not found
+  /system/status:
+    get:
+      operationId: getSystemStatus
+      tags: [observability]
+      summary: Aggregated system health snapshot
+      description: >
+        Admin-only. Each section under `sections` comes from a
+        `MetricsProbe` registered against a specific OS Core module; a
+        probe that failed appears under `errors` instead, without
+        preventing the others from reporting. Counts are page sizes from
+        each module's own `list()`, not exact totals past that page.
+      responses:
+        "200":
+          description: System status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    $ref: "#/components/schemas/SystemStatus"
+        "403":
+          description: Only admins can view system status
+  /audit-log:
+    get:
+      operationId: listAuditLog
+      tags: [observability]
+      summary: List audit log entries
+      description: >
+        Admin-only. Populated automatically for every successful mutating
+        request across the whole system — no individual route writes to
+        this directly.
+      parameters:
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: resourceType
+          in: query
+          schema:
+            type: string
+        - name: resourceId
+          in: query
+          schema:
+            type: string
+        - name: actorUserId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries]
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEntry"
+        "403":
+          description: Only admins can view the audit log
+  /audit-log/{id}:
+    get:
+      operationId: getAuditLogEntry
+      tags: [observability]
+      summary: Get a single audit log entry
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The entry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entry]
+                properties:
+                  entry:
+                    $ref: "#/components/schemas/AuditEntry"
+        "403":
+          description: Only admins can view the audit log
+        "404":
+          description: Not found
   /healthz:
     get:
       operationId: healthCheck
@@ -2950,3 +3050,48 @@ components:
         sentAt:
           type: string
           format: date-time
+
+    AuditEntry:
+      type: object
+      required: [id, action, resourceType, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          description: '"<resourceType>.<verb>" by convention, e.g. "rules.post"'
+        resourceType:
+          type: string
+        resourceId:
+          type: string
+        actorUserId:
+          type: string
+          format: uuid
+        actorRole:
+          type: string
+        ipAddress:
+          type: string
+        metadata: {}
+        createdAt:
+          type: string
+          format: date-time
+    SystemStatus:
+      type: object
+      required: [timestamp, uptimeSeconds, sections, errors]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        uptimeSeconds:
+          type: number
+        sections:
+          type: object
+          description: One entry per successfully-collected probe, keyed by probe name.
+          additionalProperties:
+            type: object
+        errors:
+          type: object
+          description: One entry per probe that threw, keyed by probe name, mapping to its error message.
+          additionalProperties:
+            type: string

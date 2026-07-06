@@ -175,6 +175,9 @@ importers:
       '@workspace/api-zod':
         specifier: workspace:*
         version: link:../../lib/api-zod
+      '@workspace/audit-observability':
+        specifier: workspace:*
+        version: link:../../lib/audit-observability
       '@workspace/brain':
         specifier: workspace:*
         version: link:../../lib/brain
@@ -685,6 +688,22 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 3.25.76
+
+  lib/audit-observability:
+    dependencies:
+      '@workspace/db':
+        specifier: workspace:*
+        version: link:../db
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/pg@8.20.0)(pg@8.22.0)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.4
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
 
   lib/brain:
     dependencies:

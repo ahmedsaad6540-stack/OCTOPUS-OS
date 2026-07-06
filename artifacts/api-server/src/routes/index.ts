@@ -15,6 +15,8 @@ import toolsRouter from "./tools.js";
 import workflowsRouter from "./workflows.js";
 import scheduledJobsRouter from "./scheduled-jobs.js";
 import notificationsRouter from "./notifications.js";
+import systemStatusRouter from "./system-status.js";
+import auditLogRouter from "./audit-log.js";
 
 const router: IRouter = Router();
 
@@ -34,5 +36,7 @@ router.use(toolsRouter);
 router.use(workflowsRouter);
 router.use(scheduledJobsRouter);
 router.use(notificationsRouter);
+router.use(systemStatusRouter);
+router.use(auditLogRouter);
 
 export default router;
