@@ -18,11 +18,13 @@ import notificationsRouter from "./notifications.js";
 import systemStatusRouter from "./system-status.js";
 import auditLogRouter from "./audit-log.js";
 import settingsRouter from "./settings.js";
+import metricsRouter from "./metrics.js";
 import { authRateLimiter } from "../middleware/security.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use(metricsRouter);
 router.use("/auth", authRateLimiter);
 router.use(authRouter);
 router.use(providersRouter);
