@@ -1,3 +1,4 @@
+import "./tracing"; // must be first — see tracing.ts's doc comment
 import app from "./app";
 import { logger } from "./lib/logger";
 import { eventBus } from "./lib/event-bus";
