@@ -1,0 +1,10 @@
+**/node_modules
+**/dist
+**/.tsbuildinfo
+**/*.tsbuildinfo
+.git
+.gitignore
+**/.vite-temp
+*.log
+.env
+.env.*

@@ -1,0 +1,50 @@
+name: CI
+
+# Runs the exact same three commands used for manual verification after
+# every module in this repository (see HANDOFF.md's "Verification workflow"):
+# typecheck, test, build. This has not been executed by a real GitHub Actions
+# runner as part of producing this repository — no CI infrastructure is
+# reachable from the sandboxed environment that built it. Treat this as a
+# real, ready-to-run config that has been validated for syntax only, not as
+# something with a recorded passing run in this repository's history.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      PORT: "5000"
+      BASE_PATH: "/"
+      DATABASE_URL: "postgres://build:build@localhost:5432/build"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Enable Corepack (pnpm)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Test
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build

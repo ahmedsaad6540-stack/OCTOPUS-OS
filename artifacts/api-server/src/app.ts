@@ -6,8 +6,11 @@ import router from "./routes/index.js";
 import { logger } from "./lib/logger.js";
 import { auditLogger } from "./lib/audit-observability.js";
 import { createAuditMiddleware } from "./middleware/audit.js";
+import { securityHeaders, apiRateLimiter } from "./middleware/security.js";
 
 const app: Express = express();
+
+app.use(securityHeaders);
 
 app.use(
   pinoHttp({
@@ -40,6 +43,6 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 app.use(createAuditMiddleware(auditLogger));
 
-app.use("/api", router);
+app.use("/api", apiRateLimiter, router);
 
 export default app;
