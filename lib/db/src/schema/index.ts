@@ -15,3 +15,4 @@ export * from "./scheduler";
 export * from "./notifications";
 export * from "./audit-log";
 export * from "./settings";
+export * from "./profit-engine.js";

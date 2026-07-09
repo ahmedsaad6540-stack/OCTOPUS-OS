@@ -31,6 +31,7 @@
     "@workspace/settings": "workspace:*",
     "@workspace/task-queue": "workspace:*",
     "@workspace/tool-manager": "workspace:*",
+    "@workspace/profit-engine": "workspace:*",
     "@workspace/workflow-engine": "workspace:*",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",

@@ -53,6 +53,9 @@
     },
     {
       "path": "../../lib/settings"
+    },
+    {
+      "path": "../../lib/profit-engine"
     }
   ]
 }

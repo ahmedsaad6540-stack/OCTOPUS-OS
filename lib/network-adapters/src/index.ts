@@ -1,0 +1,9 @@
+export type { AffiliateProduct, AffiliateNetworkAdapter, FetchOptions } from "./types.js";
+export { ClickbankAdapter } from "./adapters/clickbank.js";
+export { Digistore24Adapter } from "./adapters/digistore24.js";
+export { CJAdapter } from "./adapters/cj.js";
+export { ImpactAdapter } from "./adapters/impact.js";
+export { PartnerStackAdapter } from "./adapters/partnerstack.js";
+export { AwinAdapter } from "./adapters/awin.js";
+export { ShareASaleAdapter } from "./adapters/shareasale.js";
+export { AdapterRegistry } from "./registry.js";

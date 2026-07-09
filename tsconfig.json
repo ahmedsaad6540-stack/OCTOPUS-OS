@@ -50,6 +50,42 @@
     },
     {
       "path": "./lib/settings"
+    },
+    {
+      "path": "./lib/profit-memory"
+    },
+    {
+      "path": "./lib/profit-twin"
+    },
+    {
+      "path": "./lib/knowledge-graph"
+    },
+    {
+      "path": "./lib/strategy-engine"
+    },
+    {
+      "path": "./lib/goal-engine"
+    },
+    {
+      "path": "./lib/budget-manager"
+    },
+    {
+      "path": "./lib/experiment-engine"
+    },
+    {
+      "path": "./lib/network-adapters"
+    },
+    {
+      "path": "./lib/viral-detector"
+    },
+    {
+      "path": "./lib/self-evolution"
+    },
+    {
+      "path": "./lib/business-policy"
+    },
+    {
+      "path": "./lib/profit-engine"
     }
   ]
 }
