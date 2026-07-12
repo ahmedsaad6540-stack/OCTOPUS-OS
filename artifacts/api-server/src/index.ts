@@ -1,4 +1,4 @@
-// import "./tracing"; // مؤقتًا لحل مشكلة Railway
+/// import "./tracing"; // Disabled temporarily for Railway deployment
 import app from "./app";
 import { logger } from "./lib/logger";
 import { eventBus } from "./lib/event-bus";
