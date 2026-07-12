@@ -60,9 +60,27 @@ async function startServer() {
     });
 
     return server;
-  } catch (error) {
-    logger.fatal({ err: error }, "Failed to start API Server due to initialization error");
-    process.exit(1);
+  }} catch (error) {
+  console.error("================================");
+  console.error("API SERVER STARTUP ERROR");
+  console.error(error);
+  console.error("================================");
+
+  logger.fatal(
+    {
+      err: error instanceof Error
+        ? {
+            name: error.name,
+            message: error.message,
+            stack: error.stack,
+          }
+        : error,
+    },
+    "Failed to start API Server due to initialization error"
+  );
+
+  process.exit(1);
+}
   }
 }
 
