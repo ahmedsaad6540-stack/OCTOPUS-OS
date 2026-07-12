@@ -1,37 +1,60 @@
 # syntax=docker/dockerfile:1.7
-# Root Dockerfile for @workspace/api-server (pnpm monorepo)
-# Use this by setting Railway Builder = Dockerfile (root context).
 
 ARG NODE_VERSION=22-alpine
 
-# ---------- Base ----------
+############################
+# Base
+############################
 FROM node:${NODE_VERSION} AS base
+
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
-# Pin pnpm version explicitly (must match root package.json "packageManager")
+
 RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+
 WORKDIR /app
 
-# ---------- Deps (install with build scripts allowed) ----------
+############################
+# Install dependencies
+############################
 FROM base AS deps
-# Copy manifests only for better layer caching
+
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml .npmrc ./
 COPY artifacts ./artifacts
 COPY lib ./lib
 COPY scripts ./scripts
-# --no-frozen-lockfile to survive minor lockfile drift on Railway
-RUN pnpm install --no-frozen-lockfile \
-  && pnpm rebuild -r protobufjs || true
 
-# ---------- Builder ----------
+RUN pnpm install --no-frozen-lockfile
+RUN pnpm rebuild -r protobufjs || true
+
+############################
+# Build
+############################
 FROM deps AS builder
-RUN pnpm --filter @workspace/api-server run build
 
-# ---------- Runtime ----------
+RUN pnpm --filter @workspace/api-server build
+
+############################
+# Production dependencies
+############################
+FROM deps AS prod-deps
+
+RUN pnpm prune --prod
+
+############################
+# Runtime
+############################
 FROM node:${NODE_VERSION} AS runtime
+
 WORKDIR /app
+
 ENV NODE_ENV=production
 ENV PORT=5000
+
+COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=builder /app/artifacts/api-server/dist ./dist
+COPY --from=builder /app/artifacts/api-server/package.json ./package.json
+
 EXPOSE 5000
-CMD ["node", "--enable-source-maps", "dist/index.mjs"]
+
+CMD ["node","--enable-source-maps","dist/index.mjs"]
