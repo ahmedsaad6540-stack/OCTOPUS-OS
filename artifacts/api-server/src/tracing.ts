@@ -1,55 +1,74 @@
 /**
- * Distributed tracing bootstrap. This must be imported before any other
- * module in the process — auto-instrumentation patches Node's built-ins
- * (`http`, etc.) and libraries (`express`, `pg`) at *require/import* time,
- * so anything imported earlier in `index.ts` than this file would run
- * unpatched. `@opentelemetry/*` is deliberately excluded from the esbuild
- * bundle (see `build.mjs`'s `external` list, which already anticipated
- * this) so the instrumentation packages patch the real, shared module
- * instances at runtime rather than a bundled copy.
+ * Distributed tracing bootstrap. Loaded first from `index.ts` so
+ * auto-instrumentation can patch Node built-ins before anything else is
+ * imported.
  *
- * Exports real spans to the OTLP HTTP endpoint named by
- * `OTEL_EXPORTER_OTLP_ENDPOINT` if it's set; otherwise falls back to a
- * `ConsoleSpanExporter` so tracing is genuinely functional with zero
- * external collector — every span prints to stdout. No environment this
- * code has been run in during development had a reachable OTLP collector,
- * so the console path is what's actually been exercised; the OTLP path is
- * real code, not yet verified against a live collector.
+ * Runtime behavior:
+ *   - If `OTEL_EXPORTER_OTLP_ENDPOINT` is not set, tracing is disabled and
+ *     this module is a no-op. This is the common case in production.
+ *   - If it IS set, we try to dynamically load the OpenTelemetry SDK. The
+ *     SDK packages are intentionally NOT bundled (see build.mjs externals),
+ *     because auto-instrumentation must patch the real shared module
+ *     instances of `http`, `express`, `pg`, etc. When tracing is enabled
+ *     the deployment must install the `@opentelemetry/*` packages
+ *     alongside the bundled `dist/`.
+ *   - If the dynamic import fails (packages not installed in the runtime
+ *     image), we log a warning and continue — tracing is optional and
+ *     must never prevent the server from starting.
  */
-import { NodeSDK } from "@opentelemetry/sdk-node";
-import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
-import { ConsoleSpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { resourceFromAttributes } from "@opentelemetry/resources";
-import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
 
 const otlpEndpoint = process.env["OTEL_EXPORTER_OTLP_ENDPOINT"];
 
-const traceExporter = otlpEndpoint
-  ? new OTLPTraceExporter({ url: `${otlpEndpoint}/v1/traces` })
-  : new ConsoleSpanExporter();
+if (otlpEndpoint) {
+  try {
+    const { NodeSDK } = await import("@opentelemetry/sdk-node");
+    const { getNodeAutoInstrumentations } = await import(
+      "@opentelemetry/auto-instrumentations-node"
+    );
+    const { OTLPTraceExporter } = await import(
+      "@opentelemetry/exporter-trace-otlp-http"
+    );
+    const { SimpleSpanProcessor } = await import(
+      "@opentelemetry/sdk-trace-base"
+    );
+    const { resourceFromAttributes } = await import("@opentelemetry/resources");
+    const { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } = await import(
+      "@opentelemetry/semantic-conventions"
+    );
 
-const sdk = new NodeSDK({
-  resource: resourceFromAttributes({
-    [ATTR_SERVICE_NAME]: "octopus-os-api-server",
-    [ATTR_SERVICE_VERSION]: process.env["npm_package_version"] ?? "0.0.0",
-  }),
-  spanProcessors: [new SimpleSpanProcessor(traceExporter)],
-  instrumentations: [
-    getNodeAutoInstrumentations({
-      // Health checks and metrics scrapes are noise, not useful traces.
-      "@opentelemetry/instrumentation-http": {
-        ignoreIncomingRequestHook: (req) => req.url === "/api/healthz" || req.url === "/api/metrics",
-      },
-    }),
-  ],
-});
+    const traceExporter = new OTLPTraceExporter({
+      url: `${otlpEndpoint}/v1/traces`,
+    });
 
-sdk.start();
+    const sdk = new NodeSDK({
+      resource: resourceFromAttributes({
+        [ATTR_SERVICE_NAME]: "octopus-os-api-server",
+        [ATTR_SERVICE_VERSION]:
+          process.env["npm_package_version"] ?? "0.0.0",
+      }),
+      spanProcessors: [new SimpleSpanProcessor(traceExporter)],
+      instrumentations: [
+        getNodeAutoInstrumentations({
+          "@opentelemetry/instrumentation-http": {
+            ignoreIncomingRequestHook: (req) =>
+              req.url === "/api/healthz" || req.url === "/api/metrics",
+          },
+        }),
+      ],
+    });
 
-process.on("SIGTERM", () => {
-  sdk.shutdown().catch(() => {});
-});
-process.on("SIGINT", () => {
-  sdk.shutdown().catch(() => {});
-});
+    sdk.start();
+
+    process.on("SIGTERM", () => {
+      sdk.shutdown().catch(() => {});
+    });
+    process.on("SIGINT", () => {
+      sdk.shutdown().catch(() => {});
+    });
+  } catch (err) {
+    console.warn(
+      "[tracing] OpenTelemetry SDK unavailable, continuing without tracing:",
+      err instanceof Error ? err.message : err,
+    );
+  }
+}
