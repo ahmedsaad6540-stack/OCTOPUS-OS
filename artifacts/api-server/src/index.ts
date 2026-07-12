@@ -1,4 +1,4 @@
-import "./tracing"; // must be first — see tracing.ts's doc comment
+// import "./tracing"; // مؤقتًا لحل مشكلة Railway
 import app from "./app";
 import { logger } from "./lib/logger";
 import { eventBus } from "./lib/event-bus";
@@ -19,38 +19,38 @@ for (const envVar of REQUIRED_ENV_VARS) {
 
 async function startServer() {
   const bootStartTime = performance.now();
-  
+
   try {
     // Register the Brain's code-defined decision rules before anything is
     // published, so day-one events (system.startup included) are visible to it.
     registerCoreRules(brain);
-    
+
     // Load and register every enabled data-defined rule from the Rule Engine on
     // top of the code-defined ones above
     await ruleEngine.loadAndSync();
-    
+
     // Start ticking the Scheduler once everything it can dispatch to is wired up.
     scheduler.start();
-    
+
     const port = Number(process.env.PORT);
     if (Number.isNaN(port) || port <= 0) {
       throw new Error(`Invalid PORT value: "${process.env.PORT}"`);
     }
-    
+
     const server = app.listen(port, (err?: any) => {
       if (err) {
         logger.fatal({ err }, "Error listening on port");
         process.exit(1);
       }
-    
+
       const bootDurationMs = Math.round(performance.now() - bootStartTime);
       const memoryUsageMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-      
+
       logger.info(
-        { port, bootDurationMs, memoryUsageMB }, 
+        { port, bootDurationMs, memoryUsageMB },
         "Server listening successfully"
       );
-    
+
       void eventBus.publish("system.startup", "api-server", {
         port,
         nodeEnv: process.env.NODE_ENV ?? "development",
@@ -89,8 +89,6 @@ async function shutdown(signal: string): Promise<void> {
   scheduler.stop();
 
   await eventBus.publish("system.shutdown", "api-server", { signal });
-  // Give the shutdown event a moment to be persisted/dispatched before we
-  // stop accepting work.
   await eventBus.drain();
 
   try {
