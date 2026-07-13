@@ -1,7 +1,11 @@
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { LanguageProvider } from "@/context/LanguageContext";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { LoginPage } from "@/pages/LoginPage";
 import { CommandCenter } from "@/pages/CommandCenter";
+import { MissionControlPage } from "@/pages/MissionControlPage";
+import { WorkforcePage } from "@/pages/WorkforcePage";
+import { ChatPage } from "@/pages/ChatPage";
 import { AgentsPage } from "@/pages/AgentsPage";
 import { AIProvidersPage } from "@/pages/AIProvidersPage";
 import { SocialPage } from "@/pages/SocialPage";
@@ -23,7 +27,7 @@ import { CampaignsPage } from "@/pages/CampaignsPage";
 import { useState } from "react";
 
 export type Page =
-  | "command-center" | "agents" | "memory" | "prompt-studio"
+  | "command-center" | "agents" | "workforce" | "memory" | "prompt-studio"
   | "video-factory" | "workflow-builder" | "marketplace"
   | "providers" | "social" | "affiliates" | "integrations"
   | "analytics" | "campaigns"
@@ -35,10 +39,10 @@ function OS() {
   const [page, setPage] = useState<Page>("command-center");
 
   if (isLoading) return (
-    <div className="min-h-screen flex items-center justify-center" style={{ background: "#0a0614" }}>
+    <div className="min-h-screen flex items-center justify-center bg-[#06020f]">
       <div className="text-center">
-        <div className="text-5xl mb-4">🐙</div>
-        <div className="text-purple-400 text-sm animate-pulse">OCTOPUS NEXUS OS v7</div>
+        <div className="text-6xl mb-4 animate-bounce">🐙</div>
+        <div className="text-purple-400 font-mono text-sm tracking-widest animate-pulse">OCTOPUS NEXUS OS v7</div>
       </div>
     </div>
   );
@@ -49,6 +53,7 @@ function OS() {
     switch (page) {
       case "command-center":    return <CommandCenter />;
       case "agents":            return <AgentsPage />;
+      case "workforce":         return <WorkforcePage />;
       case "memory":            return <MemoryPage />;
       case "prompt-studio":     return <PromptStudioPage />;
       case "video-factory":     return <VideoFactoryPage />;
@@ -71,7 +76,7 @@ function OS() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden" style={{ background: "#0a0614" }}>
+    <div className="flex h-screen overflow-hidden bg-[#06020f] text-[#e2d9f3]">
       <Sidebar currentPage={page} onNavigate={setPage} />
       <main className="flex-1 overflow-y-auto">
         {renderPage()}
@@ -82,8 +87,10 @@ function OS() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <OS />
-    </AuthProvider>
+    <LanguageProvider>
+      <AuthProvider>
+        <OS />
+      </AuthProvider>
+    </LanguageProvider>
   );
 }

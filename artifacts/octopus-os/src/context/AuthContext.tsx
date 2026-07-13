@@ -24,12 +24,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Demo accounts — always work without a backend
+    // Try real API first if available
+    try {
+      const res = await fetch(`${BASE}/api/auth/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setToken(data.token); setUser(data.user);
+        localStorage.setItem("octopus_token", data.token);
+        localStorage.setItem("octopus_user", JSON.stringify(data.user));
+        return true;
+      }
+    } catch (err) {
+      console.warn("API server down, falling back to local demo mode:", err);
+    }
+
+    // Demo fallback — works when backend server is down/offline
     const DEMO: Record<string, { password: string; user: User; token: string }> = {
       "admin@octopus.ai": {
         password: "octopus123",
         token: "demo_token_admin",
-        user: { id: 1, email: "admin@octopus.ai", name: "Admin", role: "owner" },
+        user: { id: 1, email: "admin@octopus.ai", name: "Ahmed Saad", role: "admin" },
       },
     };
     const demo = DEMO[email.toLowerCase()];
@@ -40,20 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return true;
     }
 
-    // Fallback: try real API if available
-    try {
-      const res = await fetch(`${BASE}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      if (!res.ok) return false;
-      const data = await res.json();
-      setToken(data.token); setUser(data.user);
-      localStorage.setItem("octopus_token", data.token);
-      localStorage.setItem("octopus_user", JSON.stringify(data.user));
-      return true;
-    } catch { return false; }
+    return false;
   };
 
   const logout = () => {

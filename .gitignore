@@ -3,3 +3,5 @@ dist/
 *.tsbuildinfo
 .vite-temp/
 .env
+postgres_data/
+postgres.log

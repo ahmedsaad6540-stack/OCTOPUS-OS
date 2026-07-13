@@ -8,6 +8,10 @@ import { registerCoreRules } from "./lib/brain-rules";
 import { ruleEngine } from "./lib/rule-engine";
 import { scheduler } from "./lib/scheduler";
 import "./lib/notification-manager";
+import bcrypt from "bcryptjs";
+import { db } from "@workspace/db";
+import { usersTable } from "@workspace/db/schema";
+import { eq } from "drizzle-orm";
 
 const REQUIRED_ENV_VARS = ["PORT", "DATABASE_URL"];
 for (const envVar of REQUIRED_ENV_VARS) {
@@ -28,6 +32,28 @@ async function startServer() {
     // Load and register every enabled data-defined rule from the Rule Engine on
     // top of the code-defined ones above
     await ruleEngine.loadAndSync();
+
+    // Auto-seed default admin account if table is empty
+    try {
+      const email = "admin@octopus.ai";
+      const existing = await db
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.email, email.toLowerCase()))
+        .limit(1);
+      if (existing.length === 0) {
+        const hashed = await bcrypt.hash("octopus123", 12);
+        await db.insert(usersTable).values({
+          email: email.toLowerCase(),
+          password: hashed,
+          name: "Ahmed Saad",
+          role: "admin",
+        });
+        logger.info("Default admin user Ahmed Saad seeded successfully into PostgreSQL.");
+      }
+    } catch (err) {
+      logger.error({ err }, "Error checking/seeding default admin user");
+    }
 
     // Start ticking the Scheduler once everything it can dispatch to is wired up.
     scheduler.start();
@@ -60,27 +86,26 @@ async function startServer() {
     });
 
     return server;
-  }} catch (error) {
-  console.error("================================");
-  console.error("API SERVER STARTUP ERROR");
-  console.error(error);
-  console.error("================================");
+  } catch (error) {
+    console.error("================================");
+    console.error("API SERVER STARTUP ERROR");
+    console.error(error);
+    console.error("================================");
 
-  logger.fatal(
-    {
-      err: error instanceof Error
-        ? {
-            name: error.name,
-            message: error.message,
-            stack: error.stack,
-          }
-        : error,
-    },
-    "Failed to start API Server due to initialization error"
-  );
+    logger.fatal(
+      {
+        err: error instanceof Error
+          ? {
+              name: error.name,
+              message: error.message,
+              stack: error.stack,
+            }
+          : error,
+      },
+      "Failed to start API Server due to initialization error"
+    );
 
-  process.exit(1);
-}
+    process.exit(1);
   }
 }
 
