@@ -20,7 +20,7 @@ export function MissionControlPage() {
   const loadData = async () => {
     if (!token) return;
     try {
-      // 1. Fetch system status & event logs
+      // 1. Fetch system events / live logs
       const eventsRes = await fetch("/api/system/events", {
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -77,11 +77,11 @@ export function MissionControlPage() {
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 5000); // Polling every 5s
+    const interval = setInterval(loadData, 5000); // Poll every 5 s
     return () => clearInterval(interval);
   }, [token]);
 
-  // Scroll to bottom of console
+  // Auto-scroll live terminal to bottom
   useEffect(() => {
     consoleEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
@@ -95,9 +95,7 @@ export function MissionControlPage() {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` }
       });
-      if (res.ok) {
-        loadData();
-      }
+      if (res.ok) loadData();
     } catch (err) {
       console.error(err);
     }
@@ -105,10 +103,9 @@ export function MissionControlPage() {
 
   const handleEmergencyStop = async () => {
     if (!token) return;
-    // Cancel all running tasks in database
-    for (const t of tasks) {
-      if (t.status === "running") {
-        await fetch(`/api/tasks/${t.id}/cancel`, {
+    for (const task of tasks) {
+      if (task.status === "running") {
+        await fetch(`/api/tasks/${task.id}/cancel`, {
           method: "POST",
           headers: { "Authorization": `Bearer ${token}` }
         });
@@ -116,6 +113,11 @@ export function MissionControlPage() {
     }
     loadData();
   };
+
+  // Compute real success rate from fetched tasks
+  const completedCount = tasks.filter(t => t.status === "completed").length;
+  const settledCount = tasks.filter(t => t.status === "completed" || t.status === "failed").length;
+  const successRate = settledCount === 0 ? "—" : `${((completedCount / settledCount) * 100).toFixed(1)}%`;
 
   return (
     <div className="p-6 space-y-6 min-h-screen" style={{ background: "#06020f" }}>
@@ -137,22 +139,33 @@ export function MissionControlPage() {
       </div>
 
       {/* Overview Stat Row */}
-      <div className="grid grid-cols-4 gap-4">
-        {[
-          { label: t("activePipelines"), value: tasks.filter(t => t.status === "running").length, icon: "⚡", color: "text-purple-400" },
-          { label: t("queuedTasks"), value: tasks.filter(t => t.status === "running").length, icon: "📋", color: "text-blue-400" },
-          { label: t("activeCronJobs"), value: jobs.filter(j => j.status === "active").length, icon: "⏰", color: "text-emerald-400" },
-          { label: t("taskSuccessRate"), value: "100.0%", icon: "🎯", color: "text-pink-400" },
-        ].map((item, idx) => (
-          <div key={idx} className="glass-card p-4 rounded-xl">
-            <div className="flex justify-between items-center mb-1">
-              <span className="text-xs text-purple-400/50 font-medium">{item.label}</span>
-              <span className="text-lg">{item.icon}</span>
+      {loading ? (
+        <div className="grid grid-cols-4 gap-4">
+          {[0, 1, 2, 3].map(i => (
+            <div key={i} className="glass-card p-4 rounded-xl animate-pulse">
+              <div className="h-3 bg-purple-950/60 rounded w-3/4 mb-3" />
+              <div className="h-6 bg-purple-950/40 rounded w-1/2" />
             </div>
-            <div className="text-2xl font-bold text-white font-mono">{item.value}</div>
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-4 gap-4">
+          {[
+            { label: t("activePipelines"), value: tasks.filter(t => t.status === "running").length, icon: "⚡", color: "text-purple-400" },
+            { label: t("queuedTasks"), value: tasks.filter(t => t.status === "running").length, icon: "📋", color: "text-blue-400" },
+            { label: t("activeCronJobs"), value: jobs.filter(j => j.status === "active").length, icon: "⏰", color: "text-emerald-400" },
+            { label: t("taskSuccessRate"), value: successRate, icon: "🎯", color: "text-pink-400" },
+          ].map((item, idx) => (
+            <div key={idx} className="glass-card p-4 rounded-xl">
+              <div className="flex justify-between items-center mb-1">
+                <span className="text-xs text-purple-400/50 font-medium">{item.label}</span>
+                <span className="text-lg">{item.icon}</span>
+              </div>
+              <div className="text-2xl font-bold text-white font-mono">{item.value}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Side: Tasks & Workflows */}
@@ -163,7 +176,11 @@ export function MissionControlPage() {
               <span>⚡</span> {t("activeExecution")}
             </h3>
             <div className="space-y-4">
-              {tasks.length === 0 ? (
+              {loading ? (
+                <div className="text-center py-6 text-purple-400/40 text-xs font-mono animate-pulse">
+                  Loading tasks…
+                </div>
+              ) : tasks.length === 0 ? (
                 <div className="text-center py-6 text-purple-400/40 text-xs font-mono">
                   No active tasks running. Run a campaign or trigger automation.
                 </div>
@@ -183,7 +200,7 @@ export function MissionControlPage() {
                         {t(task.status)}
                       </span>
                     </div>
-                    
+
                     {/* Progress bar */}
                     <div className="flex items-center gap-3">
                       <div className="flex-1 h-1.5 rounded-full bg-purple-950/40 overflow-hidden">
@@ -207,7 +224,11 @@ export function MissionControlPage() {
               <span>🔄</span> {t("workflowAutomations")}
             </h3>
             <div className="grid grid-cols-2 gap-4">
-              {workflows.length === 0 ? (
+              {loading ? (
+                <div className="col-span-2 text-center py-6 text-purple-400/40 text-xs font-mono animate-pulse">
+                  Loading workflows…
+                </div>
+              ) : workflows.length === 0 ? (
                 <div className="col-span-2 text-center py-6 text-purple-400/40 text-xs font-mono">
                   No custom workflow automations defined.
                 </div>
@@ -234,7 +255,11 @@ export function MissionControlPage() {
               <span>⏰</span> {t("scheduledJobs")}
             </h3>
             <div className="space-y-3">
-              {jobs.length === 0 ? (
+              {loading ? (
+                <div className="text-center py-6 text-purple-400/40 text-xs font-mono animate-pulse">
+                  Loading jobs…
+                </div>
+              ) : jobs.length === 0 ? (
                 <div className="text-center py-6 text-purple-400/40 text-xs font-mono">
                   No active scheduled cron jobs.
                 </div>

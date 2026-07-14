@@ -1,0 +1,22 @@
+{
+  "name": "OCTOPUS NEXUS OS v7",
+  "short_name": "Octopus",
+  "description": "Autonomous AI Operating System Interface",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#06020f",
+  "theme_color": "#0a0614",
+  "icons": [
+    {
+      "src": "pwa-192x192.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "pwa-512x512.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
+}

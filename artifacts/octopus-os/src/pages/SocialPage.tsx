@@ -1,21 +1,22 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
 
 const PLATFORMS = [
-  { id: "tiktok",    icon: "🎵", name: "TikTok",     color: "#ff0050", followers: "0", status: "disconnected" },
-  { id: "instagram", icon: "📸", name: "Instagram",  color: "#e1306c", followers: "0", status: "disconnected" },
-  { id: "facebook",  icon: "👍", name: "Facebook",   color: "#1877f2", followers: "0", status: "disconnected" },
-  { id: "threads",   icon: "🧵", name: "Threads",    color: "#000000", followers: "0", status: "disconnected" },
-  { id: "youtube",   icon: "▶️", name: "YouTube",    color: "#ff0000", followers: "0", status: "disconnected" },
-  { id: "x",         icon: "✖️", name: "X (Twitter)", color: "#000000", followers: "0", status: "disconnected" },
-  { id: "linkedin",  icon: "💼", name: "LinkedIn",   color: "#0077b5", followers: "0", status: "disconnected" },
-  { id: "pinterest", icon: "📌", name: "Pinterest",  color: "#e60023", followers: "0", status: "disconnected" },
-  { id: "snapchat",  icon: "👻", name: "Snapchat",   color: "#fffc00", followers: "0", status: "disconnected" },
-  { id: "reddit",    icon: "🔴", name: "Reddit",     color: "#ff4500", followers: "0", status: "disconnected" },
-  { id: "telegram",  icon: "✈️", name: "Telegram",   color: "#0088cc", followers: "0", status: "disconnected" },
-  { id: "discord",   icon: "🎮", name: "Discord",    color: "#5865f2", followers: "0", status: "disconnected" },
-  { id: "medium",    icon: "✍️", name: "Medium",     color: "#000000", followers: "0", status: "disconnected" },
-  { id: "wordpress", icon: "🌐", name: "WordPress",  color: "#21759b", followers: "0", status: "disconnected" },
-  { id: "tumblr",    icon: "📝", name: "Tumblr",     color: "#35465c", followers: "0", status: "disconnected" },
+  { id: "tiktok",    icon: "🎵", name: "TikTok",      color: "#ff0050" },
+  { id: "instagram", icon: "📸", name: "Instagram",   color: "#e1306c" },
+  { id: "facebook",  icon: "👍", name: "Facebook",    color: "#1877f2" },
+  { id: "threads",   icon: "🧵", name: "Threads",     color: "#000000" },
+  { id: "youtube",   icon: "▶️", name: "YouTube",     color: "#ff0000" },
+  { id: "x",         icon: "✖️", name: "X (Twitter)", color: "#000000" },
+  { id: "linkedin",  icon: "💼", name: "LinkedIn",    color: "#0077b5" },
+  { id: "pinterest", icon: "📌", name: "Pinterest",   color: "#e60023" },
+  { id: "snapchat",  icon: "👻", name: "Snapchat",    color: "#fffc00" },
+  { id: "reddit",    icon: "🔴", name: "Reddit",      color: "#ff4500" },
+  { id: "telegram",  icon: "✈️", name: "Telegram",    color: "#0088cc" },
+  { id: "discord",   icon: "🎮", name: "Discord",     color: "#5865f2" },
+  { id: "medium",    icon: "✍️", name: "Medium",      color: "#000000" },
+  { id: "wordpress", icon: "🌐", name: "WordPress",   color: "#21759b" },
+  { id: "tumblr",    icon: "📝", name: "Tumblr",      color: "#35465c" },
 ];
 
 const FIELDS: Record<string, string[]> = {
@@ -36,12 +37,67 @@ const FIELDS: Record<string, string[]> = {
   tumblr:    ["Consumer Key", "Consumer Secret", "OAuth Token", "OAuth Token Secret"],
 };
 
+interface ProviderRecord {
+  id: string;
+  providerName: string;
+  displayName: string;
+  status: string;
+  followers?: string;
+}
+
 export function SocialPage() {
+  const { token } = useAuth();
   const [selected, setSelected] = useState("tiktok");
-  const [platforms, setPlatforms] = useState(PLATFORMS);
   const [values, setValues] = useState<Record<string, Record<string, string>>>({});
   const [testing, setTesting] = useState(false);
   const [testMsg, setTestMsg] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState("");
+
+  // Map of platformId -> ProviderRecord (from DB)
+  const [connectedMap, setConnectedMap] = useState<Record<string, ProviderRecord>>({});
+  const [loadingProviders, setLoadingProviders] = useState(true);
+
+  // Fetch connected providers on mount
+  useEffect(() => {
+    const fetchProviders = async () => {
+      if (!token) return;
+      try {
+        const res = await fetch("/api/providers", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data: ProviderRecord[] = await res.json();
+          const map: Record<string, ProviderRecord> = {};
+          for (const p of data) {
+            // Match by providerName (case-insensitive against our platform ids)
+            const platformId = PLATFORMS.find(
+              pl =>
+                pl.id === p.providerName.toLowerCase() ||
+                pl.name.toLowerCase() === p.providerName.toLowerCase()
+            )?.id;
+            if (platformId) {
+              map[platformId] = p;
+            }
+          }
+          setConnectedMap(map);
+        }
+      } catch (err) {
+        console.error("Failed to fetch providers:", err);
+      } finally {
+        setLoadingProviders(false);
+      }
+    };
+    fetchProviders();
+  }, [token]);
+
+  // Build the platforms list enriched with real DB status
+  const platforms = PLATFORMS.map(p => ({
+    ...p,
+    status: connectedMap[p.id]?.status === "active" ? "connected" : "disconnected",
+    followers: connectedMap[p.id]?.followers || "0",
+    dbId: connectedMap[p.id]?.id,
+  }));
 
   const platform = platforms.find(p => p.id === selected)!;
   const fields = FIELDS[selected] || [];
@@ -50,14 +106,92 @@ export function SocialPage() {
     setValues(v => ({ ...v, [selected]: { ...v[selected], [field]: val } }));
   };
 
-  const connect = () => {
-    setPlatforms(ps => ps.map(p => p.id === selected ? { ...p, status: p.status === "connected" ? "disconnected" : "connected" } : p));
+  // Connect: POST /api/providers
+  const connect = async () => {
+    if (!token) return;
+    setSaving(true);
+    setSaveMsg("");
+    const platformData = PLATFORMS.find(p => p.id === selected)!;
+    const credFields = fields.filter(Boolean);
+    const apiKey = values[selected]?.[credFields[0]] || "";
+
+    try {
+      const res = await fetch("/api/providers", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          providerName: selected,
+          displayName: platformData.name,
+          apiKey,
+          model: "social",
+          status: "active",
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to connect");
+      }
+
+      const created: ProviderRecord = await res.json();
+      setConnectedMap(prev => ({ ...prev, [selected]: created }));
+      setSaveMsg("✅ Connected successfully");
+    } catch (err: any) {
+      setSaveMsg(`❌ ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Disconnect: DELETE /api/providers/:id
+  const disconnect = async () => {
+    if (!token) return;
+    const record = connectedMap[selected];
+    if (!record) return;
+    setSaving(true);
+    setSaveMsg("");
+
+    try {
+      const res = await fetch(`/api/providers/${record.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to disconnect");
+      }
+
+      setConnectedMap(prev => {
+        const next = { ...prev };
+        delete next[selected];
+        return next;
+      });
+      setSaveMsg("✅ Disconnected successfully");
+    } catch (err: any) {
+      setSaveMsg(`❌ ${err.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Save Configuration: also POSTs (or re-connects) with latest credential values
+  const saveConfig = async () => {
+    await connect();
   };
 
   const testConn = async () => {
-    setTesting(true); setTestMsg("");
+    setTesting(true);
+    setTestMsg("");
     await new Promise(r => setTimeout(r, 1400));
-    setTestMsg(platform.status === "connected" ? "✅ Connection successful — API responding" : "❌ Not connected — please add credentials first");
+    setTestMsg(
+      platform.status === "connected"
+        ? "✅ Connection successful — API responding"
+        : "❌ Not connected — please add credentials first"
+    );
     setTesting(false);
   };
 
@@ -68,9 +202,11 @@ export function SocialPage() {
     <div className="flex h-full min-h-screen" style={{ background: "#0a0614" }}>
       {/* Platform List */}
       <div className="w-52 shrink-0 py-4 px-2 overflow-y-auto" style={{ background: "#0d0920", borderRight: "1px solid rgba(139,92,246,0.15)" }}>
-        <div className="text-[9px] font-bold uppercase tracking-widest text-purple-500/50 px-2 py-2">15 Platforms</div>
+        <div className="text-[9px] font-bold uppercase tracking-widest text-purple-500/50 px-2 py-2">
+          {loadingProviders ? "Loading..." : "15 Platforms"}
+        </div>
         {platforms.map(p => (
-          <button key={p.id} onClick={() => setSelected(p.id)}
+          <button key={p.id} onClick={() => { setSelected(p.id); setTestMsg(""); setSaveMsg(""); }}
             className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs font-medium mb-0.5 transition-all ${selected === p.id ? "gradient-purple text-white" : "text-purple-300/70 hover:bg-purple-900/30"}`}>
             <span className="text-sm">{p.icon}</span>
             <span className="flex-1 text-left">{p.name}</span>
@@ -99,10 +235,17 @@ export function SocialPage() {
               className="px-3 py-2 rounded-lg text-xs text-purple-300 border border-purple-500/30 hover:border-purple-400/50 transition-all">
               {testing ? "⟳ Testing..." : "🧪 Test Connection"}
             </button>
-            <button onClick={connect}
-              className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${platform.status === "connected" ? "bg-red-900/50 text-red-400 border border-red-500/30" : "gradient-purple text-white glow-purple"}`}>
-              {platform.status === "connected" ? "🔌 Disconnect" : "🔗 Connect"}
-            </button>
+            {platform.status === "connected" ? (
+              <button onClick={disconnect} disabled={saving}
+                className="px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-red-900/50 text-red-400 border border-red-500/30">
+                {saving ? "⟳ Disconnecting..." : "🔌 Disconnect"}
+              </button>
+            ) : (
+              <button onClick={connect} disabled={saving}
+                className="px-4 py-2 rounded-lg text-xs font-semibold transition-all gradient-purple text-white glow-purple">
+                {saving ? "⟳ Connecting..." : "🔗 Connect"}
+              </button>
+            )}
           </div>
         </div>
 
@@ -112,22 +255,31 @@ export function SocialPage() {
           </div>
         )}
 
+        {saveMsg && (
+          <div className={`mb-4 px-4 py-3 rounded-lg text-xs ${saveMsg.includes("✅") ? "bg-emerald-900/20 text-emerald-400 border border-emerald-500/20" : "bg-red-900/20 text-red-400 border border-red-500/20"}`}>
+            {saveMsg}
+          </div>
+        )}
+
         <div className="grid grid-cols-2 gap-4 mb-6">
           {fields.filter(Boolean).map(field => (
             <div key={field}>
               <label className="text-xs text-purple-400 mb-1 block">{field}</label>
-              <input type={field.toLowerCase().includes("secret") || field.toLowerCase().includes("token") || field.toLowerCase().includes("password") ? "password" : "text"}
+              <input
+                type={field.toLowerCase().includes("secret") || field.toLowerCase().includes("token") || field.toLowerCase().includes("password") ? "password" : "text"}
                 value={values[selected]?.[field] || ""}
                 onChange={e => setVal(field, e.target.value)}
                 placeholder={`Enter ${field.toLowerCase()}...`}
                 className="w-full px-3 py-2.5 rounded-lg text-xs text-white outline-none transition-all"
-                style={{ background: "#0d0920", border: "1px solid rgba(139,92,246,0.2)" }} />
+                style={{ background: "#0d0920", border: "1px solid rgba(139,92,246,0.2)" }}
+              />
             </div>
           ))}
         </div>
 
-        <button className="px-6 py-2.5 rounded-xl text-xs font-semibold text-white gradient-purple glow-purple">
-          💾 Save Configuration
+        <button onClick={saveConfig} disabled={saving}
+          className="px-6 py-2.5 rounded-xl text-xs font-semibold text-white gradient-purple glow-purple">
+          {saving ? "⟳ Saving..." : "💾 Save Configuration"}
         </button>
 
         {/* OAuth URI */}

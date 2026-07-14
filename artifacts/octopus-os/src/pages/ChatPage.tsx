@@ -26,8 +26,33 @@ export function ChatPage() {
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeThoughts, setActiveThoughts] = useState<string[]>([]);
-  
+
+  // Whether an AI provider config exists in the DB
+  const [hasProviderConfig, setHasProviderConfig] = useState<boolean | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Check if any AI provider config exists
+  useEffect(() => {
+    const checkProviderConfig = async () => {
+      if (!token) return;
+      try {
+        const res = await fetch("/api/provider-configs", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          // data is an array; if non-empty, a config exists
+          setHasProviderConfig(Array.isArray(data) ? data.length > 0 : !!data);
+        } else {
+          setHasProviderConfig(false);
+        }
+      } catch {
+        setHasProviderConfig(false);
+      }
+    };
+    checkProviderConfig();
+  }, [token]);
 
   // Fetch agents on load
   useEffect(() => {
@@ -35,16 +60,18 @@ export function ChatPage() {
       if (!token) return;
       try {
         const res = await fetch("/api/agents", {
-          headers: { "Authorization": `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
           const data = await res.json();
           const active = data.filter((a: any) => a.status === "active");
-          setAgents(active.map((a: any) => ({
-            id: a.id,
-            name: a.name,
-            description: a.description || "Virtual Worker"
-          })));
+          setAgents(
+            active.map((a: any) => ({
+              id: a.id,
+              name: a.name,
+              description: a.description || "Virtual Worker",
+            }))
+          );
           if (active.length > 0) {
             setSelectedAgentId(active[0].id);
           }
@@ -63,13 +90,13 @@ export function ChatPage() {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inputValue.trim() || !selectedAgentId || !token) return;
+    if (!inputValue.trim() || !token) return;
 
     const userMessage: Message = {
       id: crypto.randomUUID(),
       sender: "user",
       text: inputValue,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
 
     setMessages(prev => [...prev, userMessage]);
@@ -81,16 +108,78 @@ export function ChatPage() {
     const agent = agents.find(a => a.id === selectedAgentId);
     const agentName = agent ? agent.name : "Agent";
 
+    // If no AI provider config exists, fall back to local message only
+    if (!hasProviderConfig) {
+      const fallbackMessage: Message = {
+        id: crypto.randomUUID(),
+        sender: "agent",
+        agentName,
+        text: "⚠️ AI response coming soon — Configure an AI provider in the AI Providers page first.",
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        thoughtLog: ["No AI provider config found. Skipping AI completion."],
+      };
+      setMessages(prev => [...prev, fallbackMessage]);
+      setLoading(false);
+      setActiveThoughts([]);
+      return;
+    }
+
+    // If no agent is selected, try the provider-configs/default/complete endpoint
+    if (!selectedAgentId) {
+      try {
+        const res = await fetch("/api/provider-configs/default/complete", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            messages: [{ role: "user", content: promptToSend }],
+          }),
+        });
+
+        if (!res.ok) throw new Error("AI completion failed");
+
+        const data = await res.json();
+        const text =
+          data.result ||
+          data.output ||
+          data.choices?.[0]?.message?.content ||
+          "AI response coming soon";
+
+        const aiMessage: Message = {
+          id: crypto.randomUUID(),
+          sender: "agent",
+          agentName: "AI",
+          text,
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+        setMessages(prev => [...prev, aiMessage]);
+      } catch {
+        const aiMessage: Message = {
+          id: crypto.randomUUID(),
+          sender: "agent",
+          agentName: "AI",
+          text: "⚠️ AI response coming soon — endpoint unavailable.",
+          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        };
+        setMessages(prev => [...prev, aiMessage]);
+      } finally {
+        setLoading(false);
+        setActiveThoughts([]);
+      }
+      return;
+    }
+
+    // Agent-based invoke
     try {
-      // Simulate/Trigger API call
-      // In production, /api/agents/:id/invoke returns { decision: { result: ... } } or similar
       const res = await fetch(`/api/agents/${selectedAgentId}/invoke`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ prompt: promptToSend })
+        body: JSON.stringify({ prompt: promptToSend }),
       });
 
       if (!res.ok) {
@@ -98,23 +187,31 @@ export function ChatPage() {
       }
 
       const data = await res.json();
-      
-      // Parse intermediate actions/decisions if present
-      const finalResult = data.result || data.output || (data.decision && data.decision.reason) || "Task completed successfully.";
-      const thoughtLog = data.steps || data.decisions?.map((d: any) => `[Policy Engine] Evaluate: ${d.policyId} -> ${d.kind.toUpperCase()} (${d.reason})`) || [
-        "Analyzing user command context...",
-        "Validating operation against business policies...",
-        "Generating optimized execution plan...",
-        "Updating brain decision log ledger..."
-      ];
+
+      const finalResult =
+        data.result ||
+        data.output ||
+        (data.decision && data.decision.reason) ||
+        "Task completed successfully.";
+      const thoughtLog =
+        data.steps ||
+        data.decisions?.map(
+          (d: any) =>
+            `[Policy Engine] Evaluate: ${d.policyId} -> ${d.kind.toUpperCase()} (${d.reason})`
+        ) || [
+          "Analyzing user command context...",
+          "Validating operation against business policies...",
+          "Generating optimized execution plan...",
+          "Updating brain decision log ledger...",
+        ];
 
       const agentMessage: Message = {
         id: crypto.randomUUID(),
         sender: "agent",
         agentName,
         text: finalResult,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        thoughtLog
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        thoughtLog,
       };
 
       setMessages(prev => [...prev, agentMessage]);
@@ -125,8 +222,8 @@ export function ChatPage() {
         sender: "agent",
         agentName,
         text: `Error: ${err.message || "Failed to execute agent invocation. Check database and api-server connections."}`,
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        thoughtLog: ["Failed to finalize agent thread."]
+        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+        thoughtLog: ["Failed to finalize agent thread."],
       };
       setMessages(prev => [...prev, errorMessage]);
     } finally {
@@ -152,21 +249,35 @@ export function ChatPage() {
         {/* Selected Agent Dropdown */}
         <div className="flex items-center gap-2">
           <label className="text-xs text-purple-400">{t("selectWorker")}:</label>
-          <select value={selectedAgentId} onChange={(e) => setSelectedAgentId(e.target.value)}
-            className="bg-purple-950/50 text-white border border-purple-500/20 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-purple-500/40 font-heading">
+          <select
+            value={selectedAgentId}
+            onChange={e => setSelectedAgentId(e.target.value)}
+            className="bg-purple-950/50 text-white border border-purple-500/20 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-purple-500/40 font-heading"
+          >
             {agents.map(a => (
               <option key={a.id} value={a.id} className="bg-[#0c051a]">
                 {a.name} ({a.description})
               </option>
             ))}
-            {agents.length === 0 && <option value="" className="bg-[#0c051a]">No active agents</option>}
+            {agents.length === 0 && (
+              <option value="" className="bg-[#0c051a]">
+                No active agents
+              </option>
+            )}
           </select>
         </div>
       </div>
 
+      {/* AI Provider notice */}
+      {hasProviderConfig === false && (
+        <div className="px-4 py-3 rounded-xl text-xs bg-amber-900/20 border border-amber-500/30 text-amber-400 flex items-center gap-2">
+          ⚠️ Configure an AI provider in <strong>AI Providers</strong> page first before sending messages.
+        </div>
+      )}
+
       {/* Main chat layout */}
       <div className="flex-1 glass-card rounded-2xl flex flex-col overflow-hidden h-[450px] border border-purple-950">
-        
+
         {/* Messages viewport */}
         <div className="flex-1 p-5 overflow-y-auto space-y-4 scrollbar-thin">
           {messages.length === 0 && (
@@ -179,7 +290,7 @@ export function ChatPage() {
             </div>
           )}
 
-          {messages.map((m) => (
+          {messages.map(m => (
             <div key={m.id} className={`flex flex-col ${m.sender === "user" ? "items-end" : "items-start"} animate-fadeIn`}>
               {/* Sender Tag */}
               <span className="text-[10px] text-purple-400/50 mb-1 font-mono">
@@ -218,9 +329,9 @@ export function ChatPage() {
                 {agents.find(a => a.id === selectedAgentId)?.name || "Agent"} is thinking...
               </span>
               <div className="max-w-[75%] rounded-2xl p-4 bg-purple-950/20 text-purple-400/70 border border-purple-900/40 rounded-bl-none font-mono text-[10px] space-y-1.5">
-                {activeThoughts.map((t, idx) => (
+                {activeThoughts.map((thought, idx) => (
                   <div key={idx} className="flex items-center gap-2">
-                    <span className="text-purple-500">⚡</span> {t}
+                    <span className="text-purple-500">⚡</span> {thought}
                   </div>
                 ))}
                 <div className="flex items-center gap-1.5 text-purple-300 font-bold mt-1 animate-pulse">
@@ -234,11 +345,19 @@ export function ChatPage() {
 
         {/* Input Panel */}
         <form onSubmit={handleSendMessage} className="p-4 bg-purple-950/10 border-t border-purple-950/60 flex gap-3">
-          <input type="text" value={inputValue} onChange={(e) => setInputValue(e.target.value)} disabled={loading}
+          <input
+            type="text"
+            value={inputValue}
+            onChange={e => setInputValue(e.target.value)}
+            disabled={loading}
             placeholder={loading ? "Waiting for agent process..." : t("typeMessagePlaceholder")}
-            className="flex-1 bg-black/60 border border-purple-950 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-purple-500/30 transition-all font-sans" />
-          <button type="submit" disabled={loading}
-            className="px-5 py-3 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition-all glow-purple-sm font-sans">
+            className="flex-1 bg-black/60 border border-purple-950 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-purple-500/30 transition-all font-sans"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-5 py-3 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition-all glow-purple-sm font-sans"
+          >
             {t("send")}
           </button>
         </form>

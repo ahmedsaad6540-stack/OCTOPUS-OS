@@ -37,6 +37,7 @@ export type Page =
 function OS() {
   const { user, isLoading } = useAuth();
   const [page, setPage] = useState<Page>("command-center");
+const [mobileOpen, setMobileOpen] = useState(false);
 
   if (isLoading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#06020f]">
@@ -76,12 +77,30 @@ function OS() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#06020f] text-[#e2d9f3]">
-      <Sidebar currentPage={page} onNavigate={setPage} />
-      <main className="flex-1 overflow-y-auto">
-        {renderPage()}
-      </main>
-    </div>
+    <>
+      {/* Mobile top bar – visible on small screens */}
+      <div className="md:hidden flex items-center justify-between px-4 py-2 bg-[#06020f] text-[#e2d9f3]">
+        <button onClick={() => setMobileOpen(true)} className="text-2xl">☰</button>
+        <span className="font-bold text-sm">OCTOPUS</span>
+      </div>
+
+      <div className="flex h-screen overflow-hidden bg-[#06020f] text-[#e2d9f3]">
+        {/* Sidebar – overlay on mobile, fixed on larger screens */}
+        <div className={`fixed inset-y-0 left-0 z-20 ${mobileOpen ? "block" : "hidden"} md:block`}>
+          <Sidebar
+            currentPage={page}
+            onNavigate={p => {
+              setPage(p);
+              setMobileOpen(false);
+            }}
+          />
+        </div>
+        {/* Main content */}
+        <main className="flex-1 overflow-y-auto">
+          {renderPage()}
+        </main>
+      </div>
+    </>
   );
 }
 

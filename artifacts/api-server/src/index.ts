@@ -1,3 +1,5 @@
+import 'dotenv/config';
+console.log('DEBUG DATABASE_URL:', process.env.DATABASE_URL);
 /// import "./tracing"; // Disabled temporarily for Railway deployment
 import app from "./app";
 import { logger } from "./lib/logger";
