@@ -1,0 +1,18 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "artifacts/mockup-sandbox/package.json",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist"
+      }
+    }
+  ],
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm --filter ./artifacts/mockup-sandbox run build",
+  "outputDirectory": "artifacts/mockup-sandbox/dist",
+  "routes": [
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
+}
