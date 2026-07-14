@@ -7,8 +7,8 @@
       "config": { "distDir": "dist" }
     }
   ],
-  "installCommand": "",
-  "buildCommand": "pnpm install --filter ./artifacts/mockup-sandbox && pnpm --filter ./artifacts/mockup-sandbox run build",
+  "installCommand": "pnpm install --filter ./artifacts/mockup-sandbox",
+  "buildCommand": "pnpm --filter ./artifacts/mockup-sandbox run build",
   "outputDirectory": "artifacts/mockup-sandbox/dist",
   "routes": [{ "src": "/(.*)", "dest": "/index.html" }]
 }
