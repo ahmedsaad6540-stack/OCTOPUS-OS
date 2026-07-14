@@ -4,7 +4,7 @@
   "packageManager": "pnpm@9.15.9",
   "license": "MIT",
   "scripts": {
-    "preinstall": "powershell -Command \"Write-Host 'preinstall noop'\"",
+    "preinstall": "echo preinstall noop",
     "build": "pnpm run typecheck && pnpm -r --if-present run build",
     "dev": "cd artifacts/octopus-os && cross-env PORT=8080 BASE_PATH=/ npx vite --port 8080 --host",
     "serve": "cd artifacts/octopus-os && cross-env PORT=8080 BASE_PATH=/ npx vite preview --host",
