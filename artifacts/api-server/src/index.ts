@@ -15,7 +15,7 @@ import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
 import { eq } from "drizzle-orm";
 
-const REQUIRED_ENV_VARS = ["PORT", "DATABASE_URL"];
+const REQUIRED_ENV_VARS = ["DATABASE_URL"];
 for (const envVar of REQUIRED_ENV_VARS) {
   if (!process.env[envVar]) {
     logger.fatal(`Startup failed: Missing required environment variable ${envVar}`);
@@ -60,9 +60,10 @@ async function startServer() {
     // Start ticking the Scheduler once everything it can dispatch to is wired up.
     scheduler.start();
 
-    const port = Number(process.env.PORT);
-    if (Number.isNaN(port) || port <= 0) {
-      throw new Error(`Invalid PORT value: "${process.env.PORT}"`);
+    const rawPort = process.env.PORT ?? "5173";
+    const port = Number(rawPort);
+    if (!Number.isFinite(port) || port <= 0) {
+      throw new Error(`Invalid PORT value: "${rawPort}"`);
     }
 
     const server = app.listen(port, (err?: any) => {
