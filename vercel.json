@@ -4,15 +4,11 @@
     {
       "src": "artifacts/mockup-sandbox/package.json",
       "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist"
-      }
+      "config": { "distDir": "dist" }
     }
   ],
-  "installCommand": "pnpm install",
-  "buildCommand": "pnpm --filter ./artifacts/mockup-sandbox run build",
+  "installCommand": "",
+  "buildCommand": "pnpm install --filter ./artifacts/mockup-sandbox && pnpm --filter ./artifacts/mockup-sandbox run build",
   "outputDirectory": "artifacts/mockup-sandbox/dist",
-  "routes": [
-    { "src": "/(.*)", "dest": "/index.html" }
-  ]
+  "routes": [{ "src": "/(.*)", "dest": "/index.html" }]
 }
