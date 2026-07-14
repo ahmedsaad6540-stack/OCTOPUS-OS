@@ -1,5 +1,7 @@
 {
   "version": 2,
+  "installCommand": "pnpm install",
+  "buildCommand": "pnpm --filter @workspace/mockup-sandbox run build",
   "builds": [
     {
       "src": "artifacts/mockup-sandbox/package.json",
@@ -7,8 +9,6 @@
       "config": { "distDir": "dist" }
     }
   ],
-  "installCommand": "pnpm install --filter ./artifacts/mockup-sandbox",
-  "buildCommand": "pnpm --filter ./artifacts/mockup-sandbox run build",
   "outputDirectory": "artifacts/mockup-sandbox/dist",
   "routes": [{ "src": "/(.*)", "dest": "/index.html" }]
 }
