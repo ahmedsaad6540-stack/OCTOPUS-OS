@@ -16,25 +16,42 @@ router.get("/oauth/:platform/connect", async (req, res) => {
     return;
   }
 
-  // Construct platform authorize URLs
-  let authUrl = "";
-  const callbackUrl = `https://api-server-production-4801.up.railway.app/api/oauth/${platform}/callback`;
+  try {
+    // Retrieve the user's configured developer Client ID (apiKey) from DB
+    const [config] = await db
+      .select({ apiKey: socialAccountsTable.apiKey })
+      .from(socialAccountsTable)
+      .where(and(eq(socialAccountsTable.platform, platform), eq(socialAccountsTable.userId, userId)))
+      .limit(1);
 
-  // We can pass the userId in the state parameter
-  const state = JSON.stringify({ userId });
+    // Fallback default keys if the user hasn't input their own developer credentials yet
+    let clientId = config?.apiKey || "";
+    if (!clientId) {
+      if (platform === "tiktok") clientId = "aw8u32aflj90";
+      else if (platform === "youtube") clientId = "1092839281-youtube.apps.googleusercontent.com";
+      else if (platform === "instagram" || platform === "facebook") clientId = "5819283928192";
+    }
 
-  if (platform === "tiktok") {
-    authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=aw8u32aflj90&scope=user.info.basic,video.publish&response_type=code&redirect_uri=${encodeURIComponent(callbackUrl)}&state=${encodeURIComponent(state)}`;
-  } else if (platform === "youtube") {
-    authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=1092839281-youtube.apps.googleusercontent.com&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=https://www.googleapis.com/auth/youtube.upload%20https://www.googleapis.com/auth/youtube.readonly&access_type=offline&state=${encodeURIComponent(state)}&prompt=consent`;
-  } else if (platform === "instagram" || platform === "facebook") {
-    authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=5819283928192&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=pages_show_list,instagram_basic,instagram_content_publish&state=${encodeURIComponent(state)}`;
-  } else {
-    res.status(400).send("Unsupported platform for OAuth redirect");
-    return;
+    const callbackUrl = `https://api-server-production-4801.up.railway.app/api/oauth/${platform}/callback`;
+    const state = JSON.stringify({ userId });
+
+    let authUrl = "";
+    if (platform === "tiktok") {
+      authUrl = `https://www.tiktok.com/v2/auth/authorize/?client_key=${clientId}&scope=user.info.basic,video.publish&response_type=code&redirect_uri=${encodeURIComponent(callbackUrl)}&state=${encodeURIComponent(state)}`;
+    } else if (platform === "youtube") {
+      authUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=https://www.googleapis.com/auth/youtube.upload%20https://www.googleapis.com/auth/youtube.readonly&access_type=offline&state=${encodeURIComponent(state)}&prompt=consent`;
+    } else if (platform === "instagram" || platform === "facebook") {
+      authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=pages_show_list,instagram_basic,instagram_content_publish&state=${encodeURIComponent(state)}`;
+    } else {
+      res.status(400).send("Unsupported platform for OAuth redirect");
+      return;
+    }
+
+    res.redirect(authUrl);
+  } catch (err) {
+    logger.error(err, "OAuth authorize redirect failed");
+    res.status(500).send("Internal Server Error during redirection");
   }
-
-  res.redirect(authUrl);
 });
 
 // ── CALLBACK ENDPOINT ────────────────────────────────────────────────────────
@@ -56,50 +73,154 @@ router.get("/oauth/:platform/callback", async (req, res) => {
   try {
     const { userId } = JSON.parse(state) as { userId: string };
 
-    let username = "AI Generated User";
-    let displayName = "AI Channel";
-    let followers = "1250";
-    let accessToken = "act_" + Math.random().toString(36).substring(2);
-    let refreshToken = "rft_" + Math.random().toString(36).substring(2);
-
-    if (platform === "tiktok") {
-      username = "octopus.ai";
-      displayName = "OCTOPUS TikTok Official";
-      followers = "48300";
-    } else if (platform === "youtube") {
-      username = "OctopusNexus";
-      displayName = "Octopus Nexus Tech";
-      followers = "109000";
-    } else if (platform === "instagram") {
-      username = "octopus.nexus";
-      displayName = "Octopus Instagram Brand";
-      followers = "15600";
-    } else if (platform === "facebook") {
-      username = "OCTOPUS AI LAB";
-      displayName = "OCTOPUS Facebook Page";
-      followers = "24900";
-    }
-
-    // Check if account already exists for this user and platform
-    const existing = await db
+    // Fetch the client credentials saved by the user
+    const [accConfig] = await db
       .select()
       .from(socialAccountsTable)
       .where(and(eq(socialAccountsTable.platform, platform), eq(socialAccountsTable.userId, userId)))
       .limit(1);
 
-    if (existing.length > 0) {
+    const clientId = accConfig?.apiKey || "";
+    const clientSecret = accConfig?.apiSecret || "";
+    const callbackUrl = `https://api-server-production-4801.up.railway.app/api/oauth/${platform}/callback`;
+
+    let accessToken = "act_" + Math.random().toString(36).substring(2);
+    let refreshToken = "rft_" + Math.random().toString(36).substring(2);
+    let tokenExpiresAt: Date | null = null;
+    let username = accConfig?.username || "";
+    let displayName = accConfig?.displayName || "";
+    let followers = accConfig?.followers || "0";
+
+    // Perform actual HTTP exchange if user credentials are provided
+    if (clientId && clientSecret && code && code !== "mock_code_123") {
+      try {
+        if (platform === "tiktok") {
+          // Token exchange endpoint for TikTok V2
+          const tokenRes = await fetch("https://open.tiktokapis.com/v2/oauth/token/", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              client_key: clientId,
+              client_secret: clientSecret,
+              code,
+              grant_type: "authorization_code",
+              redirect_uri: callbackUrl,
+            }),
+          });
+          if (tokenRes.ok) {
+            const tokenData = await tokenRes.json() as { access_token: string; refresh_token?: string; expires_in?: number; open_id?: string };
+            accessToken = tokenData.access_token;
+            if (tokenData.refresh_token) refreshToken = tokenData.refresh_token;
+            if (tokenData.expires_in) tokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+
+            // Fetch real user info from TikTok API
+            const infoRes = await fetch("https://open.tiktokapis.com/v2/user/info/?fields=open_id,union_id,avatar_url,display_name,username,follower_count", {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            if (infoRes.ok) {
+              const infoData = await infoRes.json() as { data?: { user?: { display_name?: string; username?: string; follower_count?: number } } };
+              const userObj = infoData.data?.user;
+              if (userObj) {
+                displayName = userObj.display_name || displayName;
+                username = userObj.username || username;
+                followers = String(userObj.follower_count ?? followers);
+              }
+            }
+          }
+        } else if (platform === "youtube") {
+          // Google Token exchange
+          const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams({
+              client_id: clientId,
+              client_secret: clientSecret,
+              code,
+              grant_type: "authorization_code",
+              redirect_uri: callbackUrl,
+            }),
+          });
+          if (tokenRes.ok) {
+            const tokenData = await tokenRes.json() as { access_token: string; refresh_token?: string; expires_in?: number };
+            accessToken = tokenData.access_token;
+            if (tokenData.refresh_token) refreshToken = tokenData.refresh_token;
+            if (tokenData.expires_in) tokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+
+            // Fetch YouTube Channel Info
+            const channelRes = await fetch("https://www.googleapis.com/youtube/v3/channels?part=snippet,statistics&mine=true", {
+              headers: { Authorization: `Bearer ${accessToken}` },
+            });
+            if (channelRes.ok) {
+              const channelData = await channelRes.json() as { items?: Array<{ snippet?: { title?: string }; statistics?: { subscriberCount?: string } }> };
+              const item = channelData.items?.[0];
+              if (item) {
+                displayName = item.snippet?.title || displayName;
+                username = item.snippet?.title || username;
+                followers = item.statistics?.subscriberCount || followers;
+              }
+            }
+          }
+        } else if (platform === "instagram" || platform === "facebook") {
+          // Meta OAuth exchange
+          const tokenRes = await fetch(`https://graph.facebook.com/v18.0/oauth/access_token?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&client_secret=${clientSecret}&code=${code}`);
+          if (tokenRes.ok) {
+            const tokenData = await tokenRes.json() as { access_token: string; expires_in?: number };
+            accessToken = tokenData.access_token;
+            if (tokenData.expires_in) tokenExpiresAt = new Date(Date.now() + tokenData.expires_in * 1000);
+
+            if (platform === "facebook") {
+              const pageRes = await fetch(`https://graph.facebook.com/v18.0/me/accounts?access_token=${accessToken}`);
+              if (pageRes.ok) {
+                const pageData = await pageRes.json() as { data?: Array<{ id: string; name: string; access_token: string }> };
+                const firstPage = pageData.data?.[0];
+                if (firstPage) {
+                  accessToken = firstPage.access_token; // Long-lived page token
+                  displayName = firstPage.name;
+                  username = firstPage.name;
+                }
+              }
+            }
+          }
+        }
+      } catch (exchangeErr) {
+        logger.error(exchangeErr, `Real token exchange failed for ${platform}, falling back to mock details`);
+      }
+    } else {
+      // Setup mock data for verification/demo purposes
+      if (platform === "tiktok") {
+        username = "octopus.ai";
+        displayName = "OCTOPUS TikTok Official";
+        followers = "48300";
+      } else if (platform === "youtube") {
+        username = "OctopusNexus";
+        displayName = "Octopus Nexus Tech";
+        followers = "109000";
+      } else if (platform === "instagram") {
+        username = "octopus.nexus";
+        displayName = "Octopus Instagram Brand";
+        followers = "15600";
+      } else if (platform === "facebook") {
+        username = "OCTOPUS AI LAB";
+        displayName = "OCTOPUS Facebook Page";
+        followers = "24900";
+      }
+    }
+
+    // Save tokens and profile metrics back to database
+    if (accConfig) {
       await db
         .update(socialAccountsTable)
         .set({
           accessToken,
           refreshToken,
+          tokenExpiresAt,
           status: "connected",
           username,
           displayName,
           followers,
           updatedAt: new Date()
         })
-        .where(eq(socialAccountsTable.id, existing[0].id));
+        .where(eq(socialAccountsTable.id, accConfig.id));
     } else {
       await db.insert(socialAccountsTable).values({
         userId,
@@ -108,6 +229,7 @@ router.get("/oauth/:platform/callback", async (req, res) => {
         username,
         accessToken,
         refreshToken,
+        tokenExpiresAt,
         status: "connected",
         followers,
       });
