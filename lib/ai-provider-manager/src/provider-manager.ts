@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { AnthropicProviderClient } from "./anthropic-client.js";
+import { GeminiProviderClient } from "./gemini-client.js";
 import type {
   AiProviderConfig,
   AiProviderConfigStore,
@@ -23,6 +24,7 @@ export type ProviderClientFactory = (config: AiProviderConfig) => ProviderClient
 
 const builtInFactories: Record<string, ProviderClientFactory> = {
   anthropic: (config) => new AnthropicProviderClient(config),
+  gemini: (config) => new GeminiProviderClient(config),
 };
 
 /** Thrown when a config's `providerType` has no registered factory. */
