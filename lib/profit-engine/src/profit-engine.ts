@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import * as schema from "@workspace/db";
 import { PolicyEngine } from "@workspace/business-policy";
@@ -14,6 +15,7 @@ import type { ApprovalMode, DashboardStats } from "./types.js";
 
 export class ProfitEngine {
   private mode: ApprovalMode = "LEARNING";
+  private readonly db?: NodePgDatabase<typeof schema>;
   public readonly policyEngine: PolicyEngine;
   public readonly profitMemory: ProfitMemoryStore;
   public readonly knowledgeGraph: KnowledgeGraphStore;
@@ -26,6 +28,7 @@ export class ProfitEngine {
   public readonly evolution: SelfEvolution;
 
   constructor(db?: NodePgDatabase<typeof schema>) {
+    this.db = db;
     this.policyEngine = new PolicyEngine();
     this.adapters = new AdapterRegistry();
 
@@ -82,6 +85,31 @@ export class ProfitEngine {
 
     if (this.mode === "LEARNING") {
       console.log(`[LEARNING MODE] Virtual sale recorded: ${sale.productName} via ${sale.trafficSource} - Rev: $${sale.revenue}`);
+    }
+
+    if (this.db && sale.campaignId) {
+      try {
+        const [existingCampaign] = await this.db
+          .select()
+          .from(schema.campaignsTable)
+          .where(eq(schema.campaignsTable.id, sale.campaignId))
+          .limit(1);
+
+        if (existingCampaign) {
+          await this.db
+            .update(schema.campaignsTable)
+            .set({
+              revenue: (existingCampaign.revenue ?? 0) + sale.revenue,
+              conversions: (existingCampaign.conversions ?? 0) + 1,
+              commission: (existingCampaign.commission ?? 0) + sale.commission,
+              spent: (existingCampaign.spent ?? 0) + sale.cost,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.campaignsTable.id, sale.campaignId));
+        }
+      } catch (err) {
+        console.error("Error updating campaign metrics on sale recording:", err);
+      }
     }
 
     return this.profitMemory.insertSale({
