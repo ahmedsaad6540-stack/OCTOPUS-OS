@@ -6,6 +6,7 @@ export {
 export type { ProviderClientFactory } from "./provider-manager.js";
 export { AnthropicProviderClient, buildAnthropicRequest, parseAnthropicResponse } from "./anthropic-client.js";
 export { GeminiProviderClient, buildGeminiRequest, parseGeminiResponse } from "./gemini-client.js";
+export { OpenAiProviderClient, buildOpenAiRequest, parseOpenAiResponse } from "./openai-client.js";
 export type { FetchLike } from "./anthropic-client.js";
 export { ProviderBackedAgentExecutor } from "./agent-executor-adapter.js";
 export { DrizzleProviderConfigStore } from "./drizzle-store.js";
