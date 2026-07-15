@@ -1,4 +1,7 @@
-const API_BASE = "/api";
+// API base — uses the real backend in production, falls back to /api for local dev
+const API_BASE =
+  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ??
+  "/api";
 
 function getToken(): string | null {
   return localStorage.getItem("octopus_token");
@@ -9,6 +12,7 @@ async function request<T>(
   options: RequestInit = {}
 ): Promise<T> {
   const token = getToken();
+
   const res = await fetch(`${API_BASE}${path}`, {
     ...options,
     headers: {
@@ -17,9 +21,23 @@ async function request<T>(
       ...(options.headers ?? {}),
     },
   });
+
+  // Guard against non-JSON responses (e.g. 404 HTML pages in static deployments)
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    if (!res.ok) {
+      throw new Error(`Request failed with status ${res.status}`);
+    }
+    return {} as T;
+  }
+
   const data = (await res.json()) as T & { error?: string; message?: string };
   if (!res.ok) {
-    throw new Error((data as { message?: string; error?: string }).message ?? (data as { error?: string }).error ?? "Request failed");
+    throw new Error(
+      (data as { message?: string; error?: string }).message ??
+        (data as { error?: string }).error ??
+        "Request failed"
+    );
   }
   return data;
 }

@@ -106,6 +106,7 @@ function getPreviewPath(): string | null {
 function OctopusOS() {
   const { user, loading } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>("command-center");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   if (loading) {
     return (
@@ -148,9 +149,47 @@ function OctopusOS() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#0a0614]">
-      <Sidebar current={currentPage} onNavigate={setCurrentPage} />
-      {renderPage()}
+    <div className="flex h-screen overflow-hidden bg-[#0a0614] relative">
+      {/* Mobile Top Header */}
+      <div className="md:hidden fixed top-0 left-0 right-0 z-25 flex items-center justify-between bg-[#0d0920] border-b border-purple-900/30 px-4 py-3 h-[53px]">
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="text-purple-400 p-1 hover:text-white"
+        >
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+        <div className="flex items-center gap-2">
+          <span className="text-lg">🐙</span>
+          <span className="text-xs font-black text-white tracking-widest">OCTOPUS</span>
+        </div>
+        <div className="w-6" /> {/* Spacer */}
+      </div>
+
+      {/* Sidebar Backdrop Overlay on Mobile */}
+      {isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+        />
+      )}
+
+      {/* Sidebar Component */}
+      <Sidebar
+        current={currentPage}
+        onNavigate={(page) => {
+          setCurrentPage(page);
+          setIsSidebarOpen(false); // Close drawer on link click on mobile
+        }}
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+      />
+
+      {/* Main Content Area - shifts down on mobile to account for sticky top bar */}
+      <div className="flex-1 flex flex-col overflow-hidden pt-[53px] md:pt-0">
+        {renderPage()}
+      </div>
     </div>
   );
 }

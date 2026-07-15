@@ -1,339 +1,408 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { api } from "@/lib/api";
 
-interface Provider {
+// ── Types from /provider-configs API ─────────────────────────────────────────
+interface ProviderConfig {
   id: string;
   name: string;
-  displayName: string;
-  icon: string;
-  apiKey: string;
-  secret: string;
-  baseUrl: string;
+  providerType: string;
   model: string;
-  temperature: number;
-  maxTokens: number;
-  timeout: number;
-  priority: number;
-  enabled: boolean;
-  isLocal: boolean;
-  status: "online" | "offline" | "unconfigured" | "testing";
-  latency?: number;
-  costPer1k?: number;
-  usageToday?: number;
-  usageLimit?: number;
+  apiKeyEnvVar: string;
+  baseUrl?: string | null;
+  isDefault: boolean;
+  status: "active" | "disabled";
+  userId?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
-const DEFAULT_PROVIDERS: Provider[] = [
-  { id: "openai",       name: "openai",       displayName: "OpenAI",       icon: "🟢", apiKey: "", secret: "", baseUrl: "https://api.openai.com/v1",                 model: "gpt-4o",               temperature: 0.7, maxTokens: 4096, timeout: 30, priority: 1, enabled: true,  isLocal: false, status: "online",       latency: 312, costPer1k: 0.01,  usageToday: 12450, usageLimit: 50000 },
-  { id: "gemini",       name: "gemini",       displayName: "Gemini",       icon: "🔵", apiKey: "", secret: "", baseUrl: "https://generativelanguage.googleapis.com",  model: "gemini-1.5-pro",       temperature: 0.7, maxTokens: 8192, timeout: 30, priority: 2, enabled: true,  isLocal: false, status: "online",       latency: 198, costPer1k: 0.007, usageToday: 3200,  usageLimit: 50000 },
-  { id: "claude",       name: "claude",       displayName: "Claude",       icon: "🟠", apiKey: "", secret: "", baseUrl: "https://api.anthropic.com/v1",               model: "claude-3-5-sonnet",    temperature: 0.7, maxTokens: 8192, timeout: 30, priority: 3, enabled: true,  isLocal: false, status: "offline",      latency: undefined, costPer1k: 0.015, usageToday: 0, usageLimit: 50000 },
-  { id: "grok",         name: "grok",         displayName: "Grok",         icon: "⚫", apiKey: "", secret: "", baseUrl: "https://api.x.ai/v1",                       model: "grok-2-1212",          temperature: 0.7, maxTokens: 4096, timeout: 30, priority: 4, enabled: false, isLocal: false, status: "unconfigured", latency: undefined, costPer1k: 0.005, usageToday: 0, usageLimit: 50000 },
-  { id: "deepseek",     name: "deepseek",     displayName: "DeepSeek",     icon: "🐬", apiKey: "", secret: "", baseUrl: "https://api.deepseek.com/v1",               model: "deepseek-chat",        temperature: 0.7, maxTokens: 4096, timeout: 30, priority: 5, enabled: true,  isLocal: false, status: "online",       latency: 445, costPer1k: 0.0014, usageToday: 890, usageLimit: 50000 },
-  { id: "mistral",      name: "mistral",      displayName: "Mistral",      icon: "🟤", apiKey: "", secret: "", baseUrl: "https://api.mistral.ai/v1",                 model: "mistral-large-latest", temperature: 0.7, maxTokens: 4096, timeout: 30, priority: 6, enabled: false, isLocal: false, status: "unconfigured", latency: undefined, costPer1k: 0.008, usageToday: 0, usageLimit: 50000 },
-  { id: "cohere",       name: "cohere",       displayName: "Cohere",       icon: "🟡", apiKey: "", secret: "", baseUrl: "https://api.cohere.ai/v1",                  model: "command-r-plus",       temperature: 0.7, maxTokens: 4096, timeout: 30, priority: 7, enabled: false, isLocal: false, status: "unconfigured", latency: undefined, costPer1k: 0.003, usageToday: 0, usageLimit: 50000 },
-  { id: "together",     name: "together",     displayName: "Together AI",  icon: "🔴", apiKey: "", secret: "", baseUrl: "https://api.together.xyz/v1",               model: "meta-llama/Llama-3-8b-chat-hf", temperature: 0.7, maxTokens: 4096, timeout: 30, priority: 8, enabled: false, isLocal: false, status: "unconfigured", latency: undefined, costPer1k: 0.0002, usageToday: 0, usageLimit: 50000 },
-  { id: "openrouter",   name: "openrouter",   displayName: "OpenRouter",   icon: "🌐", apiKey: "", secret: "", baseUrl: "https://openrouter.ai/api/v1",              model: "openai/gpt-4o",        temperature: 0.7, maxTokens: 4096, timeout: 30, priority: 9, enabled: false, isLocal: false, status: "unconfigured", latency: undefined, costPer1k: 0.005, usageToday: 0, usageLimit: 50000 },
-  { id: "azure",        name: "azure",        displayName: "Azure OpenAI", icon: "☁️", apiKey: "", secret: "", baseUrl: "https://YOUR-RESOURCE.openai.azure.com/",  model: "gpt-4o",               temperature: 0.7, maxTokens: 4096, timeout: 30, priority: 10, enabled: false, isLocal: false, status: "unconfigured", latency: undefined, costPer1k: 0.01, usageToday: 0, usageLimit: 50000 },
-  { id: "ollama",       name: "ollama",       displayName: "Ollama",       icon: "🦙", apiKey: "local", secret: "", baseUrl: "http://localhost:11434/v1",            model: "llama3",               temperature: 0.7, maxTokens: 4096, timeout: 60, priority: 11, enabled: false, isLocal: true,  status: "unconfigured", latency: undefined, costPer1k: 0, usageToday: 0, usageLimit: 0 },
-  { id: "lmstudio",     name: "lmstudio",     displayName: "LM Studio",    icon: "🎛️", apiKey: "local", secret: "", baseUrl: "http://localhost:1234/v1",            model: "local-model",          temperature: 0.7, maxTokens: 4096, timeout: 60, priority: 12, enabled: false, isLocal: true,  status: "unconfigured", latency: undefined, costPer1k: 0, usageToday: 0, usageLimit: 0 },
-  { id: "custom",       name: "custom",       displayName: "Custom",       icon: "⚙️", apiKey: "", secret: "", baseUrl: "",                                         model: "",                     temperature: 0.7, maxTokens: 4096, timeout: 30, priority: 13, enabled: false, isLocal: false, status: "unconfigured", latency: undefined, costPer1k: 0, usageToday: 0, usageLimit: 0 },
+// ── Static metadata per provider type ─────────────────────────────────────────
+interface ProviderMeta {
+  type: string;
+  name: string;
+  icon: string;
+  color: string;
+  models: string[];
+  apiKeyName: string;
+  baseUrl?: string;
+  description: string;
+}
+
+const PROVIDER_META: ProviderMeta[] = [
+  {
+    type: "openai", name: "OpenAI", icon: "🤖", color: "from-emerald-900/30 border-emerald-800/40",
+    models: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
+    apiKeyName: "OPENAI_API_KEY", description: "أقوى نماذج GPT-4o",
+  },
+  {
+    type: "gemini", name: "Google Gemini", icon: "♊", color: "from-blue-900/30 border-blue-800/40",
+    models: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"],
+    apiKeyName: "GEMINI_API_KEY", description: "نماذج Google Gemini",
+  },
+  {
+    type: "anthropic", name: "Anthropic Claude", icon: "🔮", color: "from-orange-900/30 border-orange-800/40",
+    models: ["claude-3-5-sonnet", "claude-3-opus", "claude-3-haiku", "claude-sonnet-4-5"],
+    apiKeyName: "ANTHROPIC_API_KEY", description: "نماذج Claude من Anthropic",
+  },
+  {
+    type: "deepseek", name: "DeepSeek", icon: "🌊", color: "from-cyan-900/30 border-cyan-800/40",
+    models: ["deepseek-chat", "deepseek-coder"],
+    apiKeyName: "DEEPSEEK_API_KEY", description: "نماذج DeepSeek الصينية",
+  },
+  {
+    type: "mistral", name: "Mistral AI", icon: "🌪️", color: "from-purple-900/30 border-purple-800/40",
+    models: ["mistral-large", "mistral-medium", "mistral-small"],
+    apiKeyName: "MISTRAL_API_KEY", description: "نماذج Mistral الأوروبية",
+  },
+  {
+    type: "together", name: "Together AI", icon: "🤝", color: "from-indigo-900/30 border-indigo-800/40",
+    models: ["meta-llama/Llama-3-70b", "mistralai/Mixtral-8x7B"],
+    apiKeyName: "TOGETHER_API_KEY", description: "Open-source models API",
+  },
+  {
+    type: "openrouter", name: "OpenRouter", icon: "🔀", color: "from-violet-900/30 border-violet-800/40",
+    models: ["auto", "anthropic/claude-3.5-sonnet", "openai/gpt-4o"],
+    apiKeyName: "OPENROUTER_API_KEY", description: "بوابة لجميع النماذج",
+  },
+  {
+    type: "xai", name: "xAI Grok", icon: "🌑", color: "from-gray-900/30 border-gray-800/40",
+    models: ["grok-beta", "grok-2", "grok-3"],
+    apiKeyName: "XAI_API_KEY", description: "نماذج Grok من xAI",
+  },
 ];
 
-const STATUS_CONFIG: Record<string, { label: string; dot: string; text: string }> = {
-  online:       { label: "Online",       dot: "bg-emerald-400 shadow-[0_0_6px_#34d399] animate-pulse", text: "text-emerald-400" },
-  offline:      { label: "Offline",      dot: "bg-red-500",    text: "text-red-400" },
-  unconfigured: { label: "Not Set",      dot: "bg-gray-700",   text: "text-gray-500" },
-  testing:      { label: "Testing...",   dot: "bg-amber-400 animate-pulse", text: "text-amber-400" },
+const META_BY_TYPE = Object.fromEntries(PROVIDER_META.map(m => [m.type, m]));
+
+// ── Empty form for new provider ───────────────────────────────────────────────
+const EMPTY_FORM: Partial<ProviderConfig> = {
+  name: "", providerType: "openai", model: "gpt-4o",
+  apiKeyEnvVar: "OPENAI_API_KEY", isDefault: false, status: "active",
 };
 
 export function AIProvidersPage() {
-  const [providers, setProviders] = useState<Provider[]>(DEFAULT_PROVIDERS);
-  const [selected, setSelected] = useState<Provider | null>(null);
-  const [form, setForm] = useState<Partial<Provider>>({});
-  const [testing, setTesting] = useState<string | null>(null);
-  const [tab, setTab] = useState<"list" | "failover" | "usage">("list");
+  const [configs, setConfigs]       = useState<ProviderConfig[]>([]);
+  const [loading, setLoading]       = useState(true);
+  const [modal, setModal]           = useState<Partial<ProviderConfig> | null>(null);
+  const [isNew, setIsNew]           = useState(false);
+  const [saving, setSaving]         = useState(false);
+  const [toast, setToast]           = useState<{ msg: string; ok: boolean } | null>(null);
+  const [tab, setTab]               = useState<"list" | "failover">("list");
 
-  const openConfig = (p: Provider) => {
-    setSelected(p);
-    setForm({ ...p });
+  const showToast = (msg: string, ok: boolean) => {
+    setToast({ msg, ok });
+    setTimeout(() => setToast(null), 3000);
   };
 
-  const save = () => {
-    if (!selected) return;
-    setProviders((prev) => prev.map((p) => p.id === selected.id ? { ...p, ...form } : p));
-    setSelected(null);
+  // ── Load from real API ─────────────────────────────────────────────────────
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await api.get<{ configs: ProviderConfig[] }>("/provider-configs");
+      setConfigs(data.configs ?? []);
+    } catch {
+      showToast("تعذّر تحميل مزودي الذكاء الاصطناعي", false);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  // ── Open edit modal ────────────────────────────────────────────────────────
+  const openEdit = (cfg: ProviderConfig) => {
+    setModal({ ...cfg });
+    setIsNew(false);
   };
 
-  const testConn = async (id: string) => {
-    setTesting(id);
-    setProviders((prev) => prev.map((p) => p.id === id ? { ...p, status: "testing" } : p));
-    await new Promise((r) => setTimeout(r, 1400));
-    const ok = Math.random() > 0.3;
-    setProviders((prev) => prev.map((p) => p.id === id ? { ...p, status: ok ? "online" : "offline", latency: ok ? Math.floor(Math.random() * 500 + 100) : undefined } : p));
-    setTesting(null);
-  };
-
-  const toggleEnabled = (id: string) => {
-    setProviders((prev) => prev.map((p) => p.id === id ? { ...p, enabled: !p.enabled } : p));
-  };
-
-  const movePriority = (id: string, dir: -1 | 1) => {
-    setProviders((prev) => {
-      const list = [...prev].sort((a, b) => a.priority - b.priority);
-      const idx = list.findIndex((p) => p.id === id);
-      const newIdx = idx + dir;
-      if (newIdx < 0 || newIdx >= list.length) return prev;
-      [list[idx].priority, list[newIdx].priority] = [list[newIdx].priority, list[idx].priority];
-      return [...list];
+  // ── Open new modal ─────────────────────────────────────────────────────────
+  const openNew = (type?: string) => {
+    const meta = type ? META_BY_TYPE[type] : PROVIDER_META[0];
+    setModal({
+      ...EMPTY_FORM,
+      providerType: meta?.type ?? "openai",
+      name: meta?.name ?? "New Provider",
+      model: meta?.models[0] ?? "gpt-4o",
+      apiKeyEnvVar: meta?.apiKeyName ?? "API_KEY",
     });
+    setIsNew(true);
   };
 
-  const sorted = [...providers].sort((a, b) => a.priority - b.priority);
-  const failoverChain = sorted.filter((p) => p.enabled);
-  const online = providers.filter((p) => p.status === "online").length;
-  const totalUsage = providers.reduce((s, p) => s + (p.usageToday ?? 0), 0);
+  // ── Save (create or update) ────────────────────────────────────────────────
+  const save = async () => {
+    if (!modal) return;
+    setSaving(true);
+    try {
+      if (isNew) {
+        const data = await api.post<{ config: ProviderConfig }>("/provider-configs", modal);
+        setConfigs(prev => [...prev, data.config]);
+        showToast("✅ تمت الإضافة بنجاح", true);
+      } else {
+        const data = await api.put<{ config: ProviderConfig }>(`/provider-configs/${modal.id}`, modal);
+        setConfigs(prev => prev.map(c => c.id === modal.id ? data.config : c));
+        showToast("✅ تم الحفظ بنجاح", true);
+      }
+      setModal(null);
+    } catch (err: unknown) {
+      showToast("❌ " + (err instanceof Error ? err.message : "فشل الحفظ"), false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // ── Toggle enabled/disabled ────────────────────────────────────────────────
+  const toggleStatus = async (cfg: ProviderConfig) => {
+    const newStatus: "active" | "disabled" = cfg.status === "active" ? "disabled" : "active";
+    try {
+      const data = await api.put<{ config: ProviderConfig }>(`/provider-configs/${cfg.id}`, { status: newStatus });
+      setConfigs(prev => prev.map(c => c.id === cfg.id ? data.config : c));
+      showToast(newStatus === "active" ? "✅ مُفعَّل" : "⏸ مُوقَف", true);
+    } catch {
+      showToast("❌ فشل تغيير الحالة", false);
+    }
+  };
+
+  // ── Delete ─────────────────────────────────────────────────────────────────
+  const remove = async (cfg: ProviderConfig) => {
+    if (!confirm(`هل تريد حذف ${cfg.name}؟`)) return;
+    try {
+      await api.delete(`/provider-configs/${cfg.id}`);
+      setConfigs(prev => prev.filter(c => c.id !== cfg.id));
+      showToast("تم الحذف", true);
+    } catch {
+      showToast("❌ فشل الحذف", false);
+    }
+  };
+
+  // ── Set as default ─────────────────────────────────────────────────────────
+  const setDefault = async (cfg: ProviderConfig) => {
+    try {
+      // Unset all others first
+      await Promise.all(configs.filter(c => c.isDefault && c.id !== cfg.id).map(c =>
+        api.put(`/provider-configs/${c.id}`, { isDefault: false })
+      ));
+      const data = await api.put<{ config: ProviderConfig }>(`/provider-configs/${cfg.id}`, { isDefault: true });
+      await load();
+      showToast(`✅ ${cfg.name} هو المزود الافتراضي`, true);
+    } catch {
+      showToast("❌ فشل التعيين كافتراضي", false);
+    }
+  };
+
+  const activeCount = configs.filter(c => c.status === "active").length;
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#0a0614] p-5">
-      <div className="max-w-7xl mx-auto">
-        <div className="mb-5 flex items-start justify-between">
+    <div className="flex-1 overflow-y-auto bg-[#0a0614] p-4 md:p-6">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed top-16 right-4 z-50 px-4 py-2.5 rounded-xl text-sm font-bold shadow-xl border ${toast.ok ? "bg-emerald-900/90 text-emerald-300 border-emerald-700/50" : "bg-red-900/90 text-red-300 border-red-700/50"}`}>
+          {toast.msg}
+        </div>
+      )}
+
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="mb-5 flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-xl font-black text-white">🔮 AI Provider Manager</h1>
-            <p className="text-purple-400 text-xs mt-0.5">
-              {online} online · Auto-Failover active · {totalUsage.toLocaleString()} tokens used today
+            <h1 className="text-xl font-black text-white">⚡ AI Providers</h1>
+            <p className="text-xs text-purple-500 mt-0.5">
+              {loading ? "جارٍ التحميل..." : `${activeCount}/${configs.length} مُفعَّل · البيانات من Railway DB`}
             </p>
           </div>
-          <button onClick={() => openConfig({ ...DEFAULT_PROVIDERS.find((p) => p.id === "custom")! })} className="bg-gradient-to-r from-purple-700 to-indigo-700 text-white text-xs font-bold px-4 py-2 rounded-xl">
-            + Custom Provider
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => void load()} className="px-3 py-2 rounded-xl text-xs font-bold bg-blue-900/30 text-blue-400 border border-blue-800/40 hover:bg-blue-900/50">
+              ↻ تحديث
+            </button>
+            <button onClick={() => openNew()} className="px-4 py-2 rounded-xl text-xs font-black bg-gradient-to-r from-purple-700 to-indigo-700 text-white hover:opacity-90">
+              + إضافة مزود
+            </button>
+          </div>
         </div>
 
-        <div className="flex gap-1 bg-[#130d2a] border border-purple-900/40 rounded-xl p-1 mb-5 w-fit">
-          {([
-            { id: "list", label: "📋 All Providers" },
-            { id: "failover", label: "⚡ Failover Chain" },
-            { id: "usage", label: "📊 Usage & Cost" },
-          ] as const).map(({ id, label }) => (
-            <button key={id} onClick={() => setTab(id)} className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${tab === id ? "bg-gradient-to-r from-purple-700 to-indigo-700 text-white" : "text-purple-500 hover:text-white"}`}>
-              {label}
+        {/* Tab bar */}
+        <div className="flex gap-1 mb-5 bg-[#130d2a] border border-purple-900/30 rounded-xl p-1">
+          {(["list", "failover"] as const).map(t => (
+            <button key={t} onClick={() => setTab(t)} className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all ${tab === t ? "bg-gradient-to-r from-purple-700 to-indigo-700 text-white" : "text-purple-500 hover:text-white"}`}>
+              {t === "list" ? "📋 القائمة" : "🔄 Failover Chain"}
             </button>
           ))}
         </div>
 
-        {tab === "list" && (
-          <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl overflow-hidden">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-purple-900/40 text-left">
-                  {["#", "Provider", "Model", "Status", "Latency", "Cost/1K", "Priority", "Enabled", ""].map((h) => (
-                    <th key={h} className="px-4 py-3 text-purple-500 font-semibold">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sorted.map((p) => {
-                  const s = STATUS_CONFIG[p.status];
+        {loading ? (
+          <div className="text-center py-20 text-purple-600 animate-pulse">جارٍ تحميل المزودين من قاعدة البيانات...</div>
+        ) : tab === "list" ? (
+          <>
+            {/* Existing Configs */}
+            {configs.length === 0 ? (
+              <div className="text-center py-12 text-purple-700 text-sm">
+                <p className="text-3xl mb-3">🔮</p>
+                <p>لا يوجد مزودو ذكاء اصطناعي بعد</p>
+                <button onClick={() => openNew()} className="mt-3 px-4 py-2 rounded-xl text-xs font-bold bg-purple-800/40 text-purple-300 border border-purple-700/40">
+                  + إضافة أول مزود
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3 mb-6">
+                {configs.map(cfg => {
+                  const meta = META_BY_TYPE[cfg.providerType];
+                  const isActive = cfg.status === "active";
                   return (
-                    <tr key={p.id} className="border-b border-purple-900/20 hover:bg-purple-900/10 transition-colors">
-                      <td className="px-4 py-3 font-mono text-purple-700">{p.priority}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className="text-base">{p.icon}</span>
-                          <div>
-                            <p className="font-bold text-white">{p.displayName}</p>
-                            {p.isLocal && <span className="text-[9px] text-blue-400 font-mono">LOCAL</span>}
-                          </div>
+                    <div key={cfg.id} className={`bg-gradient-to-br ${meta?.color ?? "from-purple-900/30 border-purple-800/40"} border rounded-xl p-4 flex items-center gap-4`}>
+                      <span className="text-2xl flex-shrink-0">{meta?.icon ?? "🤖"}</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <p className="text-sm font-black text-white">{cfg.name}</p>
+                          {cfg.isDefault && <span className="text-[8px] bg-amber-800/40 text-amber-300 px-1.5 py-0.5 rounded font-mono">DEFAULT</span>}
                         </div>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-purple-300">{p.model || "—"}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <div className={`w-2 h-2 rounded-full ${s.dot}`} />
-                          <span className={s.text}>{s.label}</span>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-purple-300">{p.latency ? `${p.latency}ms` : "—"}</td>
-                      <td className="px-4 py-3 font-mono text-purple-300">{p.isLocal ? "Free" : p.costPer1k ? `$${p.costPer1k}` : "—"}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1">
-                          <button onClick={() => movePriority(p.id, -1)} className="text-purple-600 hover:text-white w-5 text-center">↑</button>
-                          <button onClick={() => movePriority(p.id, 1)} className="text-purple-600 hover:text-white w-5 text-center">↓</button>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input type="checkbox" checked={p.enabled} onChange={() => toggleEnabled(p.id)} className="sr-only peer" />
-                          <div className="w-8 h-4 bg-gray-700 rounded-full peer peer-checked:after:translate-x-4 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-purple-600" />
-                        </label>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex gap-1.5">
-                          <button
-                            onClick={() => void testConn(p.id)}
-                            disabled={testing === p.id}
-                            className="text-[10px] bg-blue-900/20 text-blue-300 border border-blue-800/30 hover:border-blue-600 px-2 py-1 rounded transition-all font-bold"
-                          >
-                            {testing === p.id ? "..." : "Test"}
+                        <p className="text-[10px] text-purple-500 font-mono">{cfg.model}</p>
+                        <p className="text-[9px] text-purple-700">{cfg.apiKeyEnvVar}</p>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className={`w-2 h-2 rounded-full ${isActive ? "bg-emerald-400 animate-pulse" : "bg-red-500"}`} />
+                        <button onClick={() => void toggleStatus(cfg)} className={`text-[10px] px-2 py-1 rounded-lg border font-mono ${isActive ? "text-amber-400 border-amber-800/40 bg-amber-900/20" : "text-emerald-400 border-emerald-800/40 bg-emerald-900/20"}`}>
+                          {isActive ? "⏸" : "▶"}
+                        </button>
+                        {!cfg.isDefault && (
+                          <button onClick={() => void setDefault(cfg)} className="text-[10px] px-2 py-1 rounded-lg border text-blue-400 border-blue-800/40 bg-blue-900/20 font-mono">
+                            ⭐
                           </button>
-                          <button
-                            onClick={() => openConfig(p)}
-                            className="text-[10px] bg-purple-900/20 text-purple-300 border border-purple-800/30 hover:border-purple-600 px-2 py-1 rounded transition-all font-bold"
-                          >
-                            Config
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                        )}
+                        <button onClick={() => openEdit(cfg)} className="text-[10px] px-2 py-1 rounded-lg border text-purple-400 border-purple-800/40 bg-purple-900/20 font-mono">
+                          ✏️
+                        </button>
+                        <button onClick={() => void remove(cfg)} className="text-[10px] px-2 py-1 rounded-lg border text-red-400 border-red-800/40 bg-red-900/20 font-mono">
+                          🗑
+                        </button>
+                      </div>
+                    </div>
                   );
                 })}
-              </tbody>
-            </table>
-          </div>
-        )}
+              </div>
+            )}
 
-        {tab === "failover" && (
-          <div>
-            <div className="mb-4 bg-[#130d2a] border border-blue-800/40 rounded-xl p-4">
-              <h3 className="text-sm font-bold text-white mb-1">⚡ Auto-Failover System</h3>
-              <p className="text-xs text-purple-400">When a provider fails or is rate-limited, OCTOPUS automatically switches to the next enabled provider in priority order — without any interruption.</p>
-            </div>
-            <div className="flex flex-col gap-3 max-w-lg">
-              {failoverChain.map((p, i) => {
-                const s = STATUS_CONFIG[p.status];
-                return (
-                  <div key={p.id}>
-                    <div className={`flex items-center gap-4 p-4 rounded-xl border ${p.status === "online" ? "bg-emerald-900/10 border-emerald-800/40" : p.status === "offline" ? "bg-red-900/10 border-red-800/30 opacity-60" : "bg-[#130d2a] border-purple-900/40"}`}>
-                      <div className="flex items-center gap-2 w-6">
-                        <span className="text-xs font-mono text-purple-600">#{i + 1}</span>
-                      </div>
-                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${s.dot}`} />
-                      <span className="text-xl">{p.icon}</span>
-                      <div className="flex-1">
-                        <p className="text-sm font-bold text-white">{p.displayName}</p>
-                        <p className="text-[10px] text-purple-500">{p.model} · {p.latency ? `${p.latency}ms` : "Offline"}</p>
-                      </div>
-                      {p.status === "offline" && (
-                        <span className="text-[10px] bg-red-900/40 text-red-400 border border-red-800/30 px-2 py-0.5 rounded-full font-mono">SKIP</span>
-                      )}
-                      {p.status === "online" && i === 0 && (
-                        <span className="text-[10px] bg-emerald-900/40 text-emerald-400 border border-emerald-800/30 px-2 py-0.5 rounded-full font-mono">ACTIVE</span>
-                      )}
-                    </div>
-                    {i < failoverChain.length - 1 && (
-                      <div className="flex justify-center my-1">
-                        <span className={`text-sm ${p.status === "online" && failoverChain[i + 1]?.status === "online" ? "text-purple-700" : "text-purple-900"}`}>↓</span>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {tab === "usage" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {providers.filter((p) => p.usageToday !== undefined && p.usageToday > 0).map((p) => {
-              const pct = p.usageLimit ? Math.round(((p.usageToday ?? 0) / p.usageLimit) * 100) : 0;
-              const cost = ((p.usageToday ?? 0) / 1000) * (p.costPer1k ?? 0);
-              return (
-                <div key={p.id} className="bg-[#130d2a] border border-purple-900/40 rounded-xl p-4">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span>{p.icon}</span>
-                    <p className="text-sm font-bold text-white">{p.displayName}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <div className="flex justify-between text-xs">
-                      <span className="text-purple-500">Tokens Today</span>
-                      <span className="text-white font-mono">{(p.usageToday ?? 0).toLocaleString()}</span>
-                    </div>
-                    {p.usageLimit ? (
-                      <>
-                        <div className="w-full bg-[#0d0920] rounded-full h-1.5">
-                          <div className={`h-1.5 rounded-full ${pct > 80 ? "bg-red-500" : "bg-gradient-to-r from-purple-600 to-indigo-500"}`} style={{ width: `${pct}%` }} />
-                        </div>
-                        <p className="text-[10px] text-purple-600">{pct}% of {(p.usageLimit ?? 0).toLocaleString()} limit</p>
-                      </>
-                    ) : null}
-                    <div className="flex justify-between text-xs mt-2 pt-2 border-t border-purple-900/20">
-                      <span className="text-purple-500">Cost Today</span>
-                      <span className="text-amber-400 font-mono font-bold">${cost.toFixed(4)}</span>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {/* Config Modal */}
-        {selected && (
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-            <div className="bg-[#130d2a] border border-purple-800/60 rounded-2xl p-6 w-full max-w-xl shadow-2xl max-h-[90vh] overflow-y-auto">
-              <h2 className="text-base font-black text-white mb-1 flex items-center gap-2">
-                <span>{selected.icon}</span> Configure {selected.displayName}
-              </h2>
-              {selected.isLocal && (
-                <div className="bg-blue-900/20 border border-blue-800/40 rounded-xl p-3 mb-4 text-xs text-blue-300">
-                  📍 Local provider — runs on your machine. No API key required.
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-3 mb-4">
-                {[
-                  { key: "apiKey",   label: "API Key",   type: selected.isLocal ? "text" : "password", placeholder: selected.isLocal ? "local" : "sk-..." },
-                  { key: "secret",   label: "Secret",    type: "password", placeholder: "Optional secret" },
-                  { key: "baseUrl",  label: "Base URL",  type: "text",     placeholder: "https://api.openai.com/v1" },
-                  { key: "model",    label: "Model",     type: "text",     placeholder: "gpt-4o" },
-                ].map(({ key, label, type, placeholder }) => (
-                  <div key={key} className={key === "baseUrl" ? "col-span-2" : ""}>
-                    <label className="block text-xs font-medium text-purple-300 mb-1">{label}</label>
-                    <input
-                      type={type}
-                      value={(form[key as keyof Provider] as string) ?? ""}
-                      onChange={(e) => setForm({ ...form, [key]: e.target.value })}
-                      placeholder={placeholder}
-                      className="w-full bg-[#0d0920] border border-purple-800/50 rounded-xl px-3 py-2 text-white text-xs placeholder-purple-700 focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
+            {/* Add more providers */}
+            <div>
+              <p className="text-xs font-bold text-purple-500 mb-3">إضافة مزود جديد</p>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {PROVIDER_META.filter(m => !configs.find(c => c.providerType === m.type)).map(meta => (
+                  <button
+                    key={meta.type}
+                    onClick={() => openNew(meta.type)}
+                    className="bg-[#130d2a] border border-purple-900/30 rounded-xl p-3 text-left hover:border-purple-700/50 transition-all"
+                  >
+                    <span className="text-xl block mb-1">{meta.icon}</span>
+                    <p className="text-xs font-bold text-white">{meta.name}</p>
+                    <p className="text-[9px] text-purple-600">{meta.description}</p>
+                  </button>
                 ))}
               </div>
-              <div className="grid grid-cols-3 gap-3 mb-4">
-                {[
-                  { key: "temperature", label: "Temperature", min: 0, max: 2, step: 0.1 },
-                  { key: "maxTokens",   label: "Max Tokens",  min: 256, max: 32768, step: 256 },
-                  { key: "timeout",     label: "Timeout (s)", min: 5, max: 120, step: 5 },
-                ].map(({ key, label, min, max, step }) => (
-                  <div key={key}>
-                    <label className="block text-xs font-medium text-purple-300 mb-1">{label}</label>
-                    <input
-                      type="number"
-                      min={min} max={max} step={step}
-                      value={(form[key as keyof Provider] as number) ?? 0}
-                      onChange={(e) => setForm({ ...form, [key]: parseFloat(e.target.value) })}
-                      className="w-full bg-[#0d0920] border border-purple-800/50 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500"
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="flex items-center gap-4 mb-4">
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input type="checkbox" checked={form.enabled ?? false} onChange={(e) => setForm({ ...form, enabled: e.target.checked })} className="accent-purple-600 w-4 h-4" />
-                  <span className="text-xs text-purple-300 font-semibold">Enabled</span>
-                </label>
-              </div>
-              <div className="flex gap-3">
-                <button onClick={save} className="flex-1 bg-gradient-to-r from-purple-700 to-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm">Save</button>
-                <button
-                  onClick={() => { if (selected) void testConn(selected.id); setSelected(null); }}
-                  className="flex-1 bg-blue-900/20 text-blue-300 font-bold py-2.5 rounded-xl text-sm border border-blue-800/40"
-                >
-                  Test Connection
-                </button>
-                <button onClick={() => setSelected(null)} className="flex-1 bg-[#0d0920] text-purple-300 font-bold py-2.5 rounded-xl text-sm border border-purple-800/40">Cancel</button>
-              </div>
             </div>
+          </>
+        ) : (
+          /* Failover Chain View */
+          <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl p-5">
+            <p className="text-xs font-bold text-purple-300 mb-4">سلسلة Failover التلقائي — بناءً على ترتيب الأولوية</p>
+            {configs.filter(c => c.status === "active").length === 0 ? (
+              <p className="text-purple-700 text-sm text-center py-8">لا يوجد مزودون نشطون</p>
+            ) : (
+              <div className="flex flex-wrap gap-3 items-center">
+                {configs.filter(c => c.status === "active").map((cfg, i, arr) => {
+                  const meta = META_BY_TYPE[cfg.providerType];
+                  return (
+                    <div key={cfg.id} className="flex items-center gap-3">
+                      <div className={`text-center px-4 py-3 rounded-xl border bg-gradient-to-br ${meta?.color ?? "from-purple-900/30 border-purple-800/40"}`}>
+                        <span className="text-xl block">{meta?.icon ?? "🤖"}</span>
+                        <p className="text-xs font-bold text-white mt-1">{cfg.name}</p>
+                        <p className="text-[9px] text-purple-500 font-mono">{cfg.model}</p>
+                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 mx-auto mt-1 animate-pulse" />
+                        {cfg.isDefault && <span className="text-[8px] text-amber-300">⭐ default</span>}
+                      </div>
+                      {i < arr.length - 1 && <span className="text-purple-700 font-bold text-lg">→</span>}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Edit / Create Modal */}
+      {modal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+          <div className="bg-[#130d2a] border border-purple-800/50 rounded-2xl p-5 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <h3 className="text-sm font-black text-white mb-4">
+              {isNew ? "➕ إضافة مزود جديد" : `✏️ تعديل ${modal.name}`}
+            </h3>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] font-medium text-purple-400 mb-1">الاسم</label>
+                <input value={modal.name ?? ""} onChange={e => setModal(m => ({ ...m!, name: e.target.value }))}
+                  className="w-full bg-[#0d0920] border border-purple-800/50 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500" />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-medium text-purple-400 mb-1">نوع المزود</label>
+                <select value={modal.providerType ?? "openai"} onChange={e => {
+                  const meta = META_BY_TYPE[e.target.value];
+                  setModal(m => ({ ...m!, providerType: e.target.value, name: meta?.name ?? m!.name, model: meta?.models[0] ?? m!.model, apiKeyEnvVar: meta?.apiKeyName ?? m!.apiKeyEnvVar }));
+                }} className="w-full bg-[#0d0920] border border-purple-800/50 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500">
+                  {PROVIDER_META.map(m => <option key={m.type} value={m.type}>{m.icon} {m.name}</option>)}
+                  <option value="custom">🔧 Custom</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-medium text-purple-400 mb-1">النموذج (Model)</label>
+                <input value={modal.model ?? ""} onChange={e => setModal(m => ({ ...m!, model: e.target.value }))}
+                  list={`models-${modal.providerType}`}
+                  className="w-full bg-[#0d0920] border border-purple-800/50 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500 font-mono"
+                  placeholder="gpt-4o" />
+                <datalist id={`models-${modal.providerType}`}>
+                  {(META_BY_TYPE[modal.providerType ?? ""]?.models ?? []).map(m => <option key={m} value={m} />)}
+                </datalist>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-medium text-purple-400 mb-1">اسم متغير API Key</label>
+                <input value={modal.apiKeyEnvVar ?? ""} onChange={e => setModal(m => ({ ...m!, apiKeyEnvVar: e.target.value }))}
+                  className="w-full bg-[#0d0920] border border-purple-800/50 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500 font-mono"
+                  placeholder="OPENAI_API_KEY" />
+                <p className="text-[9px] text-purple-700 mt-1">اسم المتغير البيئي الذي يحتوي على المفتاح في Railway</p>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-medium text-purple-400 mb-1">Base URL (اختياري)</label>
+                <input value={modal.baseUrl ?? ""} onChange={e => setModal(m => ({ ...m!, baseUrl: e.target.value }))}
+                  className="w-full bg-[#0d0920] border border-purple-800/50 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500 font-mono"
+                  placeholder="https://api.openai.com/v1" />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-medium text-purple-400 mb-1">الحالة</label>
+                <select value={modal.status ?? "active"} onChange={e => setModal(m => ({ ...m!, status: e.target.value as "active" | "disabled" }))}
+                  className="w-full bg-[#0d0920] border border-purple-800/50 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500">
+                  <option value="active">✅ نشط</option>
+                  <option value="disabled">❌ موقوف</option>
+                </select>
+              </div>
+
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" checked={modal.isDefault ?? false} onChange={e => setModal(m => ({ ...m!, isDefault: e.target.checked }))}
+                  className="accent-purple-600 w-4 h-4" />
+                <span className="text-xs text-purple-300">تعيين كمزود افتراضي</span>
+              </label>
+            </div>
+
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => void save()} disabled={saving} className="flex-1 bg-gradient-to-r from-purple-700 to-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm disabled:opacity-50">
+                {saving ? "⏳ جارٍ الحفظ..." : "💾 حفظ"}
+              </button>
+              <button onClick={() => setModal(null)} className="px-4 py-2.5 rounded-xl text-sm bg-gray-800/50 text-gray-400 hover:bg-gray-800">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite";
 import path from "path";
 import runtimeErrorOverlay from "@replit/vite-plugin-runtime-error-modal";
 import { mockupPreviewPlugin } from "./mockupPreviewPlugin";
+import { VitePWA } from "vite-plugin-pwa";
 
 // Provide sensible defaults for environment variables used during development and production builds.
 const rawPort = process.env.PORT ?? "5173";
@@ -14,12 +15,26 @@ if (!Number.isFinite(port) || port <= 0) {
 const basePath = process.env.BASE_PATH ?? "/";
 
 export default defineConfig(async () => {
-  const plugins = [
-    mockupPreviewPlugin(),
-    react(),
-    tailwindcss(),
-    runtimeErrorOverlay(),
-  ];
+    const plugins = [
+        mockupPreviewPlugin(),
+        react(),
+        tailwindcss(),
+        runtimeErrorOverlay(),
+        VitePWA({
+            manifest: {
+                name: "OCTOPUS OS",
+                short_name: "OCTOPUS",
+                start_url: ".",
+                display: "standalone",
+                theme_color: "#ffffff",
+                background_color: "#ffffff",
+                icons: [
+                    { src: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+                    { src: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+                ],
+            },
+        }),
+    ];
 
   // In Replit environments, optionally load the cartographer plugin when not in production.
   if (process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined) {
@@ -47,7 +62,7 @@ export default defineConfig(async () => {
     server: {
       port,
       host: "0.0.0.0",
-      allowedHosts: true,
+      allowedHosts: true as true,
       fs: {
         strict: true,
       },
@@ -55,7 +70,7 @@ export default defineConfig(async () => {
     preview: {
       port,
       host: "0.0.0.0",
-      allowedHosts: true,
+      allowedHosts: true as true,
     },
   };
 });

@@ -18,8 +18,13 @@ router.get("/dashboard", async (req, res) => {
 
 /* POST /api/profit-engine/sale */
 router.post("/sale", async (req, res) => {
-  const result = await profitEngine.recordSale(req.body);
-  res.json(result);
+  try {
+    const result = await profitEngine.recordSale(req.body);
+    res.json(result);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: "Sale recording failed", detail: msg });
+  }
 });
 
 /* POST /api/profit-engine/trigger-hunt

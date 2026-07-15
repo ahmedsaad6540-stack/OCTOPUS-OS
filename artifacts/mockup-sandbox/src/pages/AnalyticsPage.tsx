@@ -1,184 +1,309 @@
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import { api } from "@/lib/api";
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
 } from "recharts";
 
-const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-const rand = (min: number, max: number) => Math.floor(Math.random() * (max - min) + min);
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface Campaign {
+  id: string;
+  name: string;
+  platform: string;
+  network: string;
+  status: string;
+  budget?: string | number | null;
+  clicks?: string | number | null;
+  conversions?: string | number | null;
+  revenue?: string | number | null;
+  createdAt: string;
+}
 
-const weeklyData = DAYS.map((day) => ({
-  day,
-  revenue: rand(50, 500),
-  clicks: rand(200, 2000),
-  conversions: rand(2, 30),
-  impressions: rand(5000, 50000),
-}));
+interface DashboardMetrics {
+  revenue: number;
+  clicks: number;
+  sales: number;
+}
 
-const platformData = [
-  { name: "TikTok", revenue: 1240, clicks: 8900, color: "#ec4899" },
-  { name: "YouTube", revenue: 890, clicks: 4500, color: "#ef4444" },
-  { name: "Instagram", revenue: 670, clicks: 3200, color: "#8b5cf6" },
-  { name: "Pinterest", revenue: 420, clicks: 2100, color: "#f43f5e" },
-  { name: "Facebook", revenue: 310, clicks: 1800, color: "#3b82f6" },
-];
+interface ChartPoint {
+  day: string;
+  revenue: number;
+  clicks: number;
+  conversions: number;
+}
 
-const pieData = [
-  { name: "TikTok", value: 38, color: "#ec4899" },
-  { name: "YouTube", value: 27, color: "#ef4444" },
-  { name: "Instagram", value: 20, color: "#8b5cf6" },
-  { name: "Pinterest", value: 10, color: "#f43f5e" },
-  { name: "Facebook", value: 5, color: "#3b82f6" },
-];
+interface PlatformStat {
+  name: string;
+  revenue: number;
+  clicks: number;
+  color: string;
+}
 
-const monthlyData = Array.from({ length: 30 }, (_, i) => ({
-  day: String(i + 1),
-  revenue: rand(20, 800),
-  clicks: rand(100, 3000),
-}));
+const PLATFORM_COLORS: Record<string, string> = {
+  tiktok: "#ec4899", youtube: "#ef4444", instagram: "#8b5cf6",
+  pinterest: "#f43f5e", facebook: "#3b82f6", x: "#06b6d4",
+  reddit: "#f97316", linkedin: "#0ea5e9",
+};
+
+const DAYS_AR = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
 
 type Range = "7d" | "30d";
 
-const KPIS = [
-  { label: "Total Revenue", value: "$3,530", change: "+12.4%", up: true, icon: "💰" },
-  { label: "Total Clicks", value: "20,500", change: "+8.2%", up: true, icon: "👆" },
-  { label: "Conversions", value: "342", change: "+22.1%", up: true, icon: "✅" },
-  { label: "Avg. ROI", value: "287%", change: "+4.5%", up: true, icon: "📈" },
-  { label: "Cost per Click", value: "$0.08", change: "-3.2%", up: false, icon: "💸" },
-  { label: "Conv. Rate", value: "1.67%", change: "+0.3%", up: true, icon: "🎯" },
-];
-
 export function AnalyticsPage() {
-  const [range, setRange] = useState<Range>("7d");
-  const chartData = range === "7d" ? weeklyData : monthlyData;
+  const [range, setRange]         = useState<Range>("7d");
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [metrics, setMetrics]     = useState<DashboardMetrics | null>(null);
+  const [loading, setLoading]     = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+
+  // ── Load real data ─────────────────────────────────────────────────────────
+  const load = useCallback(async () => {
+    try {
+      setLoading(true);
+      const [campData, metricsData] = await Promise.all([
+        api.get<{ campaigns: Campaign[] }>("/campaigns"),
+        api.get<{ metrics: DashboardMetrics }>("/profit-engine/dashboard").catch(() => ({ metrics: null })),
+      ]);
+      setCampaigns(campData.campaigns ?? []);
+      setMetrics((metricsData as { metrics: DashboardMetrics | null }).metrics);
+      setLastUpdated(new Date());
+    } catch { /* silent — show zeros */ } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { void load(); }, [load]);
+
+  // ── Derived aggregates from real campaign data ─────────────────────────────
+  const totalRevenue    = metrics?.revenue ?? campaigns.reduce((s, c) => s + Number(c.revenue ?? 0), 0);
+  const totalClicks     = metrics?.clicks  ?? campaigns.reduce((s, c) => s + Number(c.clicks ?? 0), 0);
+  const totalConversions = metrics?.sales  ?? campaigns.reduce((s, c) => s + Number(c.conversions ?? 0), 0);
+  const totalBudget     = campaigns.reduce((s, c) => s + Number(c.budget ?? 0), 0);
+  const avgROI          = totalBudget > 0 ? ((totalRevenue - totalBudget) / totalBudget * 100).toFixed(1) : "0";
+  const cpc             = totalClicks > 0 ? (totalRevenue / totalClicks).toFixed(4) : "0";
+  const convRate        = totalClicks > 0 ? ((totalConversions / totalClicks) * 100).toFixed(2) : "0";
+
+  const KPIS = [
+    { label: "إجمالي الإيراد",   value: `$${totalRevenue.toFixed(2)}`,   icon: "💰", color: "text-emerald-400" },
+    { label: "إجمالي النقرات",    value: totalClicks.toLocaleString(),     icon: "👆", color: "text-blue-400" },
+    { label: "التحويلات",         value: totalConversions.toString(),       icon: "✅", color: "text-purple-400" },
+    { label: "متوسط ROI",        value: `${avgROI}%`,                      icon: "📈", color: "text-amber-400" },
+    { label: "تكلفة النقرة",     value: `$${cpc}`,                         icon: "💸", color: "text-pink-400" },
+    { label: "معدل التحويل",     value: `${convRate}%`,                    icon: "🎯", color: "text-cyan-400" },
+  ];
+
+  // ── Build chart data from campaigns (by date) ──────────────────────────────
+  const buildChartData = (days: number): ChartPoint[] => {
+    const now = new Date();
+    const points: ChartPoint[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dayStr = days === 7
+        ? DAYS_AR[d.getDay()]
+        : `${d.getDate()}/${d.getMonth() + 1}`;
+
+      // Filter campaigns created on or before this day (approximation)
+      const active = campaigns.filter(c => new Date(c.createdAt) <= d);
+      const rev = active.reduce((s, c) => s + Number(c.revenue ?? 0), 0);
+      const cl  = active.reduce((s, c) => s + Number(c.clicks ?? 0), 0);
+      const conv = active.reduce((s, c) => s + Number(c.conversions ?? 0), 0);
+      points.push({ day: dayStr, revenue: rev, clicks: cl, conversions: conv });
+    }
+    return points;
+  };
+
+  const chartData = buildChartData(range === "7d" ? 7 : 30);
+
+  // ── Platform breakdown ─────────────────────────────────────────────────────
+  const platformMap: Record<string, PlatformStat> = {};
+  for (const c of campaigns) {
+    const p = c.platform?.toLowerCase() ?? "other";
+    if (!platformMap[p]) platformMap[p] = { name: c.platform, revenue: 0, clicks: 0, color: PLATFORM_COLORS[p] ?? "#7c3aed" };
+    platformMap[p].revenue += Number(c.revenue ?? 0);
+    platformMap[p].clicks  += Number(c.clicks ?? 0);
+  }
+  const platformData = Object.values(platformMap).sort((a, b) => b.revenue - a.revenue).slice(0, 6);
+  const totalPlatformRev = platformData.reduce((s, p) => s + p.revenue, 0);
+  const pieData = platformData.map(p => ({
+    name: p.name, value: totalPlatformRev > 0 ? Math.round(p.revenue / totalPlatformRev * 100) : 0, color: p.color,
+  }));
 
   return (
-    <div className="flex-1 overflow-y-auto bg-[#0a0614] p-6">
+    <div className="flex-1 overflow-y-auto bg-[#0a0614] p-4 md:p-6">
       <div className="max-w-7xl mx-auto">
-        <div className="mb-6 flex items-start justify-between">
+        {/* Header */}
+        <div className="mb-5 flex items-start justify-between flex-wrap gap-3">
           <div>
-            <h1 className="text-2xl font-black text-white">📊 Analytics</h1>
-            <p className="text-purple-400 text-sm mt-1">Real-time performance across all campaigns & platforms</p>
+            <h1 className="text-xl font-black text-white">📊 Analytics</h1>
+            <p className="text-purple-400 text-xs mt-0.5">
+              {loading ? "جارٍ تحميل البيانات الحقيقية..." :
+                lastUpdated ? `آخر تحديث: ${lastUpdated.toLocaleTimeString("ar-SA")} · ${campaigns.length} حملة` : "لا توجد بيانات"}
+            </p>
           </div>
-          <div className="flex bg-[#130d2a] border border-purple-900/40 rounded-xl p-1">
-            {(["7d", "30d"] as Range[]).map((r) => (
-              <button key={r} onClick={() => setRange(r)} className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${range === r ? "bg-gradient-to-r from-purple-700 to-indigo-700 text-white" : "text-purple-500 hover:text-white"}`}>
-                {r}
-              </button>
-            ))}
+          <div className="flex items-center gap-2">
+            <button onClick={() => void load()} className="px-3 py-1.5 rounded-xl text-xs font-bold bg-blue-900/30 text-blue-400 border border-blue-800/40 hover:bg-blue-900/50">
+              ↻ تحديث
+            </button>
+            <div className="flex bg-[#130d2a] border border-purple-900/40 rounded-xl p-1">
+              {(["7d", "30d"] as Range[]).map(r => (
+                <button key={r} onClick={() => setRange(r)} className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${range === r ? "bg-gradient-to-r from-purple-700 to-indigo-700 text-white" : "text-purple-500 hover:text-white"}`}>{r}</button>
+              ))}
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-3 md:grid-cols-6 gap-3 mb-6">
-          {KPIS.map((kpi) => (
+        {/* No campaigns notice */}
+        {!loading && campaigns.length === 0 && (
+          <div className="mb-5 p-4 bg-amber-900/20 border border-amber-800/30 rounded-xl text-xs text-amber-300">
+            ⚠️ لا توجد حملات بعد. أنشئ حملاتك من صفحة <strong>Campaigns</strong> لتظهر البيانات هنا.
+          </div>
+        )}
+
+        {/* KPI Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 mb-5">
+          {KPIS.map(kpi => (
             <div key={kpi.label} className="bg-[#130d2a] border border-purple-900/40 rounded-xl p-3 hover:border-purple-700/60 transition-colors">
-              <p className="text-lg mb-1">{kpi.icon}</p>
-              <p className="text-lg font-black text-white">{kpi.value}</p>
-              <p className="text-[9px] text-purple-400 leading-tight">{kpi.label}</p>
-              <p className={`text-[10px] font-mono mt-1 ${kpi.up ? "text-emerald-400" : "text-red-400"}`}>{kpi.change}</p>
+              <p className="text-xl mb-1">{kpi.icon}</p>
+              <p className={`text-base font-black ${loading ? "text-purple-800 animate-pulse" : "text-white"}`}>
+                {loading ? "..." : kpi.value}
+              </p>
+              <p className="text-[9px] text-purple-400 leading-tight mt-0.5">{kpi.label}</p>
             </div>
           ))}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-          <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl p-5">
-            <h2 className="text-sm font-bold text-purple-300 mb-4">📈 Revenue Over Time</h2>
-            <ResponsiveContainer width="100%" height={200}>
-              <AreaChart data={chartData} margin={{ top: 0, right: 0, left: -25, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="revG" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e1040" />
-                <XAxis dataKey={range === "7d" ? "day" : "day"} stroke="#6b21a8" tick={{ fontSize: 10 }} />
-                <YAxis stroke="#6b21a8" tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{ background: "#130d2a", border: "1px solid #4c1d95", borderRadius: 8, fontSize: 11 }} labelStyle={{ color: "#c4b5fd" }} />
-                <Area type="monotone" dataKey="revenue" stroke="#7c3aed" strokeWidth={2} fill="url(#revG)" name="Revenue ($)" />
-              </AreaChart>
-            </ResponsiveContainer>
+        {/* Charts */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+          {/* Revenue chart */}
+          <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl p-4">
+            <h2 className="text-sm font-bold text-purple-300 mb-3">📈 الإيراد عبر الزمن</h2>
+            {loading ? <div className="h-44 flex items-center justify-center text-purple-700 text-xs animate-pulse">جارٍ التحميل...</div> : (
+              <ResponsiveContainer width="100%" height={180}>
+                <AreaChart data={chartData} margin={{ top: 0, right: 0, left: -25, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="revG" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1f1535" />
+                  <XAxis dataKey="day" tick={{ fill: "#7c3aed", fontSize: 9 }} />
+                  <YAxis tick={{ fill: "#7c3aed", fontSize: 9 }} />
+                  <Tooltip contentStyle={{ background: "#130d2a", border: "1px solid #4c1d95", borderRadius: 8 }} labelStyle={{ color: "#c4b5fd" }} itemStyle={{ color: "#a78bfa" }} formatter={(v: number) => [`$${v.toFixed(2)}`, "الإيراد"]} />
+                  <Area type="monotone" dataKey="revenue" stroke="#7c3aed" fill="url(#revG)" strokeWidth={2} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
-          <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl p-5">
-            <h2 className="text-sm font-bold text-purple-300 mb-4">👆 Clicks & Conversions</h2>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={chartData} margin={{ top: 0, right: 0, left: -25, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#1e1040" />
-                <XAxis dataKey={range === "7d" ? "day" : "day"} stroke="#6b21a8" tick={{ fontSize: 10 }} />
-                <YAxis stroke="#6b21a8" tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{ background: "#130d2a", border: "1px solid #4c1d95", borderRadius: 8, fontSize: 11 }} labelStyle={{ color: "#c4b5fd" }} />
-                <Legend wrapperStyle={{ fontSize: 10, color: "#a855f7" }} />
-                <Bar dataKey="clicks" fill="#4f46e5" name="Clicks" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="conversions" fill="#7c3aed" name="Conversions" radius={[2, 2, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+          {/* Clicks chart */}
+          <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl p-4">
+            <h2 className="text-sm font-bold text-purple-300 mb-3">👆 النقرات</h2>
+            {loading ? <div className="h-44 flex items-center justify-center text-purple-700 text-xs animate-pulse">جارٍ التحميل...</div> : (
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={chartData} margin={{ top: 0, right: 0, left: -25, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1f1535" />
+                  <XAxis dataKey="day" tick={{ fill: "#7c3aed", fontSize: 9 }} />
+                  <YAxis tick={{ fill: "#7c3aed", fontSize: 9 }} />
+                  <Tooltip contentStyle={{ background: "#130d2a", border: "1px solid #4c1d95", borderRadius: 8 }} labelStyle={{ color: "#c4b5fd" }} itemStyle={{ color: "#60a5fa" }} formatter={(v: number) => [v.toLocaleString(), "نقرة"]} />
+                  <Bar dataKey="clicks" fill="#4f46e5" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl p-5 flex flex-col items-center">
-            <h2 className="text-sm font-bold text-purple-300 mb-4 self-start">🥧 Traffic by Platform</h2>
-            <ResponsiveContainer width="100%" height={160}>
-              <PieChart>
-                <Pie data={pieData} cx="50%" cy="50%" outerRadius={65} dataKey="value" stroke="none">
-                  {pieData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ background: "#130d2a", border: "1px solid #4c1d95", borderRadius: 8, fontSize: 11 }} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="flex flex-wrap gap-2 mt-2 justify-center">
-              {pieData.map((entry) => (
-                <div key={entry.name} className="flex items-center gap-1 text-[10px] text-purple-300">
-                  <div className="w-2 h-2 rounded-full" style={{ background: entry.color }} />
-                  {entry.name} {entry.value}%
-                </div>
-              ))}
-            </div>
+        {/* Platform breakdown */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+          {/* Bar by platform */}
+          <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl p-4">
+            <h2 className="text-sm font-bold text-purple-300 mb-3">🌐 الإيراد حسب المنصة</h2>
+            {!loading && platformData.length === 0 ? (
+              <div className="h-44 flex items-center justify-center text-purple-700 text-xs">لا توجد بيانات منصات</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={180}>
+                <BarChart data={platformData} margin={{ top: 0, right: 0, left: -25, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1f1535" />
+                  <XAxis dataKey="name" tick={{ fill: "#7c3aed", fontSize: 9 }} />
+                  <YAxis tick={{ fill: "#7c3aed", fontSize: 9 }} />
+                  <Tooltip contentStyle={{ background: "#130d2a", border: "1px solid #4c1d95", borderRadius: 8 }} labelStyle={{ color: "#c4b5fd" }} formatter={(v: number) => [`$${v.toFixed(2)}`, "إيراد"]} />
+                  <Bar dataKey="revenue" radius={[4, 4, 0, 0]}>
+                    {platformData.map((p, i) => <Cell key={i} fill={p.color} />)}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
-          <div className="lg:col-span-2 bg-[#130d2a] border border-purple-900/40 rounded-xl p-5">
-            <h2 className="text-sm font-bold text-purple-300 mb-3">🏆 Platform Performance</h2>
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-purple-900/40">
-                  {["Platform", "Revenue", "Clicks", "Trend"].map((h) => (
-                    <th key={h} className="text-left py-2 px-2 text-purple-500 font-semibold">{h}</th>
+          {/* Pie */}
+          <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl p-4">
+            <h2 className="text-sm font-bold text-purple-300 mb-3">🥧 توزيع الإيراد</h2>
+            {!loading && pieData.length === 0 ? (
+              <div className="h-44 flex items-center justify-center text-purple-700 text-xs">لا توجد بيانات</div>
+            ) : (
+              <div className="flex items-center gap-4">
+                <ResponsiveContainer width="50%" height={160}>
+                  <PieChart>
+                    <Pie data={pieData} cx="50%" cy="50%" innerRadius={40} outerRadius={70} paddingAngle={3} dataKey="value">
+                      {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
+                    </Pie>
+                    <Tooltip contentStyle={{ background: "#130d2a", border: "1px solid #4c1d95", borderRadius: 8 }} formatter={(v: number) => [`${v}%`, "الحصة"]} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="flex-1 space-y-1">
+                  {pieData.map(p => (
+                    <div key={p.name} className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.color }} />
+                      <span className="text-[10px] text-purple-300">{p.name}</span>
+                      <span className="text-[10px] text-white ml-auto font-mono">{p.value}%</span>
+                    </div>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {platformData.sort((a, b) => b.revenue - a.revenue).map((p) => (
-                  <tr key={p.name} className="border-b border-purple-900/20 hover:bg-purple-900/10 transition-colors">
-                    <td className="py-2.5 px-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full" style={{ background: p.color }} />
-                        <span className="font-semibold text-white">{p.name}</span>
-                      </div>
-                    </td>
-                    <td className="py-2.5 px-2 text-emerald-400 font-bold">${p.revenue}</td>
-                    <td className="py-2.5 px-2 text-purple-300">{p.clicks.toLocaleString()}</td>
-                    <td className="py-2.5 px-2">
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1 bg-[#0d0920] rounded-full h-1.5">
-                          <div
-                            className="h-1.5 rounded-full"
-                            style={{
-                              width: `${Math.round((p.revenue / 1240) * 100)}%`,
-                              background: p.color,
-                            }}
-                          />
-                        </div>
-                        <span className="text-[10px] text-purple-500">{Math.round((p.revenue / 1240) * 100)}%</span>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                </div>
+              </div>
+            )}
           </div>
+        </div>
+
+        {/* Campaigns table */}
+        <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl p-4">
+          <h2 className="text-sm font-bold text-purple-300 mb-3">📋 الحملات الحقيقية ({campaigns.length})</h2>
+          {loading ? (
+            <div className="text-center py-8 text-purple-600 text-xs animate-pulse">جارٍ التحميل...</div>
+          ) : campaigns.length === 0 ? (
+            <div className="text-center py-8 text-purple-700 text-xs">لا توجد حملات — أنشئ حملة أولاً</div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="text-purple-600 border-b border-purple-900/30">
+                    <th className="text-right py-2 font-semibold">الحملة</th>
+                    <th className="text-right py-2 font-semibold">المنصة</th>
+                    <th className="text-right py-2 font-semibold">الشبكة</th>
+                    <th className="text-right py-2 font-semibold">الإيراد</th>
+                    <th className="text-right py-2 font-semibold">النقرات</th>
+                    <th className="text-right py-2 font-semibold">الحالة</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {campaigns.map(c => (
+                    <tr key={c.id} className="border-b border-purple-900/20 hover:bg-purple-900/10">
+                      <td className="py-2 text-white font-medium">{c.name}</td>
+                      <td className="py-2 text-purple-400">{c.platform}</td>
+                      <td className="py-2 text-purple-400">{c.network}</td>
+                      <td className="py-2 text-emerald-400 font-mono">${Number(c.revenue ?? 0).toFixed(2)}</td>
+                      <td className="py-2 text-blue-400 font-mono">{Number(c.clicks ?? 0).toLocaleString()}</td>
+                      <td className="py-2">
+                        <span className={`px-1.5 py-0.5 rounded text-[9px] font-mono border ${c.status === "active" ? "text-emerald-400 border-emerald-800/40 bg-emerald-900/20" : "text-gray-500 border-gray-800/30 bg-gray-900/20"}`}>
+                          {c.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>

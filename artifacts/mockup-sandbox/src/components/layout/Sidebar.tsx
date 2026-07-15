@@ -61,14 +61,18 @@ const GROUPS = ["OS Core", "Creation", "Connect", "Business", "Platform", "Syste
 interface SidebarProps {
   current: Page;
   onNavigate: (page: Page) => void;
+  isOpen: boolean;
+  onClose: () => void;
 }
 
-export function Sidebar({ current, onNavigate }: SidebarProps) {
+export function Sidebar({ current, onNavigate, isOpen, onClose }: SidebarProps) {
   const { user, logout } = useAuth();
 
   return (
-    <aside className="w-56 min-h-screen bg-[#0d0920] border-r border-purple-900/30 flex flex-col">
-      <div className="px-4 py-4 border-b border-purple-900/30">
+    <aside className={`fixed md:static inset-y-0 left-0 z-50 w-56 h-screen bg-[#0d0920] border-r border-purple-900/30 flex flex-col transform ${
+      isOpen ? "translate-x-0" : "-translate-x-full"
+    } md:translate-x-0 transition-transform duration-200 ease-in-out`}>
+      <div className="px-4 py-4 border-b border-purple-900/30 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-700 flex items-center justify-center text-lg shadow-lg shadow-purple-900/50">
             🐙
@@ -77,10 +81,15 @@ export function Sidebar({ current, onNavigate }: SidebarProps) {
             <p className="text-sm font-black text-white tracking-tight leading-none">OCTOPUS</p>
             <p className="text-[10px] text-purple-500 font-mono">NEXUS OS v6</p>
           </div>
-          <div className="ml-auto flex items-center gap-1">
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_6px_#34d399]" />
-          </div>
         </div>
+        <button
+          onClick={onClose}
+          className="md:hidden text-purple-500 hover:text-white p-1"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
       </div>
 
       <div className="flex-1 overflow-y-auto py-2 px-2">

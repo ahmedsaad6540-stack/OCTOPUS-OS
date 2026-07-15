@@ -131,6 +131,42 @@ router.get("/auth/me", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+router.post("/auth/change-password", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body as {
+      currentPassword?: string;
+      newPassword?: string;
+    };
+
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ error: "Bad Request", message: "currentPassword and newPassword are required" });
+      return;
+    }
+
+    if (newPassword.length < 8) {
+      res.status(400).json({ error: "Bad Request", message: "New password must be at least 8 characters" });
+      return;
+    }
+
+    const [user] = await db.select().from(usersTable).where(eq(usersTable.id, req.user!.userId)).limit(1);
+    if (!user) { res.status(404).json({ error: "Not Found" }); return; }
+
+    const valid = await bcrypt.compare(currentPassword, user.password);
+    if (!valid) {
+      res.status(401).json({ error: "Unauthorized", message: "Current password is incorrect" });
+      return;
+    }
+
+    const hashed = await bcrypt.hash(newPassword, 12);
+    await db.update(usersTable).set({ password: hashed, updatedAt: new Date() }).where(eq(usersTable.id, req.user!.userId));
+
+    res.json({ message: "Password updated successfully" });
+  } catch (err) {
+    req.log.error(err, "Change password error");
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
 router.post("/auth/logout", requireAuth, (_req, res) => {
   res.json({ message: "Logged out successfully" });
 });

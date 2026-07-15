@@ -1,0 +1,21 @@
+{
+  "version": 2,
+  "buildCommand": "echo 'pre-built'",
+  "outputDirectory": "dist",
+  "installCommand": "echo 'skip'",
+  "routes": [
+    {
+      "src": "/assets/(.*)",
+      "headers": { "cache-control": "public, max-age=31536000, immutable" },
+      "dest": "/assets/$1"
+    },
+    {
+      "src": "/(.*\\.js|.*\\.css|.*\\.png|.*\\.jpg|.*\\.svg|.*\\.ico|.*\\.webmanifest|sw\\.js|workbox-.*\\.js)",
+      "dest": "/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/index.html"
+    }
+  ]
+}
