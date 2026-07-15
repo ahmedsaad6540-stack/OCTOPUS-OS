@@ -22,12 +22,14 @@ import metricsRouter from "./metrics.js";
 import { authRateLimiter } from "../middleware/security.js";
 import profitEngineRouter from "./profit-engine.js";
 import oauthRouter from "./oauth.js";
+import webhooksRouter from "./webhooks.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(metricsRouter);
 router.use(oauthRouter);
+router.use(webhooksRouter);
 router.use("/profit-engine", profitEngineRouter);
 router.use("/auth", authRateLimiter);
 router.use(authRouter);
