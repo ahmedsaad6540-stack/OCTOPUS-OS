@@ -21,10 +21,13 @@ import settingsRouter from "./settings.js";
 import metricsRouter from "./metrics.js";
 import { authRateLimiter } from "../middleware/security.js";
 import profitEngineRouter from "./profit-engine.js";
+import oauthRouter from "./oauth.js";
+
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(metricsRouter);
+router.use(oauthRouter);
 router.use("/profit-engine", profitEngineRouter);
 router.use("/auth", authRateLimiter);
 router.use(authRouter);

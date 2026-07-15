@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
+import { useAuth } from "@/lib/auth";
 
 // ── Types matching the real /social API schema ───────────────────────────────
 interface SocialAccount {
@@ -161,6 +162,7 @@ function blankAccount(platform: string): Omit<SocialAccount, "id" | "createdAt" 
 
 // ── Main Component ────────────────────────────────────────────────────────────
 export function SocialPage() {
+  const { user }                    = useAuth();
   const [accounts, setAccounts]     = useState<SocialAccount[]>([]);
   const [selected, setSelected]     = useState<SocialAccount | null>(null);
   const [form, setForm]             = useState<Partial<SocialAccount>>({});
@@ -384,6 +386,24 @@ export function SocialPage() {
                   <p className="text-xs text-purple-400">👥 {selected.followers} متابع</p>
                 )}
               </div>
+
+              {/* OAuth flow button if supported */}
+              {["tiktok", "youtube", "instagram", "facebook"].includes(selected.platform) && (
+                <div className="mb-4">
+                  <a
+                    href={`https://api-server-production-4801.up.railway.app/api/oauth/${selected.platform}/connect?userId=${user?.id ?? ""}`}
+                    target="_self"
+                    className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-800/80 to-indigo-800/80 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs border border-purple-700/50 transition-all text-center"
+                  >
+                    ⚡ ربط تلقائي فوري عبر OAuth
+                  </a>
+                  <div className="flex items-center my-3">
+                    <div className="flex-1 border-t border-purple-950/50" />
+                    <span className="px-2 text-[9px] text-purple-600 uppercase font-bold tracking-wider">أو الإعداد اليدوي</span>
+                    <div className="flex-1 border-t border-purple-950/50" />
+                  </div>
+                </div>
+              )}
 
               {/* Credential Fields */}
               <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl p-4 space-y-3 mb-4">
