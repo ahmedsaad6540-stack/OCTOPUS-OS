@@ -107,12 +107,13 @@ export class SocialEngine {
   async publish(
     input: UnifiedPublishInput,
     platform: SocialPlatform,
-    credentials: SocialCredentials = {},
+    credentials?: SocialCredentials,
     useGateway = false
   ): Promise<UnifiedPublishResult> {
-    const adapter = this.getAdapter(platform, useGateway || credentials.gatewayKey !== undefined);
+    const creds = credentials || {};
+    const adapter = this.getAdapter(platform, useGateway || creds.gatewayKey !== undefined);
     const optimizedInput = this.optimizeContentForPlatform(input, platform);
-    return adapter.publish(optimizedInput, credentials);
+    return adapter.publish(optimizedInput, creds);
   }
 
   /**

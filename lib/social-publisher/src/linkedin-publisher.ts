@@ -47,9 +47,9 @@ export class LinkedInPublisher implements SocialPlatformAdapter {
     }
   }
 
-  async publish(input: UnifiedPublishInput, credentials: SocialCredentials): Promise<UnifiedPublishResult> {
-    const token = credentials.accessToken || process.env["LINKEDIN_ACCESS_TOKEN"];
-    const authorId = credentials.accountId || credentials.pageId || process.env["LINKEDIN_AUTHOR_URN"]; // e.g. "urn:li:person:12345" or "urn:li:organization:67890"
+  async publish(input: UnifiedPublishInput, credentials?: SocialCredentials): Promise<UnifiedPublishResult> {
+    const token = credentials?.accessToken || process.env["LINKEDIN_ACCESS_TOKEN"];
+    const authorId = credentials?.accountId || credentials?.pageId || process.env["LINKEDIN_AUTHOR_URN"]; // e.g. "urn:li:person:12345" or "urn:li:organization:67890"
 
     if (!token || !authorId) {
       return {

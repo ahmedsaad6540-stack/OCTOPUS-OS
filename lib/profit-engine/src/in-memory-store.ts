@@ -145,18 +145,18 @@ export class InMemoryProfitEngineStore implements ProfitEngineStore {
 
   // Video Jobs
   async insertVideoJob(job: InsertVideoJob): Promise<VideoJob> {
-    const record: VideoJob = {
+    const record = {
       id: randomUUID(),
       campaignId: job.campaignId ?? null,
-      title: job.title,
-      script: job.script,
-      platform: job.platform,
+      title: job.title ?? null,
+      script: job.script ?? null,
+      platform: job.platform ?? null,
       status: job.status ?? "pending",
       publishedUrl: job.publishedUrl ?? null,
       userId: job.userId ?? null,
       createdAt: new Date(),
       updatedAt: new Date()
-    };
+    } as unknown as VideoJob;
     this.videoJobs.push(record);
     return record;
   }

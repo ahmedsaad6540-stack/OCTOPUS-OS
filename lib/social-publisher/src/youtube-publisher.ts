@@ -96,7 +96,7 @@ export class YouTubePublisher implements SocialPlatformAdapter {
     };
   }
 
-  async publish(input: UnifiedPublishInput, credentials: SocialCredentials): Promise<UnifiedPublishResult> {
+  async publish(input: UnifiedPublishInput, credentials?: SocialCredentials): Promise<UnifiedPublishResult> {
     const token = await this.getAccessToken(credentials);
     if (!token) {
       return {

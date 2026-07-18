@@ -56,9 +56,9 @@ export class UniversalGatewayAdapter implements SocialPlatformAdapter {
     }
   }
 
-  async publish(input: UnifiedPublishInput, credentials: SocialCredentials): Promise<UnifiedPublishResult> {
-    const gatewayKey = credentials.gatewayKey || credentials.accessToken || process.env["POSTIZ_API_KEY"] || process.env["AYRSHARE_API_KEY"];
-    const gatewayUrl = credentials.gatewayUrl || process.env["POSTIZ_BASE_URL"] || "https://app.ayrshare.com/api";
+  async publish(input: UnifiedPublishInput, credentials?: SocialCredentials): Promise<UnifiedPublishResult> {
+    const gatewayKey = credentials?.gatewayKey || credentials?.accessToken || process.env["POSTIZ_API_KEY"] || process.env["AYRSHARE_API_KEY"];
+    const gatewayUrl = credentials?.gatewayUrl || process.env["POSTIZ_BASE_URL"] || "https://app.ayrshare.com/api";
 
     if (!gatewayKey) {
       return {

@@ -60,6 +60,7 @@ export interface UnifiedPublishResult {
   platform: SocialPlatform;
   platformId: string;
   platformUrl?: string;
+  platformVideoUrl?: string;
   status: "completed" | "failed";
   error?: string;
   publishedAt?: string;
@@ -76,7 +77,7 @@ export interface MultiPlatformPublishResult {
 
 export interface SocialPlatformAdapter {
   readonly platform: SocialPlatform;
-  publish(input: UnifiedPublishInput, credentials: SocialCredentials): Promise<UnifiedPublishResult>;
+  publish(input: UnifiedPublishInput, credentials?: SocialCredentials): Promise<UnifiedPublishResult>;
   refreshToken?(credentials: SocialCredentials): Promise<SocialCredentials | null>;
   verifyConnection?(credentials: SocialCredentials): Promise<{
     connected: boolean;

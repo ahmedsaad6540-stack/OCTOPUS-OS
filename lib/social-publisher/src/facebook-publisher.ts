@@ -50,9 +50,9 @@ export class FacebookPublisher implements SocialPlatformAdapter {
     }
   }
 
-  async publish(input: UnifiedPublishInput, credentials: SocialCredentials): Promise<UnifiedPublishResult> {
-    const token = credentials.accessToken || process.env["FACEBOOK_ACCESS_TOKEN"];
-    const pageId = credentials.pageId || credentials.accountId || process.env["FACEBOOK_PAGE_ID"] || "me";
+  async publish(input: UnifiedPublishInput, credentials?: SocialCredentials): Promise<UnifiedPublishResult> {
+    const token = credentials?.accessToken || process.env["FACEBOOK_ACCESS_TOKEN"];
+    const pageId = credentials?.pageId || credentials?.accountId || process.env["FACEBOOK_PAGE_ID"] || "me";
 
     if (!token) {
       return {

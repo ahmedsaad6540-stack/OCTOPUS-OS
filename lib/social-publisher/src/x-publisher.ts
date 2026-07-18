@@ -50,8 +50,8 @@ export class XPublisher implements SocialPlatformAdapter {
     }
   }
 
-  async publish(input: UnifiedPublishInput, credentials: SocialCredentials): Promise<UnifiedPublishResult> {
-    const token = credentials.accessToken || process.env["X_ACCESS_TOKEN"] || process.env["TWITTER_ACCESS_TOKEN"];
+  async publish(input: UnifiedPublishInput, credentials?: SocialCredentials): Promise<UnifiedPublishResult> {
+    const token = credentials?.accessToken || process.env["X_ACCESS_TOKEN"] || process.env["TWITTER_ACCESS_TOKEN"];
 
     if (!token) {
       return {

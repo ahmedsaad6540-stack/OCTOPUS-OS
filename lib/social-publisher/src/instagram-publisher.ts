@@ -51,9 +51,9 @@ export class InstagramPublisher implements SocialPlatformAdapter {
     }
   }
 
-  async publish(input: UnifiedPublishInput, credentials: SocialCredentials): Promise<UnifiedPublishResult> {
-    const token = credentials.accessToken || process.env["INSTAGRAM_ACCESS_TOKEN"] || process.env["FACEBOOK_ACCESS_TOKEN"];
-    const igAccountId = credentials.accountId || process.env["INSTAGRAM_ACCOUNT_ID"];
+  async publish(input: UnifiedPublishInput, credentials?: SocialCredentials): Promise<UnifiedPublishResult> {
+    const token = credentials?.accessToken || process.env["INSTAGRAM_ACCESS_TOKEN"] || process.env["FACEBOOK_ACCESS_TOKEN"];
+    const igAccountId = credentials?.accountId || process.env["INSTAGRAM_ACCOUNT_ID"];
 
     if (!token || !igAccountId) {
       return {
