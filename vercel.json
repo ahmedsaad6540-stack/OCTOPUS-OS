@@ -2,6 +2,6 @@
   "version": 2,
   "installCommand": "pnpm install --no-frozen-lockfile",
   "buildCommand": "pnpm --filter @workspace/octopus-os run build",
-  "outputDirectory": "artifacts/octopus-os/dist",
+  "outputDirectory": "artifacts/octopus-os/dist/public",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
