@@ -106,10 +106,6 @@ router.post("/provider-configs", requireAuth, async (req: AuthRequest, res) => {
 
 router.get("/provider-configs", requireAuth, async (req: AuthRequest, res) => {
   try {
-    if (req.user!.role !== "admin") {
-      res.status(403).json({ error: "Forbidden", message: "Only admins can view provider configs" });
-      return;
-    }
     const { providerType, status, limit } = req.query;
     if (typeof status === "string" && !STATUSES.includes(status as ProviderStatus)) {
       res.status(400).json({ error: "Bad Request", message: `status must be one of: ${STATUSES.join(", ")}` });
@@ -120,6 +116,7 @@ router.get("/provider-configs", requireAuth, async (req: AuthRequest, res) => {
       providerType: typeof providerType === "string" ? providerType : undefined,
       status: typeof status === "string" ? (status as ProviderStatus) : undefined,
       limit: Number.isFinite(parsedLimit) ? parsedLimit : undefined,
+      userId: req.user!.userId,
     });
     res.json({ configs });
   } catch (err) {
@@ -130,10 +127,6 @@ router.get("/provider-configs", requireAuth, async (req: AuthRequest, res) => {
 
 router.get("/provider-configs/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    if (req.user!.role !== "admin") {
-      res.status(403).json({ error: "Forbidden", message: "Only admins can view provider configs" });
-      return;
-    }
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) {
       res.status(400).json({ error: "Bad Request", message: "id must be a UUID" });

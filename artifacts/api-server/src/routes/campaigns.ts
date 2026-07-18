@@ -22,32 +22,32 @@ router.get("/campaigns", requireAuth, async (req: AuthRequest, res) => {
 
 router.post("/campaigns", requireAuth, async (req: AuthRequest, res) => {
   try {
-    const body = req.body as Partial<typeof campaignsTable.$inferInsert>;
+    const { id: _id, userId: _uid, createdAt: _ca, updatedAt: _ua, ...cleanBody } = req.body as Record<string, any>;
     const [row] = await db
       .insert(campaignsTable)
-      .values({ ...body, userId: req.user!.userId } as typeof campaignsTable.$inferInsert)
+      .values({ ...cleanBody, userId: req.user!.userId } as typeof campaignsTable.$inferInsert)
       .returning();
     res.status(201).json({ campaign: row });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err instanceof Error ? err.message : "Internal Server Error" });
   }
 });
 
 router.put("/campaigns/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
-    const body = req.body as Partial<typeof campaignsTable.$inferInsert>;
+    const { id: _id, userId: _uid, createdAt: _ca, updatedAt: _ua, ...cleanBody } = req.body as Record<string, any>;
     const [row] = await db
       .update(campaignsTable)
-      .set({ ...body, updatedAt: new Date() })
+      .set({ ...cleanBody, updatedAt: new Date() })
       .where(and(eq(campaignsTable.id, id), eq(campaignsTable.userId, req.user!.userId)))
       .returning();
     if (!row) { res.status(404).json({ error: "Not Found" }); return; }
     res.json({ campaign: row });
   } catch (err) {
     req.log.error(err);
-    res.status(500).json({ error: "Internal Server Error" });
+    res.status(500).json({ error: err instanceof Error ? err.message : "Internal Server Error" });
   }
 });
 

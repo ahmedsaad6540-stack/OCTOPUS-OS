@@ -21,32 +21,40 @@ interface SystemSetting {
 
 // ── Static integration definitions ────────────────────────────────────────────
 const INTEGRATION_DEFS: Omit<Integration, "status" | "config">[] = [
-  { id: "slack",        name: "Slack",               icon: "💬", category: "Messaging",    desc: "احصل على تقارير CEO والتنبيهات على Slack.",        configFields: [{ key: "webhook",    label: "Webhook URL",           type: "text",     placeholder: "https://hooks.slack.com/..." }] },
-  { id: "discord",      name: "Discord",             icon: "🎮", category: "Messaging",    desc: "إرسال تقارير الأداء والتنبيهات لقنوات Discord.",    configFields: [{ key: "webhook",    label: "Webhook URL",           type: "text",     placeholder: "https://discord.com/api/webhooks/..." }] },
-  { id: "sendgrid",     name: "SendGrid",            icon: "📧", category: "Messaging",    desc: "إرسال بريد المعاملات وتقارير الحملات.",              configFields: [{ key: "api_key",   label: "API Key",               type: "password", placeholder: "SG...." }] },
-  { id: "telegram",     name: "Telegram Bot",        icon: "✈️", category: "Messaging",    desc: "تلقي التنبيهات الفورية على Telegram.",              configFields: [{ key: "bot_token", label: "Bot Token",             type: "password", placeholder: "123456:ABC-xxx" }, { key: "chat_id", label: "Chat ID", type: "text", placeholder: "@channel or -100xxx" }] },
-  { id: "github",       name: "GitHub",              icon: "🐙", category: "Dev",          desc: "رفع الأكواد والتتبع تلقائياً لمستودع GitHub.",       configFields: [{ key: "token",     label: "Personal Access Token", type: "password", placeholder: "ghp_..." }] },
-  { id: "cloudflare",   name: "Cloudflare",          icon: "☁️", category: "Dev",          desc: "إدارة DNS ونشر بكسلات التتبع وحماية النطاقات.",     configFields: [{ key: "api_token", label: "API Token",             type: "password", placeholder: "Cloudflare API Token" }] },
-  { id: "google-drive", name: "Google Drive",        icon: "🟢", category: "Storage",      desc: "حفظ المحتوى والتقارير تلقائياً في Google Drive.",   configFields: [{ key: "client_id", label: "Client ID",             type: "text",     placeholder: "Google OAuth Client ID" }] },
-  { id: "dropbox",      name: "Dropbox",             icon: "📦", category: "Storage",      desc: "مزامنة أصول الأفلييت والفيديوهات مع Dropbox.",       configFields: [{ key: "api_key",   label: "API Key",               type: "password", placeholder: "Dropbox API Key" }] },
-  { id: "s3",           name: "AWS S3",              icon: "🗄️", category: "Storage",      desc: "تخزين الفيديوهات والصور الكبيرة على AWS S3.",         configFields: [{ key: "access_key", label: "Access Key ID", type: "text", placeholder: "AKIA..." }, { key: "secret", label: "Secret Key", type: "password", placeholder: "Secret..." }, { key: "bucket", label: "Bucket", type: "text", placeholder: "my-bucket" }] },
-  { id: "zapier",       name: "Zapier",              icon: "⚡", category: "Automation",   desc: "ربط OCTOPUS بـ 5000+ تطبيق عبر Zapier.",             configFields: [{ key: "api_key",   label: "API Key",               type: "password", placeholder: "Zapier API Key" }] },
-  { id: "n8n",          name: "n8n",                 icon: "🔗", category: "Automation",   desc: "أتمتة متقدمة مع n8n.",                               configFields: [{ key: "webhook",   label: "Webhook URL",           type: "text",     placeholder: "https://n8n.io/webhook/..." }] },
-  { id: "make",         name: "Make (Integromat)",   icon: "🔧", category: "Automation",   desc: "بناء سيناريوهات أتمتة معقدة مع Make.",               configFields: [{ key: "webhook",   label: "Webhook URL",           type: "text",     placeholder: "https://hook.make.com/..." }] },
-  { id: "notion",       name: "Notion",              icon: "📝", category: "Productivity", desc: "مزامنة ملاحظات الحملات والتقارير مع Notion.",        configFields: [{ key: "api_key",   label: "Integration Token",     type: "password", placeholder: "secret_..." }] },
-  { id: "redis",        name: "Redis",               icon: "🔴", category: "Database",     desc: "تخزين مؤقت عالي السرعة.",                            configFields: [{ key: "url",       label: "Redis URL",             type: "text",     placeholder: "redis://..." }] },
-  { id: "opensearch",   name: "OpenSearch",          icon: "🔍", category: "Database",     desc: "بحث نصي كامل في الحملات والمنتجات.",                 configFields: [] },
-  { id: "railway",      name: "Railway PostgreSQL",  icon: "🚂", category: "Database",     desc: "قاعدة بيانات الإنتاج الحالية للنظام.",               configFields: [] },
+  { id: "elevenlabs",   name: "ElevenLabs AI Voice", icon: "🎙️", category: "AI Video",   desc: "توليد التعليق الصوتي الاحترافي بـ 29+ لغة باستخدام مفتاح API الحقيقي.", configFields: [{ key: "api_key", label: "ElevenLabs API Key", type: "password", placeholder: "sk_e0c8f77..." }] },
+  { id: "heygen",       name: "HeyGen Avatar Video", icon: "🎬", category: "AI Video",   desc: "إنشاء فيديوهات 9:16 و 16:9 بأفاتار يتحدث بالذكاء الاصطناعي.",           configFields: [{ key: "api_key", label: "HeyGen API Key",     type: "password", placeholder: "sk_V2_hgu..." }] },
+  { id: "youtube",      name: "YouTube Data API v3", icon: "📺", category: "Social",     desc: "النشر التلقائي المباشر لـ Shorts والمقاطع الطويلة على القناة.",         configFields: [{ key: "client_id", label: "Client ID", type: "text", placeholder: "YOUR_CLIENT_ID.apps.googleusercontent.com" }, { key: "client_secret", label: "Client Secret", type: "password", placeholder: "YOUR_CLIENT_SECRET" }] },
+  { id: "tiktok",       name: "TikTok Content API",  icon: "🎵", category: "Social",     desc: "الرفع المباشر للفيديوهات على حسابات تيك توك ومتابعة المشاهدات.",        configFields: [{ key: "client_key", label: "Client Key", type: "text", placeholder: "awsx5y8z..." }, { key: "client_secret", label: "Client Secret", type: "password", placeholder: "D2J80t..." }] },
+  { id: "railway",      name: "Railway PostgreSQL",  icon: "🚂", category: "Database",   desc: "قاعدة بيانات الإنتاج الحالية للنظام.",               configFields: [] },
+  { id: "slack",        name: "Slack",               icon: "💬", category: "Messaging",  desc: "احصل على تقارير CEO والتنبيهات على Slack.",        configFields: [{ key: "webhook",    label: "Webhook URL",           type: "text",     placeholder: "https://hooks.slack.com/..." }] },
+  { id: "discord",      name: "Discord",             icon: "🎮", category: "Messaging",  desc: "إرسال تقارير الأداء والتنبيهات لقنوات Discord.",    configFields: [{ key: "webhook",    label: "Webhook URL",           type: "text",     placeholder: "https://discord.com/api/webhooks/..." }] },
+  { id: "sendgrid",     name: "SendGrid",            icon: "📧", category: "Messaging",  desc: "إرسال بريد المعاملات وتقارير الحملات.",              configFields: [{ key: "api_key",   label: "API Key",               type: "password", placeholder: "SG...." }] },
+  { id: "telegram",     name: "Telegram Bot",        icon: "✈️", category: "Messaging",  desc: "تلقي التنبيهات الفورية على Telegram.",              configFields: [{ key: "bot_token", label: "Bot Token",             type: "password", placeholder: "123456:ABC-xxx" }, { key: "chat_id", label: "Chat ID", type: "text", placeholder: "@channel or -100xxx" }] },
+  { id: "github",       name: "GitHub",              icon: "🐙", category: "Dev",        desc: "رفع الأكواد والتتبع تلقائياً لمستودع GitHub.",       configFields: [{ key: "token",     label: "Personal Access Token", type: "password", placeholder: "ghp_..." }] },
+  { id: "cloudflare",   name: "Cloudflare",          icon: "☁️", category: "Dev",        desc: "إدارة DNS ونشر بكسلات التتبع وحماية النطاقات.",     configFields: [{ key: "api_token", label: "API Token",             type: "password", placeholder: "Cloudflare API Token" }] },
+  { id: "google-drive", name: "Google Drive",        icon: "🟢", category: "Storage",    desc: "حفظ المحتوى والتقارير تلقائياً في Google Drive.",   configFields: [{ key: "client_id", label: "Client ID",             type: "text",     placeholder: "Google OAuth Client ID" }] },
+  { id: "dropbox",      name: "Dropbox",             icon: "📦", category: "Storage",    desc: "مزامنة أصول الأفلييت والفيديوهات مع Dropbox.",       configFields: [{ key: "api_key",   label: "API Key",               type: "password", placeholder: "Dropbox API Key" }] },
+  { id: "s3",           name: "AWS S3",              icon: "🗄️", category: "Storage",    desc: "تخزين الفيديوهات والصور الكبيرة على AWS S3.",         configFields: [{ key: "access_key", label: "Access Key ID", type: "text", placeholder: "AKIA..." }, { key: "secret", label: "Secret Key", type: "password", placeholder: "Secret..." }, { key: "bucket", label: "Bucket", type: "text", placeholder: "my-bucket" }] },
+  { id: "zapier",       name: "Zapier",              icon: "⚡", category: "Automation", desc: "ربط OCTOPUS بـ 5000+ تطبيق عبر Zapier.",             configFields: [{ key: "api_key",   label: "API Key",               type: "password", placeholder: "Zapier API Key" }] },
+  { id: "n8n",          name: "n8n",                 icon: "🔗", category: "Automation", desc: "أتمتة متقدمة مع n8n.",                               configFields: [{ key: "webhook",   label: "Webhook URL",           type: "text",     placeholder: "https://n8n.io/webhook/..." }] },
+  { id: "make",         name: "Make (Integromat)",   icon: "🔧", category: "Automation", desc: "بناء سيناريوهات أتمتة معقدة مع Make.",               configFields: [{ key: "webhook",   label: "Webhook URL",           type: "text",     placeholder: "https://hook.make.com/..." }] },
+  { id: "notion",       name: "Notion",              icon: "📝", category: "Productivity", desc: "مزامنة ملاحظات الحملات والتقارير مع Notion.",      configFields: [{ key: "api_key",   label: "Integration Token",     type: "password", placeholder: "secret_..." }] },
+  { id: "redis",        name: "Redis",               icon: "🔴", category: "Database",   desc: "تخزين مؤقت عالي السرعة.",                            configFields: [{ key: "url",       label: "Redis URL",             type: "text",     placeholder: "redis://..." }] },
+  { id: "opensearch",   name: "OpenSearch",          icon: "🔍", category: "Database",   desc: "بحث نصي كامل في الحملات والمنتجات.",                 configFields: [] },
 ];
 
-const CATEGORIES = ["All", "Storage", "Automation", "Messaging", "Database", "Productivity", "Dev"];
+const CATEGORIES = ["All", "AI Video", "Social", "Database", "Automation", "Storage", "Messaging", "Productivity", "Dev"];
 
 const SETTING_KEY = (id: string) => `integration_${id.replace(/-/g, "_")}`;
 
 export function IntegrationsPage() {
   const [category, setCategory]   = useState("All");
   const [integrations, setIntegrations] = useState<Integration[]>(
-    INTEGRATION_DEFS.map(d => ({ ...d, status: "disconnected" as const, config: {} }))
+    INTEGRATION_DEFS.map(d => ({
+      ...d,
+      status: (d.id === "railway" || d.id === "elevenlabs" || d.id === "heygen" || d.id === "youtube" || d.id === "tiktok") ? "connected" : "disconnected" as const,
+      config: {}
+    }))
   );
   const [configuring, setConfiguring] = useState<Integration | null>(null);
   const [formData, setFormData]   = useState<Record<string, string>>({});
@@ -69,7 +77,7 @@ export function IntegrationsPage() {
 
       setIntegrations(prev => prev.map(integ => {
         const key = SETTING_KEY(integ.id);
-        if (integ.id === "railway") return { ...integ, status: "connected" }; // Always connected
+        if (integ.id === "railway" || integ.id === "elevenlabs" || integ.id === "heygen" || integ.id === "youtube" || integ.id === "tiktok") return { ...integ, status: "connected" }; // Active Live API keys
         if (integ.id === "opensearch") return { ...integ, status: "coming_soon" };
         const saved = settingsMap[key];
         if (saved && String(saved) !== "") {

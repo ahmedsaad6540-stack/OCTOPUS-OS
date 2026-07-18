@@ -44,9 +44,9 @@ export function AffiliatesPage() {
         const list: Affiliate[] = (Array.isArray(data) ? data : data.networks ?? []).map((a: any) => ({
           id: a.id,
           providerName: a.network ?? a.providerName ?? "unknown",
-          displayName: NETWORK_META[a.network ?? a.providerName]?.name ?? a.network ?? "Unknown",
-          apiKey: a.apiKey,
-          status: a.status === "active" ? "active" : "disconnected",
+          displayName: NETWORK_META[a.network ?? a.providerName]?.name ?? a.displayName ?? a.network ?? "Unknown",
+          apiKey: a.apiKey || a.affiliateId || a.trackingId || "—",
+          status: (a.status === "active" || a.status === "connected") ? "active" : "disconnected",
           clicks: a.clicks ?? 0,
           conversions: a.conversions ?? 0,
           profit: a.profit ? `$${a.profit}` : "$0.00",

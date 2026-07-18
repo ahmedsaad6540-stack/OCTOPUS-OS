@@ -3,6 +3,7 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import pinoHttp from "pino-http";
 import router from "./routes/index.js";
+import youtubeOauthRouter from "./routes/youtube-oauth.js";
 import { logger } from "./lib/logger.js";
 import { auditLogger } from "./lib/audit-observability.js";
 import { createAuditMiddleware } from "./middleware/audit.js";
@@ -45,6 +46,8 @@ app.use(cookieParser());
 app.use(httpMetricsMiddleware);
 app.use(createAuditMiddleware(auditLogger));
 
+app.use(youtubeOauthRouter);
+app.use("/api", youtubeOauthRouter);
 app.use("/api", apiRateLimiter, router);
 
 export default app;

@@ -6,4 +6,5 @@ export { ImpactAdapter } from "./adapters/impact.js";
 export { PartnerStackAdapter } from "./adapters/partnerstack.js";
 export { AwinAdapter } from "./adapters/awin.js";
 export { ShareASaleAdapter } from "./adapters/shareasale.js";
+export { AmazonAdapter } from "./adapters/amazon.js";
 export { AdapterRegistry } from "./registry.js";

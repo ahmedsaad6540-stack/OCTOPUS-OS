@@ -330,6 +330,9 @@ importers:
       '@workspace/event-bus':
         specifier: workspace:*
         version: link:../../lib/event-bus
+      '@workspace/network-adapters':
+        specifier: workspace:*
+        version: link:../../lib/network-adapters
       '@workspace/notification-system':
         specifier: workspace:*
         version: link:../../lib/notification-system
@@ -345,12 +348,21 @@ importers:
       '@workspace/settings':
         specifier: workspace:*
         version: link:../../lib/settings
+      '@workspace/social-publisher':
+        specifier: workspace:*
+        version: link:../../lib/social-publisher
       '@workspace/task-queue':
         specifier: workspace:*
         version: link:../../lib/task-queue
       '@workspace/tool-manager':
         specifier: workspace:*
         version: link:../../lib/tool-manager
+      '@workspace/video-renderer':
+        specifier: workspace:*
+        version: link:../../lib/video-renderer
+      '@workspace/viral-detector':
+        specifier: workspace:*
+        version: link:../../lib/viral-detector
       '@workspace/workflow-engine':
         specifier: workspace:*
         version: link:../../lib/workflow-engine
@@ -1166,6 +1178,15 @@ importers:
         specifier: 'catalog:'
         version: 4.22.4
 
+  lib/social-publisher:
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.4
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
+
   lib/strategy-engine:
     dependencies:
       '@workspace/db':
@@ -1206,6 +1227,15 @@ importers:
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@opentelemetry/api@1.9.1)(@types/pg@8.20.0)(pg@8.22.0)
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.9.4
+      tsx:
+        specifier: 'catalog:'
+        version: 4.22.4
+
+  lib/video-renderer:
     devDependencies:
       '@types/node':
         specifier: 'catalog:'

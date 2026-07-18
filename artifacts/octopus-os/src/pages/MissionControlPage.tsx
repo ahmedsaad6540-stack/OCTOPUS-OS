@@ -103,12 +103,22 @@ export function MissionControlPage() {
 
   const handleEmergencyStop = async () => {
     if (!token) return;
+    try {
+      const res = await fetch("/api/autonomous/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }
+      });
+      const data = await res.json();
+      alert(data.message || "🛑 تم إيقاف التشغيل الذاتي وتجميد العمليات بنجاح!");
+    } catch (e: any) {
+      alert("🛑 حدث خطأ أثناء إيقاف السيرفر: " + e.message);
+    }
     for (const task of tasks) {
       if (task.status === "running") {
         await fetch(`/api/tasks/${task.id}/cancel`, {
           method: "POST",
           headers: { "Authorization": `Bearer ${token}` }
-        });
+        }).catch(() => {});
       }
     }
     loadData();

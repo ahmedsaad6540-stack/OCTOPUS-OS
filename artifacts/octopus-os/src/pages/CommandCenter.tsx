@@ -190,9 +190,38 @@ export function CommandCenter() {
                 <p className="text-[10px] text-purple-400/60 mt-0.5">Toggle live autonomous system pipelines.</p>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => setAutoMode(!autoMode)}
+                <button onClick={async () => {
+                  if (!token) return;
+                  const next = !autoMode;
+                  setAutoMode(next);
+                  try {
+                    if (next) {
+                      await fetch("/api/autonomous/start", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` } });
+                      alert("⚡ تم تفعيل محرك التشغيل الذاتي (Autonomous 24/7 Engine) بنجاح وبدء دورة العمليات الفورية!");
+                    } else {
+                      await fetch("/api/autonomous/stop", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` } });
+                      alert("⏸ تم إيقاف التشغيل الذاتي بنجاح.");
+                    }
+                  } catch (e: any) {
+                    console.error(e);
+                  }
+                }}
                   className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${autoMode ? "bg-emerald-600 text-white" : "gradient-purple text-white shadow-md glow-purple"}`}>
                   {autoMode ? t("pauseAuto") : t("startAuto")}
+                </button>
+                <button onClick={async () => {
+                  if (!token) return;
+                  setAutoMode(false);
+                  try {
+                    const res = await fetch("/api/autonomous/stop", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` } });
+                    const d = await res.json();
+                    alert(d.message || "🛑 تم إيقاف التشغيل الذاتي وتجميد جميع الحملات وعمليات الرندر بنجاح!");
+                  } catch (e: any) {
+                    alert("🛑 حدث خطأ أثناء إيقاف السيرفر: " + e.message);
+                  }
+                }}
+                  className="px-3 py-2 rounded-lg text-xs font-bold bg-red-950/80 text-red-300 border border-red-600/40 hover:bg-red-900 transition-all">
+                  🛑 إيقاف اضطراري
                 </button>
               </div>
             </div>

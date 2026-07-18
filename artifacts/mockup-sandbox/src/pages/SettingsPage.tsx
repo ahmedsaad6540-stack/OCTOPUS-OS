@@ -126,6 +126,8 @@ export function SettingsPage() {
 
   const CREDENTIALS = [
     { key: "github_token",        label: "GitHub Token",        placeholder: "ghp_xxxxxxxxxxxx",  type: "password" },
+    { key: "impact_account_id",   label: "Impact Account ID",   placeholder: "7482519",           type: "text" },
+    { key: "impact_program_id",   label: "Impact Program ID",   placeholder: "55719",             type: "text" },
     { key: "amazon_tracking_id",  label: "Amazon Tracking ID",  placeholder: "yourname-20",       type: "text" },
     { key: "digistore24_id",      label: "Digistore24 ID",      placeholder: "username4418",      type: "text" },
     { key: "owner_email",         label: "البريد الإلكتروني",   placeholder: "you@gmail.com",      type: "text" },

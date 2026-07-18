@@ -35,6 +35,21 @@ interface Campaign {
   revenue: number | null;
   clicks: number | null;
   conversions: number | null;
+  productUrl?: string | null;
+  affiliateNetwork?: string | null;
+}
+
+interface VideoJob {
+  id: string;
+  productName: string;
+  title?: string;
+  platform?: string;
+  status: string;
+  progress: number;
+  videoUrl?: string;
+  publishedUrl?: string;
+  errorMessage?: string;
+  heygenVideoId?: string;
 }
 
 // ── Agent icon map ────────────────────────────────────────────────────────────
@@ -103,27 +118,52 @@ function Dot({ on }: { on: boolean }) {
 export function CommandCenter() {
   const { user } = useAuth();
   const clock = useClock();
-  const [autonomous, setAutonomous] = useState(false);
-  const [stopped, setStopped] = useState(false);
+  const [autonomous, setAutonomous] = useState(() => localStorage.getItem("octopus_auto") === "true");
+  const [stopped, setStopped] = useState(() => localStorage.getItem("octopus_stopped") === "true");
+  const [runningLoop, setRunningLoop] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
+  const [agentResults, setAgentResults] = useState<Array<{agent: string; campaignName: string; status: string; output: any}>>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("octopus_agent_results") || "[]");
+    } catch {
+      return [];
+    }
+  });
+  const [showResults, setShowResults] = useState(() => localStorage.getItem("octopus_show_results") === "true");
+
+  useEffect(() => {
+    localStorage.setItem("octopus_auto", String(autonomous));
+  }, [autonomous]);
+
+  useEffect(() => {
+    localStorage.setItem("octopus_stopped", String(stopped));
+  }, [stopped]);
+
+  useEffect(() => {
+    localStorage.setItem("octopus_show_results", String(showResults));
+  }, [showResults]);
 
   // Real data from API
   const [agents, setAgents] = useState<Agent[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [jobs, setJobs] = useState<VideoJob[]>([]);
   const [loading, setLoading] = useState(true);
   const [lastFetched, setLastFetched] = useState<Date | null>(null);
 
   const fetchData = useCallback(async () => {
     try {
-      const [agentsRes, providersRes, campaignsRes] = await Promise.allSettled([
+      const [agentsRes, providersRes, campaignsRes, jobsRes] = await Promise.allSettled([
         api.get<{ agents: Agent[] }>("/agents"),
         api.get<{ configs: Provider[] }>("/provider-configs"),
         api.get<{ campaigns: Campaign[] }>("/campaigns"),
+        api.get<{ jobs: VideoJob[] }>("/production/jobs"),
       ]);
 
       if (agentsRes.status === "fulfilled") setAgents(agentsRes.value.agents ?? []);
       if (providersRes.status === "fulfilled") setProviders(providersRes.value.configs ?? []);
       if (campaignsRes.status === "fulfilled") setCampaigns(campaignsRes.value.campaigns ?? []);
+      if (jobsRes.status === "fulfilled") setJobs(jobsRes.value.jobs ?? []);
       setLastFetched(new Date());
     } catch {
       // Keep previous state on error
@@ -132,12 +172,79 @@ export function CommandCenter() {
     }
   }, []);
 
+  const triggerLoop = async () => {
+    setRunningLoop(true);
+    setAgentResults([]);
+    setToast("⏳ دورة التشغيل الذاتي الحقيقية تعمل... جارٍ استدعاء أسطول الذكاء الاصطناعي وتنفيذ المهام...");
+    try {
+      if (!autonomous) {
+        await api.post("/autonomous/start", {}).catch(() => {});
+      }
+      const data = await api.post<{
+        success: boolean;
+        message: string;
+        results: Array<{agent: string; campaignName: string; status: string; output: any}>;
+      }>("/autonomous/run", {});
+      if (data.success && data.results.length > 0) {
+        setAgentResults(data.results);
+        setShowResults(true);
+        setAutonomous(true);
+        setStopped(false);
+        localStorage.setItem("octopus_agent_results", JSON.stringify(data.results));
+        setToast(`✅ ${data.message}`);
+        await fetchData();
+      } else {
+        setToast(`⚠️ ${data.message}`);
+      }
+    } catch (err: any) {
+      setToast("❌ فشل تشغيل الوكلاء: " + (err?.message || String(err)));
+    } finally {
+      setRunningLoop(false);
+      setTimeout(() => setToast(null), 5000);
+    }
+  };
+
+  const handleStopAutonomous = async () => {
+    setAutonomous(false);
+    setStopped(true);
+    setToast("🛑 جارٍ إيقاف محرك التشغيل الذاتي وتجميد العمليات في السيرفر...");
+    try {
+      const res = await api.post<{ success: boolean; message?: string }>("/autonomous/stop", {});
+      setToast(res.message || "🛑 تم إيقاف التشغيل الذاتي وتجميد جميع الحملات وعمليات الرندر بنجاح!");
+      await fetchData();
+    } catch (err: any) {
+      setToast("🛑 تم الإيقاف محلياً. (تحذير السيرفر: " + (err?.message || String(err)) + ")");
+    } finally {
+      setTimeout(() => setToast(null), 6000);
+    }
+  };
+
   useEffect(() => {
     void fetchData();
     // Auto-refresh every 30 seconds
     const id = setInterval(() => void fetchData(), 30_000);
     return () => clearInterval(id);
   }, [fetchData]);
+
+  // Keep autonomous loop active in the background when enabled
+  useEffect(() => {
+    if (!autonomous) return;
+    
+    // Initial trigger after mount/refresh
+    const initialTimer = setTimeout(() => {
+      void triggerLoop();
+    }, 1500);
+
+    // Periodic run every 90 seconds
+    const intervalId = setInterval(() => {
+      void triggerLoop();
+    }, 90_000);
+
+    return () => {
+      clearTimeout(initialTimer);
+      clearInterval(intervalId);
+    };
+  }, [autonomous]);
 
   const greeting = clock.getHours() < 12 ? "morning" : clock.getHours() < 18 ? "afternoon" : "evening";
   const activeAgents = agents.filter((a) => a.status === "active").length;
@@ -214,13 +321,14 @@ export function CommandCenter() {
             </div>
             <div className="flex gap-2 flex-shrink-0 ml-2">
               <button
-                onClick={() => { setStopped(false); setAutonomous((a) => !a); }}
-                className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all border ${autonomous ? "bg-emerald-800/40 text-emerald-300 border-emerald-700/40" : "bg-gradient-to-r from-purple-700 to-indigo-700 text-white border-transparent"}`}
+                onClick={() => void triggerLoop()}
+                disabled={runningLoop}
+                className={`px-3 py-2 rounded-xl text-[11px] font-black transition-all border ${autonomous ? "bg-emerald-800/40 text-emerald-300 border-emerald-700/40" : "bg-gradient-to-r from-purple-700 to-indigo-700 text-white border-transparent"} disabled:opacity-50`}
               >
-                {autonomous ? "⚡ AUTO ON" : "▶ Autonomous"}
+                {runningLoop ? "⏳ Running..." : autonomous ? "⚡ AUTO ON" : "▶ Autonomous"}
               </button>
               <button
-                onClick={() => { setAutonomous(false); setStopped(true); }}
+                onClick={() => void handleStopAutonomous()}
                 className="px-3 py-2 rounded-xl text-[11px] font-black bg-red-900/30 text-red-400 border border-red-800/40 hover:bg-red-900/50 transition-all"
               >
                 🛑 Stop
@@ -235,6 +343,58 @@ export function CommandCenter() {
             </div>
           </div>
         </div>
+
+        {/* Live Toast feedback */}
+        {toast && (
+          <div className="fixed top-16 right-4 z-50 px-4 py-2.5 rounded-xl text-sm font-bold bg-[#1d123d] border border-purple-800 text-purple-300 shadow-2xl animate-bounce">
+            {toast}
+          </div>
+        )}
+
+        {/* Live Agent Activities & AI Output */}
+        {showResults && agentResults.length > 0 && (
+          <div className="bg-[#130d2a] border-2 border-emerald-500/50 rounded-xl p-4 shadow-xl shadow-emerald-950/20">
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center gap-2">
+                <span className="text-emerald-400 text-lg">🤖</span>
+                <p className="text-sm font-black text-white">Live Agent Activities — Real-Time Execution</p>
+              </div>
+              <button 
+                onClick={() => setShowResults(false)}
+                className="text-xs text-purple-400 hover:text-white px-2 py-1 rounded bg-[#0d0920] border border-purple-800/40"
+              >
+                ✕ Hide
+              </button>
+            </div>
+            <div className="space-y-4 max-h-96 overflow-y-auto pr-1">
+              {agentResults.map((res, idx) => (
+                <div key={idx} className="bg-[#0d0920] border border-purple-900/40 rounded-lg p-3">
+                  <div className="flex justify-between items-center border-b border-purple-900/20 pb-2 mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">
+                        {res.agent.toLowerCase().includes("creator") ? "🎬" :
+                         res.agent.toLowerCase().includes("trend") ? "🔥" :
+                         res.agent.toLowerCase().includes("ceo") ? "👔" : "🧠"}
+                      </span>
+                      <p className="text-xs font-bold text-white">{res.agent}</p>
+                    </div>
+                    <span className={`text-[9px] px-1.5 py-0.5 rounded-full border font-mono ${res.status === "completed" ? "bg-emerald-950/40 border-emerald-800 text-emerald-400" : "bg-red-950/40 border-red-800 text-red-400"}`}>
+                      {res.status}
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-purple-400 mb-1">Campaign: <span className="text-purple-300 font-bold">{res.campaignName}</span></p>
+                  
+                  {/* Content response */}
+                  <div className="text-xs text-purple-200 leading-relaxed font-mono whitespace-pre-wrap bg-black/40 p-2.5 rounded border border-purple-950/60 max-h-48 overflow-y-auto">
+                    {res.status === "completed" && res.output && typeof res.output === "object" 
+                      ? (res.output as any).content || JSON.stringify(res.output, null, 2)
+                      : String(res.output || "No output")}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* KPI Row — real data */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -401,6 +561,63 @@ export function CommandCenter() {
               )}
             </div>
 
+            {/* Live Production Video Jobs — real HeyGen & YouTube pipeline */}
+            <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl overflow-hidden">
+              <div className="px-4 py-2.5 border-b border-purple-900/30 flex items-center justify-between">
+                <p className="text-xs font-bold text-purple-300">🎬 Live Production Video Jobs (HeyGen & YouTube)</p>
+                {jobs.length > 0 && (
+                  <span className="text-[10px] text-emerald-400 font-mono">{jobs.filter(j => j.status === "done").length}/{jobs.length} completed</span>
+                )}
+              </div>
+              {loading ? (
+                <div className="p-4 text-center text-purple-600 text-xs animate-pulse">Loading active video production jobs…</div>
+              ) : jobs.length === 0 ? (
+                <div className="p-4 text-center space-y-1">
+                  <p className="text-purple-500 text-xs">No active video jobs yet</p>
+                  <p className="text-purple-700 text-[10px]">Launch a campaign or generate videos in Video Factory to start real rendering</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-purple-900/20 max-h-56 overflow-y-auto">
+                  {jobs.map((j) => (
+                    <div key={j.id} className="flex items-center justify-between px-3 py-2.5 hover:bg-purple-900/10 transition-colors">
+                      <div className="flex-1 min-w-0 pr-3">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs">🎬</span>
+                          <p className="text-xs font-bold text-white truncate">{j.title || j.productName}</p>
+                          <span className="text-[9px] text-purple-400 bg-purple-900/40 px-1.5 py-0.5 rounded font-mono">{j.platform || "YouTube Shorts"}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-1">
+                          <div className="w-24 bg-purple-950 rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-gradient-to-r from-purple-500 to-emerald-400 h-1.5 transition-all duration-500" style={{ width: `${j.progress || 0}%` }} />
+                          </div>
+                          <span className="text-[9px] text-purple-300 font-mono">{j.progress || 0}%</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {j.publishedUrl ? (
+                          <a href={j.publishedUrl} target="_blank" rel="noreferrer" className="bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-bold px-2.5 py-1 rounded transition-all flex items-center gap-1">
+                            📺 Live on {j.platform || "YouTube"} ↗
+                          </a>
+                        ) : j.videoUrl ? (
+                          <a href={j.videoUrl} target="_blank" rel="noreferrer" className="bg-purple-800 hover:bg-purple-700 text-white text-[10px] font-bold px-2.5 py-1 rounded transition-all">
+                            ▶ View MP4 ↗
+                          </a>
+                        ) : (
+                          <span className={`text-[9px] px-2 py-0.5 rounded-full border font-mono ${
+                            j.status === "done" ? "bg-emerald-950/40 border-emerald-800 text-emerald-400" :
+                            j.status === "failed" ? "bg-red-950/40 border-red-800 text-red-400" :
+                            "bg-amber-950/40 border-amber-800 text-amber-400 animate-pulse"
+                          }`}>
+                            {j.status}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Campaigns — real data */}
             <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl overflow-hidden">
               <div className="px-4 py-2.5 border-b border-purple-900/30">
@@ -425,6 +642,15 @@ export function CommandCenter() {
                         <p className="text-xs font-black text-emerald-400">${(c.revenue ?? 0).toFixed(2)}</p>
                         <p className="text-[9px] text-purple-600">{c.clicks ?? 0} clicks</p>
                       </div>
+                      <a
+                        href={c.productUrl || (c.affiliateNetwork?.toLowerCase().includes("impact") ? "https://app.impact.com/secure/advertiser/checklist/checklist-instance.ihtml" : c.affiliateNetwork?.toLowerCase().includes("amazon") ? "https://affiliate-program.amazon.com/" : "https://www.digistore24.com/vendor/cockpit")}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={`فتح صفحة الأفيلييت والحساب في ${c.affiliateNetwork || 'Amazon'}`}
+                        className="text-[9px] font-bold px-2 py-1 rounded border border-indigo-600/40 bg-indigo-950/30 text-indigo-300 hover:text-white hover:bg-indigo-900/60 transition-all flex items-center gap-1 flex-shrink-0"
+                      >
+                        <span>🔗</span> <span>{c.affiliateNetwork || 'amazon'}</span>
+                      </a>
                       <span className={`text-[8px] px-1.5 py-0.5 rounded-full border font-mono flex-shrink-0 ${
                         c.status === "active" ? "text-emerald-400 border-emerald-800/40 bg-emerald-900/20" :
                         c.status === "paused" ? "text-amber-400 border-amber-800/40 bg-amber-900/20" :

@@ -68,21 +68,7 @@ export const marketingContentTable = pgTable("marketing_content", {
   index("marketing_content_type_idx").on(table.type),
 ]);
 
-export const videoJobsTable = pgTable("video_jobs", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  campaignId: uuid("campaign_id").references(() => campaignsTable.id, { onDelete: "cascade" }),
-  title: text("title").notNull(),
-  script: text("script").notNull(),
-  platform: text("platform").notNull(), // youtube, shorts, tiktok, reels
-  status: text("status").notNull().default("pending"), // pending, processing, completed, failed
-  publishedUrl: text("published_url"),
-  userId: uuid("user_id").references(() => usersTable.id, { onDelete: "cascade" }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-}, (table) => [
-  index("video_jobs_campaign_id_idx").on(table.campaignId),
-  index("video_jobs_status_idx").on(table.status),
-]);
+
 
 export const competitorInsightsTable = pgTable("competitor_insights", {
   id: uuid("id").primaryKey().defaultRandom(),

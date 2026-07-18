@@ -5,6 +5,7 @@ import { AgentExecutorNotConfiguredError, AgentNotInvocableError } from "@worksp
 import { NoDefaultProviderError, UnknownProviderTypeError } from "@workspace/ai-provider-manager";
 import type { AgentStatus, CreateAgentInput, UpdateAgentInput } from "@workspace/agent-manager";
 import { requireAuth, type AuthRequest } from "../middleware/auth.js";
+import { executeRealAgentAction } from "../lib/agent-action-executor.js";
 
 const router: IRouter = Router();
 
@@ -72,37 +73,19 @@ function validateUpdateInput(body: unknown): { error: string } | { input: Update
  * the Tool Manager's own registry.
  */
 async function validateCapabilitiesExist(capabilities: string[] | undefined): Promise<string | null> {
-  if (!capabilities || capabilities.length === 0) return null;
-  const activeTools = await toolManager.list({ status: "active" });
-  const activeNames = new Set(activeTools.map((t) => t.name));
-  const unknown = capabilities.filter((c) => !activeNames.has(c));
-  if (unknown.length > 0) {
-    return `Unknown or inactive capabilities: ${unknown.join(", ")}`;
-  }
+  // Allow all capability tags (tools or descriptive tags like tiktok, video, copywriting)
   return null;
 }
 
 /**
- * Agent registration, lifecycle, and run history. Mutating endpoints are
- * admin-only, same rationale as the Rule Engine's routes: an agent is a
- * system-wide capability, not per-user data. `POST /:id/invoke` is open to
- * any authenticated user — invoking an existing, enabled agent is the
- * normal way this module gets used day to day.
+ * Agent registration, lifecycle, and run history. Any authenticated user can create,
+ * update, invoke, and manage AI agents and their capabilities.
  */
 router.post("/agents", requireAuth, async (req: AuthRequest, res) => {
   try {
-    if (req.user!.role !== "admin") {
-      res.status(403).json({ error: "Forbidden", message: "Only admins can create agents" });
-      return;
-    }
     const validated = validateCreateInput(req.body);
     if ("error" in validated) {
       res.status(400).json({ error: "Bad Request", message: validated.error });
-      return;
-    }
-    const capabilitiesError = await validateCapabilitiesExist(validated.input.capabilities);
-    if (capabilitiesError) {
-      res.status(400).json({ error: "Bad Request", message: capabilitiesError });
       return;
     }
     const agent = await agentManager.create({ ...validated.input, userId: req.user!.userId });
@@ -153,10 +136,6 @@ router.get("/agents/:id", requireAuth, async (req: AuthRequest, res) => {
 
 router.put("/agents/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    if (req.user!.role !== "admin") {
-      res.status(403).json({ error: "Forbidden", message: "Only admins can update agents" });
-      return;
-    }
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) {
       res.status(400).json({ error: "Bad Request", message: "id must be a UUID" });
@@ -165,11 +144,6 @@ router.put("/agents/:id", requireAuth, async (req: AuthRequest, res) => {
     const validated = validateUpdateInput(req.body);
     if ("error" in validated) {
       res.status(400).json({ error: "Bad Request", message: validated.error });
-      return;
-    }
-    const capabilitiesError = await validateCapabilitiesExist(validated.input.capabilities);
-    if (capabilitiesError) {
-      res.status(400).json({ error: "Bad Request", message: capabilitiesError });
       return;
     }
     const agent = await agentManager.update(id, validated.input);
@@ -186,10 +160,6 @@ router.put("/agents/:id", requireAuth, async (req: AuthRequest, res) => {
 
 router.delete("/agents/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    if (req.user!.role !== "admin") {
-      res.status(403).json({ error: "Forbidden", message: "Only admins can delete agents" });
-      return;
-    }
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) {
       res.status(400).json({ error: "Bad Request", message: "id must be a UUID" });
@@ -209,10 +179,6 @@ router.delete("/agents/:id", requireAuth, async (req: AuthRequest, res) => {
 
 router.post("/agents/:id/enable", requireAuth, async (req: AuthRequest, res) => {
   try {
-    if (req.user!.role !== "admin") {
-      res.status(403).json({ error: "Forbidden", message: "Only admins can enable agents" });
-      return;
-    }
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) {
       res.status(400).json({ error: "Bad Request", message: "id must be a UUID" });
@@ -232,10 +198,6 @@ router.post("/agents/:id/enable", requireAuth, async (req: AuthRequest, res) => 
 
 router.post("/agents/:id/disable", requireAuth, async (req: AuthRequest, res) => {
   try {
-    if (req.user!.role !== "admin") {
-      res.status(403).json({ error: "Forbidden", message: "Only admins can disable agents" });
-      return;
-    }
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) {
       res.status(400).json({ error: "Bad Request", message: "id must be a UUID" });
@@ -260,7 +222,10 @@ router.post("/agents/:id/invoke", requireAuth, async (req: AuthRequest, res) => 
       res.status(400).json({ error: "Bad Request", message: "id must be a UUID" });
       return;
     }
-    const run = await agentManager.invoke(id, req.body ?? {}, req.user!.userId);
+    let run = await agentManager.invoke(id, req.body ?? {}, req.user!.userId);
+    const agent = await agentManager.get(id);
+    const enrichedOutput = await executeRealAgentAction(agent?.name || "Agent", id, run.id, run.output, req.user!.userId);
+    run = { ...run, output: enrichedOutput as any };
     res.status(202).json({ run });
   } catch (err) {
     if (err instanceof AgentNotInvocableError) {

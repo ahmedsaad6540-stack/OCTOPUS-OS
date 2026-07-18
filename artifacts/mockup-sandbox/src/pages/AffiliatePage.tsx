@@ -127,10 +127,10 @@ export function AffiliatePage() {
                         <td className="px-4 py-3 text-right font-bold text-emerald-400">${parseFloat(n.totalEarnings ?? "0").toFixed(2)}</td>
                         <td className="px-4 py-3 text-center">
                           <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono border ${
-                            n.status === "connected"
+                            (n.status === "connected" || n.status === "active")
                               ? "text-emerald-400 border-emerald-800/40 bg-emerald-900/20"
                               : "text-gray-500 border-gray-800/30 bg-gray-900/20"
-                          }`}>{n.status}</span>
+                          }`}>{n.status === "active" ? "connected" : n.status}</span>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-center gap-1.5">

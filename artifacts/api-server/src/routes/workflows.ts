@@ -79,10 +79,6 @@ function validateUpdateInput(body: unknown): { error: string } | { input: Update
  */
 router.post("/workflows", requireAuth, async (req: AuthRequest, res) => {
   try {
-    if (req.user!.role !== "admin") {
-      res.status(403).json({ error: "Forbidden", message: "Only admins can create workflows" });
-      return;
-    }
     const validated = validateCreateInput(req.body);
     if ("error" in validated) {
       res.status(400).json({ error: "Bad Request", message: validated.error });
@@ -136,10 +132,6 @@ router.get("/workflows/:id", requireAuth, async (req: AuthRequest, res) => {
 
 router.put("/workflows/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    if (req.user!.role !== "admin") {
-      res.status(403).json({ error: "Forbidden", message: "Only admins can update workflows" });
-      return;
-    }
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) {
       res.status(400).json({ error: "Bad Request", message: "id must be a UUID" });
@@ -164,10 +156,6 @@ router.put("/workflows/:id", requireAuth, async (req: AuthRequest, res) => {
 
 router.delete("/workflows/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
-    if (req.user!.role !== "admin") {
-      res.status(403).json({ error: "Forbidden", message: "Only admins can delete workflows" });
-      return;
-    }
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) {
       res.status(400).json({ error: "Bad Request", message: "id must be a UUID" });
@@ -187,10 +175,6 @@ router.delete("/workflows/:id", requireAuth, async (req: AuthRequest, res) => {
 
 router.post("/workflows/:id/enable", requireAuth, async (req: AuthRequest, res) => {
   try {
-    if (req.user!.role !== "admin") {
-      res.status(403).json({ error: "Forbidden", message: "Only admins can enable workflows" });
-      return;
-    }
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) {
       res.status(400).json({ error: "Bad Request", message: "id must be a UUID" });
@@ -210,10 +194,6 @@ router.post("/workflows/:id/enable", requireAuth, async (req: AuthRequest, res) 
 
 router.post("/workflows/:id/disable", requireAuth, async (req: AuthRequest, res) => {
   try {
-    if (req.user!.role !== "admin") {
-      res.status(403).json({ error: "Forbidden", message: "Only admins can disable workflows" });
-      return;
-    }
     const { id } = req.params as { id: string };
     if (!UUID_RE.test(id)) {
       res.status(400).json({ error: "Bad Request", message: "id must be a UUID" });

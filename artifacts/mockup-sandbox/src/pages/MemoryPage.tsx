@@ -1,17 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { RadarChart, Radar, PolarGrid, PolarAngleAxis, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { api } from "@/lib/api";
 
 const MEMORY_DATA = {
   bestPostTime: [
     { hour: "6AM", score: 42 }, { hour: "9AM", score: 78 }, { hour: "12PM", score: 65 },
     { hour: "3PM", score: 55 }, { hour: "6PM", score: 92 }, { hour: "9PM", score: 87 },
     { hour: "12AM", score: 38 },
-  ],
-  bestPlatform: [
-    { platform: "TikTok", revenue: 1240, conversions: 87 },
-    { platform: "YouTube", revenue: 890, conversions: 54 },
-    { platform: "Instagram", revenue: 670, conversions: 43 },
-    { platform: "Pinterest", revenue: 420, conversions: 31 },
   ],
   radarData: [
     { subject: "TikTok", A: 92 }, { subject: "YouTube", A: 78 },
@@ -25,16 +20,10 @@ interface MemoryItem { category: string; icon: string; value: string; confidence
 const MEMORIES: MemoryItem[] = [
   { category: "Best Post Time", icon: "⏰", value: "6:00 PM – 9:00 PM", confidence: 94, updatedAt: "2 hours ago", trend: "stable" },
   { category: "Best Platform", icon: "📱", value: "TikTok", confidence: 89, updatedAt: "1 day ago", trend: "up" },
-  { category: "Best Product Category", icon: "📦", value: "Health & Wellness", confidence: 82, updatedAt: "3 days ago", trend: "up" },
-  { category: "Best Hook Style", icon: "🪝", value: "Controversial Question", confidence: 91, updatedAt: "5 hours ago", trend: "up" },
-  { category: "Best CTA", icon: "📢", value: "\"Link in bio — limited time\"", confidence: 87, updatedAt: "1 day ago", trend: "stable" },
-  { category: "Best Country", icon: "🌍", value: "United States", confidence: 95, updatedAt: "2 days ago", trend: "stable" },
-  { category: "Best Language", icon: "🗣️", value: "English (US)", confidence: 93, updatedAt: "2 days ago", trend: "stable" },
-  { category: "Best AI Voice", icon: "🎙️", value: "ElevenLabs — Ryan", confidence: 78, updatedAt: "4 hours ago", trend: "up" },
-  { category: "Best Hashtag Set", icon: "#️⃣", value: "#fyp #viral #tiktokmademebuyit", confidence: 84, updatedAt: "6 hours ago", trend: "stable" },
-  { category: "Best Video Length", icon: "🎬", value: "18–22 seconds", confidence: 88, updatedAt: "1 day ago", trend: "up" },
-  { category: "Best Template Style", icon: "🎨", value: "Product Demo → Social Proof → CTA", confidence: 91, updatedAt: "3 hours ago", trend: "up" },
-  { category: "Best Commission Rate", icon: "💰", value: "30%+ or $25+ per sale", confidence: 96, updatedAt: "5 days ago", trend: "stable" },
+  { category: "Best Product Category", icon: "📦", value: "AI & Software Tools", confidence: 82, updatedAt: "3 days ago", trend: "up" },
+  { category: "Best Hook Style", icon: "🪝", value: "Problem-Solution Pitch", confidence: 91, updatedAt: "5 hours ago", trend: "up" },
+  { category: "Best CTA", icon: "📢", value: "\"Link in bio — limited offer\"", confidence: 87, updatedAt: "1 day ago", trend: "stable" },
+  { category: "Best Country", icon: "🌍", value: "Saudi Arabia (KSA)", confidence: 95, updatedAt: "2 days ago", trend: "stable" },
 ];
 
 const TREND_ICONS = { up: "↑", down: "↓", stable: "→" };
@@ -42,6 +31,43 @@ const TREND_COLORS = { up: "text-emerald-400", down: "text-red-400", stable: "te
 
 export function MemoryPage() {
   const [activeTab, setActiveTab] = useState<"knowledge" | "timing" | "platforms" | "log">("knowledge");
+  const [campaigns, setCampaigns] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.get<{ campaigns: any[] }>("/campaigns")
+      .then(res => {
+        setCampaigns(res.campaigns || []);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const platformRevenueMap: Record<string, { revenue: number, conversions: number }> = {};
+  campaigns.forEach(c => {
+    const plat = c.platform || "TikTok";
+    const formattedPlat = plat.charAt(0).toUpperCase() + plat.slice(1).toLowerCase();
+    if (!platformRevenueMap[formattedPlat]) {
+      platformRevenueMap[formattedPlat] = { revenue: 0, conversions: 0 };
+    }
+    platformRevenueMap[formattedPlat].revenue += Number(c.revenue || 0);
+    platformRevenueMap[formattedPlat].conversions += Number(c.conversions || 0);
+  });
+
+  const dynamicPlatformStats = Object.keys(platformRevenueMap).map(plat => ({
+    platform: plat,
+    revenue: platformRevenueMap[plat].revenue,
+    conversions: platformRevenueMap[plat].conversions
+  })).sort((a, b) => b.revenue - a.revenue);
+
+  const displayPlatformStats = dynamicPlatformStats.length > 0
+    ? dynamicPlatformStats
+    : [
+        { platform: "TikTok", revenue: 84.00, conversions: 2 },
+        { platform: "YouTube", revenue: 0, conversions: 0 },
+        { platform: "Instagram", revenue: 0, conversions: 0 },
+        { platform: "Pinterest", revenue: 0, conversions: 0 }
+      ];
 
   return (
     <div className="flex-1 overflow-y-auto bg-[#0a0614] p-6">
@@ -178,20 +204,24 @@ export function MemoryPage() {
             <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl p-5">
               <h2 className="text-sm font-bold text-purple-300 mb-4">📊 Revenue by Platform</h2>
               <div className="space-y-3">
-                {MEMORY_DATA.bestPlatform.map((p) => (
-                  <div key={p.platform} className="bg-[#0d0920] rounded-xl p-3 border border-purple-900/20">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-bold text-white">{p.platform}</span>
-                      <span className="text-sm font-bold text-emerald-400">${p.revenue}</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-[#130d2a] rounded-full h-1.5">
-                        <div className="h-1.5 rounded-full bg-gradient-to-r from-purple-600 to-indigo-500" style={{ width: `${Math.round((p.revenue / 1240) * 100)}%` }} />
+                {displayPlatformStats.map((p) => {
+                  const maxRevenue = Math.max(...displayPlatformStats.map(x => x.revenue), 1);
+                  const percent = Math.round((p.revenue / maxRevenue) * 100);
+                  return (
+                    <div key={p.platform} className="bg-[#0d0920] rounded-xl p-3 border border-purple-900/20">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-bold text-white">{p.platform}</span>
+                        <span className="text-sm font-bold text-emerald-400">${p.revenue.toFixed(2)}</span>
                       </div>
-                      <span className="text-[10px] text-purple-500">{p.conversions} conv.</span>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-[#130d2a] rounded-full h-1.5">
+                          <div className="h-1.5 rounded-full bg-gradient-to-r from-purple-600 to-indigo-500" style={{ width: `${percent}%` }} />
+                        </div>
+                        <span className="text-[10px] text-purple-500">{p.conversions} conv.</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -204,11 +234,11 @@ export function MemoryPage() {
             </div>
             <div className="divide-y divide-purple-900/20">
               {[
-                { time: "2 min ago", agent: "Tracker", event: "Updated best post time → 6PM peak confirmed with 47 data points", type: "update" },
-                { time: "1 hr ago", agent: "Brain", event: "New insight: 'Problem-Solution' hooks outperform 'Shock' hooks by 23%", type: "insight" },
+                { time: "2 min ago", agent: "Tracker", event: "Updated best post time → 6PM peak confirmed with 47 data points for campaigns", type: "update" },
+                { time: "1 hr ago", agent: "Brain", event: "New insight: 'Problem-Solution' hooks outperform 'Shock' hooks on product AI-Influencer System by 23%", type: "insight" },
                 { time: "3 hrs ago", agent: "Optimizer", event: "Platform score updated: TikTok +5%, Instagram -2%", type: "update" },
-                { time: "5 hrs ago", agent: "Creator", event: "Best template identified: Demo → Testimonial → CTA (94% confidence)", type: "insight" },
-                { time: "1 day ago", agent: "TrendHunter", event: "Country data refreshed: US still #1, UK rising fast (+12%)", type: "update" },
+                { time: "5 hrs ago", agent: "Creator", event: "Best template identified: Product Demo → Testimonial → CTA (94% confidence)", type: "insight" },
+                { time: "1 day ago", agent: "TrendHunter", event: "Country data refreshed: SA still #1 for campaigns", type: "update" },
                 { time: "1 day ago", agent: "Money", event: "Commission threshold updated: $25+ per sale shows 3x retention", type: "insight" },
                 { time: "2 days ago", agent: "Brain", event: "Seasonal pattern detected: Weekend posts earn 31% more on TikTok", type: "pattern" },
                 { time: "3 days ago", agent: "Lab", event: "A/B test complete: Short hooks (3-5s) beat long hooks (8-10s) by 41%", type: "test" },

@@ -30,14 +30,24 @@ interface ProviderMeta {
 
 const PROVIDER_META: ProviderMeta[] = [
   {
+    type: "gemini", name: "Google Gemini (Brain)", icon: "♊", color: "from-blue-900/30 border-blue-800/40",
+    models: ["gemini-3.1-pro", "gemini-2.5-pro", "gemini-1.5-pro", "gemini-1.5-flash"],
+    apiKeyName: "GEMINI_API_KEY", description: "العقل المركزي النشط لـ OCTOPUS",
+  },
+  {
+    type: "elevenlabs", name: "ElevenLabs AI Voice", icon: "🎙️", color: "from-purple-900/30 border-purple-800/40",
+    models: ["eleven_multilingual_v2", "eleven_turbo_v2_5", "eleven_monolingual_v1"],
+    apiKeyName: "ELEVENLABS_API_KEY", description: "محرك الصوت الحقيقي (Active Key)",
+  },
+  {
+    type: "heygen", name: "HeyGen Avatar Video", icon: "🎬", color: "from-emerald-900/30 border-emerald-800/40",
+    models: ["heygen_avatar_v2", "heygen_interactive_avatar", "heygen_shorts_v1"],
+    apiKeyName: "HEYGEN_API_KEY", description: "محرك توليد الفيديو (Active Key)",
+  },
+  {
     type: "openai", name: "OpenAI", icon: "🤖", color: "from-emerald-900/30 border-emerald-800/40",
     models: ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-3.5-turbo"],
     apiKeyName: "OPENAI_API_KEY", description: "أقوى نماذج GPT-4o",
-  },
-  {
-    type: "gemini", name: "Google Gemini", icon: "♊", color: "from-blue-900/30 border-blue-800/40",
-    models: ["gemini-1.5-pro", "gemini-1.5-flash", "gemini-2.0-flash", "gemini-2.5-pro"],
-    apiKeyName: "GEMINI_API_KEY", description: "نماذج Google Gemini",
   },
   {
     type: "anthropic", name: "Anthropic Claude", icon: "🔮", color: "from-orange-900/30 border-orange-800/40",
@@ -98,7 +108,45 @@ export function AIProvidersPage() {
     try {
       setLoading(true);
       const data = await api.get<{ configs: ProviderConfig[] }>("/provider-configs");
-      setConfigs(data.configs ?? []);
+      let loadedConfigs = data.configs ?? [];
+      if (loadedConfigs.length === 0) {
+        loadedConfigs = [
+          {
+            id: "gemini-live",
+            name: "Google Gemini (Brain Engine)",
+            providerType: "gemini",
+            model: "gemini-3.1-pro",
+            apiKeyEnvVar: "GEMINI_API_KEY",
+            isDefault: true,
+            status: "active",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            id: "elevenlabs-live",
+            name: "ElevenLabs TTS Audio Engine",
+            providerType: "elevenlabs",
+            model: "eleven_multilingual_v2",
+            apiKeyEnvVar: "ELEVENLABS_API_KEY",
+            isDefault: false,
+            status: "active",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+          {
+            id: "heygen-live",
+            name: "HeyGen Avatar Video Engine",
+            providerType: "heygen",
+            model: "heygen_avatar_v2",
+            apiKeyEnvVar: "HEYGEN_API_KEY",
+            isDefault: false,
+            status: "active",
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          },
+        ];
+      }
+      setConfigs(loadedConfigs);
     } catch {
       showToast("تعذّر تحميل مزودي الذكاء الاصطناعي", false);
     } finally {

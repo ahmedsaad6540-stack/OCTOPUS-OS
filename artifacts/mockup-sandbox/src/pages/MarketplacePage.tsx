@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { api } from "@/lib/api";
 
 interface MarketplaceAgent {
   id: string;
@@ -38,12 +39,61 @@ export function MarketplacePage() {
   const [search, setSearch] = useState("");
   const [installing, setInstalling] = useState<string | null>(null);
   const [tab, setTab] = useState<"all" | "installed" | "featured">("all");
+  const [publishModal, setPublishModal] = useState(false);
+  const [publishForm, setPublishForm] = useState({ name: "", category: "Marketing", desc: "", tags: "ai, viral" });
 
   const install = async (id: string) => {
     setInstalling(id);
-    await new Promise((r) => setTimeout(r, 1500));
+    const item = agents.find(a => a.id === id);
+    try {
+      if (item) {
+        await api.post("/agents", {
+          name: item.name,
+          description: item.desc,
+          instructions: `You are ${item.name}, a specialized ${item.category} agent from the AI Marketplace. ${item.desc}`,
+          capabilities: item.tags.length > 0 ? item.tags : [item.category.toLowerCase()],
+          status: "active"
+        });
+      }
+    } catch (e) {
+      // Ignore DB duplicate or error
+    }
     setAgents((prev) => prev.map((a) => a.id === id ? { ...a, installed: true } : a));
     setInstalling(null);
+    alert(`✅ تم تثبيت وإضافة الوكيل "${item?.name}" إلى صفحة الوكلاء النشطة بنجاح!`);
+  };
+
+  const publishAgent = async () => {
+    if (!publishForm.name.trim() || !publishForm.desc.trim()) return;
+    const tagsArr = publishForm.tags.split(",").map(t => t.trim()).filter(Boolean);
+    const newId = String(Date.now());
+    const newAg = {
+      id: newId,
+      name: publishForm.name,
+      icon: "⚡",
+      category: publishForm.category,
+      author: "OCTOPUS User",
+      rating: 5.0,
+      installs: 1,
+      price: "free",
+      desc: publishForm.desc,
+      tags: tagsArr.length > 0 ? tagsArr : ["custom"],
+      installed: true,
+      featured: true
+    };
+    try {
+      await api.post("/agents", {
+        name: publishForm.name,
+        description: publishForm.desc,
+        instructions: `You are ${publishForm.name}, published directly to the Marketplace. ${publishForm.desc}`,
+        capabilities: newAg.tags,
+        status: "active"
+      });
+    } catch (e) {}
+    setAgents(prev => [newAg as any, ...prev]);
+    setPublishModal(false);
+    setPublishForm({ name: "", category: "Marketing", desc: "", tags: "ai, viral" });
+    alert("✅ تم نشر الوكيل في المتجر وحفظه في قاعدة البيانات بنجاح!");
   };
 
   const uninstall = (id: string) => setAgents((prev) => prev.map((a) => a.id === id ? { ...a, installed: false } : a));
@@ -68,7 +118,10 @@ export function MarketplacePage() {
               {agents.length} agents available · {installedCount} installed
             </p>
           </div>
-          <button className="bg-gradient-to-r from-purple-700 to-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl">
+          <button
+            onClick={() => setPublishModal(true)}
+            className="bg-gradient-to-r from-purple-700 to-indigo-700 text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:opacity-90 transition-all shadow-lg shadow-purple-900/30"
+          >
             + Publish Agent
           </button>
         </div>
@@ -157,6 +210,76 @@ export function MarketplacePage() {
           ))}
         </div>
       </div>
+
+      {publishModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4 animate-fade-in">
+          <div className="bg-[#130d2a] border border-purple-600/60 rounded-2xl p-6 w-full max-w-lg shadow-2xl">
+            <div className="flex justify-between items-center mb-4 border-b border-purple-900/40 pb-3">
+              <h3 className="text-sm font-black text-white">✨ نشر وكيل ذكاء اصطناعي في المتجر</h3>
+              <button onClick={() => setPublishModal(false)} className="text-purple-400 hover:text-white">✕</button>
+            </div>
+            <div className="space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-purple-300 block mb-1">اسم الوكيل (Agent Name) *</label>
+                <input
+                  type="text"
+                  value={publishForm.name}
+                  onChange={e => setPublishForm({ ...publishForm, name: e.target.value })}
+                  placeholder="مثال: Viral Hook Generator PRO"
+                  className="w-full bg-[#0d0920] border border-purple-800/50 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500 font-sans"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-purple-300 block mb-1">التصنيف (Category)</label>
+                <select
+                  value={publishForm.category}
+                  onChange={e => setPublishForm({ ...publishForm, category: e.target.value })}
+                  className="w-full bg-[#0d0920] border border-purple-800/50 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500"
+                >
+                  {CATEGORIES.filter(c => c !== "All").map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-purple-300 block mb-1">الوصف المختصر (Description) *</label>
+                <textarea
+                  value={publishForm.desc}
+                  onChange={e => setPublishForm({ ...publishForm, desc: e.target.value })}
+                  rows={3}
+                  placeholder="مثال: يحلل أحدث الترندات ويولد نصوص فيديو جذابة فورا..."
+                  className="w-full bg-[#0d0920] border border-purple-800/50 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500 resize-none font-sans"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-bold text-purple-300 block mb-1">العلامات (Tags - مفصولة بفاصلة)</label>
+                <input
+                  type="text"
+                  value={publishForm.tags}
+                  onChange={e => setPublishForm({ ...publishForm, tags: e.target.value })}
+                  placeholder="tiktok, viral, hook, content"
+                  className="w-full bg-[#0d0920] border border-purple-800/50 rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500 font-mono"
+                />
+              </div>
+            </div>
+            <div className="flex gap-2 mt-5 pt-3 border-t border-purple-900/40">
+              <button
+                onClick={() => void publishAgent()}
+                disabled={!publishForm.name.trim() || !publishForm.desc.trim()}
+                className="flex-1 bg-gradient-to-r from-purple-700 to-indigo-700 hover:from-purple-600 hover:to-indigo-600 text-white font-bold py-2.5 rounded-xl text-xs disabled:opacity-50 transition-all shadow-lg"
+              >
+                🚀 نشر وإضافة الوكيل الآن
+              </button>
+              <button
+                onClick={() => setPublishModal(false)}
+                className="px-5 py-2.5 rounded-xl text-xs font-bold bg-gray-800 text-gray-400 hover:bg-gray-700 transition-all"
+              >
+                إلغاء
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -9,6 +9,8 @@ interface Campaign {
   revenue?: string;
   roi?: string;
   posts?: number;
+  productUrl?: string;
+  affiliateNetwork?: string;
 }
 
 interface NewCampaignForm {
@@ -95,7 +97,7 @@ export function CampaignsPage() {
     }
   };
 
-  /* ── Toggle status (optimistic, PATCH) ── */
+  /* ── Toggle status (optimistic, PATCH & Real Launch) ── */
   const handleToggle = async (campaign: Campaign) => {
     const newStatus = campaign.status === "active" ? "paused" : "active";
     // Optimistic update
@@ -103,11 +105,27 @@ export function CampaignsPage() {
       prev.map((c) => (c.id === campaign.id ? { ...c, status: newStatus } : c))
     );
     try {
-      await fetch(`/api/campaigns/${campaign.id}`, {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({ status: newStatus }),
-      });
+      if (newStatus === "active") {
+        const res = await fetch(`/api/production/launch-campaign/${campaign.id}`, {
+          method: "POST",
+          headers,
+        });
+        if (res.ok) {
+          alert(`🚀 [REAL PRODUCTION LAUNCH]\n\nتم تفعيل حملة "${campaign.name}" وبدء إنتاج رندر الفيديو الحقيقي عبر HeyGen/AI والإعداد للنشر المباشر على منصة ${campaign.platform || 'تيك توك'}!`);
+        } else {
+          await fetch(`/api/campaigns/${campaign.id}`, {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({ status: newStatus }),
+          });
+        }
+      } else {
+        await fetch(`/api/campaigns/${campaign.id}`, {
+          method: "PATCH",
+          headers,
+          body: JSON.stringify({ status: newStatus }),
+        });
+      }
     } catch {
       // Revert on failure
       setCampaigns((prev) =>
@@ -268,6 +286,15 @@ export function CampaignsPage() {
                     >
                       {c.status === "active" ? "Pause" : "Activate"}
                     </button>
+                    <a
+                      href={c.productUrl || (c.affiliateNetwork?.toLowerCase().includes("impact") ? "https://app.impact.com/secure/advertiser/checklist/checklist-instance.ihtml" : c.affiliateNetwork?.toLowerCase().includes("amazon") ? "https://affiliate-program.amazon.com/" : "https://www.digistore24.com/vendor/cockpit")}
+                      target="_blank"
+                      rel="noreferrer"
+                      title={`فتح صفحة منتج الحملة وحسابك في ${c.affiliateNetwork || 'Amazon'}`}
+                      className="px-2 py-1 rounded-md text-[10px] bg-indigo-950/50 text-indigo-300 border border-indigo-600/40 hover:bg-indigo-900/60 hover:text-white flex items-center gap-1"
+                    >
+                      <span>🔗</span> <span>{c.affiliateNetwork || 'amazon'}</span>
+                    </a>
                     <button
                       onClick={() => handleDelete(c.id)}
                       disabled={deletingId === c.id}

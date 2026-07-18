@@ -1,11 +1,29 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { socialAccountsTable } from "@workspace/db/schema";
+import { socialAccountsTable, usersTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../middleware/auth.js";
+import { SocialEngine, type AccountTarget, type SocialPlatform } from "@workspace/social-publisher";
 
 const router = Router();
+const socialEngine = new SocialEngine();
 
+// Helper to resolve user ID for agent calls or authenticated calls
+async function resolveUserId(req: AuthRequest): Promise<string> {
+  if (req.user?.userId) return req.user.userId;
+  try {
+    const [admin] = await db
+      .select()
+      .from(usersTable)
+      .where(eq(usersTable.email, "admin1@octopus.ai"))
+      .limit(1);
+    return admin ? admin.id : "admin-default";
+  } catch {
+    return "admin-default";
+  }
+}
+
+// 1. GET /social - List all social accounts for user
 router.get("/social", requireAuth, async (req: AuthRequest, res) => {
   try {
     const rows = await db
@@ -19,6 +37,7 @@ router.get("/social", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+// 2. POST /social - Create social account entry manually or via integration
 router.post("/social", requireAuth, async (req: AuthRequest, res) => {
   try {
     const body = req.body as Partial<typeof socialAccountsTable.$inferInsert>;
@@ -33,6 +52,7 @@ router.post("/social", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+// 3. PUT /social/:id - Update social account
 router.put("/social/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
@@ -50,6 +70,7 @@ router.put("/social/:id", requireAuth, async (req: AuthRequest, res) => {
   }
 });
 
+// 4. DELETE /social/:id - Disconnect account
 router.delete("/social/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
@@ -60,6 +81,103 @@ router.delete("/social/:id", requireAuth, async (req: AuthRequest, res) => {
   } catch (err) {
     req.log.error(err);
     res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+// 5. POST /social/publish - AI Multi-channel Auto-Dispatch & Unified Publishing Endpoint
+router.post("/social/publish", async (req: AuthRequest, res) => {
+  try {
+    const userId = await resolveUserId(req);
+    const {
+      title,
+      description,
+      videoUrl,
+      imageUrl,
+      tags = [],
+      platforms = [],
+      privacyStatus = "public",
+      aiOptimize = true,
+      useGateway = false,
+    } = req.body as {
+      title: string;
+      description: string;
+      videoUrl?: string;
+      imageUrl?: string;
+      tags?: string[];
+      platforms?: string[]; // e.g. ["facebook", "instagram", "youtube", "tiktok", "x", "linkedin"] or ["all"]
+      privacyStatus?: "public" | "unlisted" | "private";
+      aiOptimize?: boolean;
+      useGateway?: boolean;
+    };
+
+    if (!title && !description) {
+      res.status(400).json({ error: "Title and description are required for social publishing." });
+      return;
+    }
+
+    // Fetch user's connected social accounts from DB
+    const userAccounts = await db
+      .select()
+      .from(socialAccountsTable)
+      .where(and(eq(socialAccountsTable.userId, userId), eq(socialAccountsTable.status, "connected")));
+
+    if (userAccounts.length === 0) {
+      res.status(400).json({
+        error: "No connected social accounts found.",
+        message: "Please connect your accounts via 1-Click OAuth on the Social Hub page.",
+      });
+      return;
+    }
+
+    // Determine target platforms
+    const targets: AccountTarget[] = [];
+    for (const acc of userAccounts) {
+      const platformName = acc.platform.toLowerCase() as SocialPlatform;
+      if (platforms.includes("all") || platforms.length === 0 || platforms.includes(platformName)) {
+        targets.push({
+          platform: platformName,
+          credentials: {
+            accessToken: acc.accessToken || undefined,
+            refreshToken: acc.refreshToken || undefined,
+            accountId: acc.username || undefined,
+          },
+          useGateway: useGateway || acc.platform === "universal_gateway",
+        });
+      }
+    }
+
+    if (targets.length === 0) {
+      res.status(400).json({
+        error: `None of the requested platforms (${platforms.join(", ")}) are connected.`,
+        availableConnected: userAccounts.map((a) => a.platform),
+      });
+      return;
+    }
+
+    req.log?.info({ userId, targetsCount: targets.length, aiOptimize }, "Executing multi-channel AI social dispatch");
+
+    const multiResult = await socialEngine.publishMulti(
+      {
+        title,
+        description,
+        videoUrl,
+        imageUrl,
+        tags,
+        privacyStatus,
+        aiOptimize,
+      },
+      targets
+    );
+
+    res.json({
+      success: multiResult.successCount > 0,
+      summary: `${multiResult.successCount} succeeded, ${multiResult.failureCount} failed out of ${multiResult.totalTargeted} platforms.`,
+      result: multiResult,
+    });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    req.log?.error({ err }, "Error in POST /social/publish");
+    res.status(500).json({ error: "Internal Server Error during multi-channel publishing", details: msg });
   }
 });
 

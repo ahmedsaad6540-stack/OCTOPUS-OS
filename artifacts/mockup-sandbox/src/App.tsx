@@ -22,6 +22,12 @@ import { DeploymentPage } from "@/pages/DeploymentPage";
 import { SaaSPage } from "@/pages/SaaSPage";
 import { LegalPage } from "@/pages/LegalPage";
 import { IdentityCenter } from "@/pages/IdentityCenter";
+import { PrivacyPolicyPage } from "@/pages/PrivacyPolicyPage";
+import { TermsOfServicePage } from "@/pages/TermsOfServicePage";
+import { LandingPage } from "@/pages/LandingPage";
+import { DemoShowcasePage } from "@/pages/DemoShowcasePage";
+import { YouTubeLoginPage } from "@/pages/YouTubeLoginPage";
+import { YouTubeCallbackPage } from "@/pages/YouTubeCallbackPage";
 
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
 
@@ -105,7 +111,9 @@ function getPreviewPath(): string | null {
 
 function OctopusOS() {
   const { user, loading } = useAuth();
-  const [currentPage, setCurrentPage] = useState<Page>("command-center");
+  const [currentPage, setCurrentPage] = useState<Page>(() => {
+    return (localStorage.getItem("octopus_current_page") as Page) || "command-center";
+  });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   if (loading) {
@@ -120,7 +128,11 @@ function OctopusOS() {
   }
 
   if (!user) {
-    return <LoginPage />;
+    const pathname = window.location.pathname;
+    if (pathname === "/login") {
+      return <LoginPage />;
+    }
+    return <LandingPage />;
   }
 
   const renderPage = () => {
@@ -180,15 +192,46 @@ function OctopusOS() {
         current={currentPage}
         onNavigate={(page) => {
           setCurrentPage(page);
+          localStorage.setItem("octopus_current_page", page);
           setIsSidebarOpen(false); // Close drawer on link click on mobile
         }}
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
       />
 
-      {/* Main Content Area - shifts down on mobile to account for sticky top bar */}
-      <div className="flex-1 flex flex-col overflow-hidden pt-[53px] md:pt-0">
+      {/* Main Content Area - shifts down on mobile to account for sticky top bar and padded bottom for mobile navbar */}
+      <div className="flex-1 flex flex-col overflow-y-auto overflow-x-hidden pt-[53px] pb-[68px] md:pt-0 md:pb-0">
         {renderPage()}
+      </div>
+
+      {/* Mobile Touch Bottom Navigation Bar (MVP & PWA) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 h-[64px] bg-[#0d0920]/95 backdrop-blur-md border-t border-purple-900/40 flex items-center justify-around px-2 shadow-2xl shadow-purple-950/80">
+        {[
+          { id: "command-center", icon: "🖥️", label: "الرئيسية" },
+          { id: "campaigns",      icon: "📣", label: "الحملات" },
+          { id: "video-factory",  icon: "🎬", label: "فيديو AI" },
+          { id: "agents",         icon: "🤖", label: "الوكلاء" },
+          { id: "analytics",      icon: "📊", label: "الأرباح" },
+        ].map((tab) => {
+          const isActive = currentPage === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => {
+                setCurrentPage(tab.id as Page);
+                localStorage.setItem("octopus_current_page", tab.id);
+              }}
+              className={`flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all ${
+                isActive
+                  ? "text-white bg-purple-600/30 border border-purple-500/50 scale-105"
+                  : "text-purple-400/70 hover:text-purple-300"
+              }`}
+            >
+              <span className="text-lg leading-none mb-1">{tab.icon}</span>
+              <span className="text-[10px] font-bold leading-none">{tab.label}</span>
+            </button>
+          );
+        })}
       </div>
     </div>
   );
@@ -204,6 +247,23 @@ function App() {
         modules={discoveredModules}
       />
     );
+  }
+
+  const pathname = window.location.pathname;
+  if (pathname === "/privacy") {
+    return <PrivacyPolicyPage />;
+  }
+  if (pathname === "/terms") {
+    return <TermsOfServicePage />;
+  }
+  if (pathname === "/demo") {
+    return <DemoShowcasePage />;
+  }
+  if (pathname === "/auth/youtube/login") {
+    return <YouTubeLoginPage />;
+  }
+  if (pathname === "/auth/youtube/callback") {
+    return <YouTubeCallbackPage />;
   }
 
   return (

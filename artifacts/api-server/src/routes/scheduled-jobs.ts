@@ -296,4 +296,14 @@ router.get("/scheduled-jobs/:id/runs", requireAuth, async (req: AuthRequest, res
   }
 });
 
+router.post("/scheduled-jobs/tick", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    await scheduler.tick();
+    res.json({ success: true, message: "Scheduler ticked successfully" });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    res.status(500).json({ error: "Scheduler tick failed", detail: msg });
+  }
+});
+
 export default router;

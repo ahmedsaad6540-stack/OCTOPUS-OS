@@ -28,7 +28,6 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
-    runtimeErrorOverlay(),
     VitePWA({
       registerType: "autoUpdate",
       manifest: {
@@ -86,12 +85,15 @@ export default defineConfig({
     strictPort: true,
     host: "0.0.0.0",
     allowedHosts: true,
+    hmr: {
+      overlay: false,
+    },
     fs: {
       strict: true,
     },
     proxy: {
       "/api": {
-        target: "http://127.0.0.1:5002",
+        target: "http://127.0.0.1:5000",
         changeOrigin: true,
       },
     },

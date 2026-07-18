@@ -23,14 +23,26 @@ import { authRateLimiter } from "../middleware/security.js";
 import profitEngineRouter from "./profit-engine.js";
 import oauthRouter from "./oauth.js";
 import webhooksRouter from "./webhooks.js";
+import trendsRouter from "./trends.js";
+import productsRouter from "./products.js";
+import autonomousRouter from "./autonomous.js";
+import youtubeOauthRouter from "./youtube-oauth.js";
+import oauthProvidersRouter from "./oauth-providers.js";
+import productionEngineRouter from "./production-engine.js";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
 router.use(metricsRouter);
+router.use(youtubeOauthRouter);
+router.use(oauthProvidersRouter);
 router.use(oauthRouter);
 router.use(webhooksRouter);
+router.use(trendsRouter);
+router.use(productsRouter);
+router.use(autonomousRouter);
 router.use("/profit-engine", profitEngineRouter);
+router.use("/production", productionEngineRouter);
 router.use("/auth", authRateLimiter);
 router.use(authRouter);
 router.use(providersRouter);

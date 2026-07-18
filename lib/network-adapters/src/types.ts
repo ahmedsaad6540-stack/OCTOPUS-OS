@@ -9,6 +9,8 @@ export interface AffiliateProduct {
   description?: string;
   gravity?: number;
   avgSale?: number;
+  suggestedBudget?: number;
+  expectedRoi?: string;
 }
 
 export interface AffiliateNetworkAdapter {

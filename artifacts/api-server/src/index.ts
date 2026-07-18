@@ -1,5 +1,13 @@
 import 'dotenv/config';
 console.log('DEBUG DATABASE_URL:', process.env.DATABASE_URL);
+
+process.on("uncaughtException", (err) => {
+  console.error("[24/7 Resilience] Caught uncaughtException:", err.message || err);
+});
+process.on("unhandledRejection", (reason) => {
+  console.error("[24/7 Resilience] Caught unhandledRejection:", reason);
+});
+
 /// import "./tracing"; // Disabled temporarily for Railway deployment
 import app from "./app";
 import { logger } from "./lib/logger";
@@ -8,7 +16,9 @@ import { taskQueue } from "./lib/task-queue";
 import { brain } from "./lib/brain";
 import { registerCoreRules } from "./lib/brain-rules";
 import { ruleEngine } from "./lib/rule-engine";
+import { registerRealToolHandlers, ensureRealToolsRegistered } from "./lib/real-tools-registry";
 import { scheduler } from "./lib/scheduler";
+import { startAutonomousDaemon } from "./lib/autonomous-daemon";
 import "./lib/notification-manager";
 import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
@@ -35,6 +45,10 @@ async function startServer() {
     // top of the code-defined ones above
     await ruleEngine.loadAndSync();
 
+    // Register real concrete tool handlers and seed database tool definitions
+    registerRealToolHandlers();
+    await ensureRealToolsRegistered();
+
     // Auto-seed default admin account if table is empty
     try {
       const email = "admin@octopus.ai";
@@ -59,6 +73,7 @@ async function startServer() {
 
     // Start ticking the Scheduler once everything it can dispatch to is wired up.
     scheduler.start();
+    startAutonomousDaemon();
 
     const rawPort = process.env.PORT ?? "5173";
     const port = Number(rawPort);

@@ -17,6 +17,8 @@ export const campaignsTable = pgTable("campaigns", {
   clicks: integer("clicks").default(0),
   impressions: integer("impressions").default(0),
   commission: doublePrecision("commission").default(0),
+  publishedUrl: text("published_url").default(""),
+  videoId: text("video_id").default(""),
   notes: text("notes").default(""),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),

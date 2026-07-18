@@ -1,7 +1,6 @@
 // API base — uses the real backend in production, falls back to /api for local dev
-const API_BASE =
-  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ??
-  "/api";
+const envUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
+export const API_BASE = envUrl ? (envUrl.endsWith("/api") ? envUrl : `${envUrl}/api`) : "/api";
 
 function getToken(): string | null {
   return localStorage.getItem("octopus_token");
@@ -44,9 +43,9 @@ async function request<T>(
 
 export const api = {
   get: <T>(path: string) => request<T>(path),
-  post: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: "POST", body: JSON.stringify(body) }),
-  put: <T>(path: string, body: unknown) =>
-    request<T>(path, { method: "PUT", body: JSON.stringify(body) }),
+  post: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: "POST", ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
+  put: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: "PUT", ...(body !== undefined ? { body: JSON.stringify(body) } : {}) }),
   delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
 };

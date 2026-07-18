@@ -19,7 +19,7 @@ export default defineConfig(async () => {
         mockupPreviewPlugin(),
         react(),
         tailwindcss(),
-        runtimeErrorOverlay(),
+        // runtimeErrorOverlay(),
         VitePWA({
             manifest: {
                 name: "OCTOPUS OS",
@@ -63,14 +63,27 @@ export default defineConfig(async () => {
       port,
       host: "0.0.0.0",
       allowedHosts: true as true,
+      hmr: { overlay: false },
       fs: {
         strict: true,
+      },
+      proxy: {
+        "/api": {
+          target: process.env.VITE_API_URL || "http://localhost:5000",
+          changeOrigin: true,
+        },
       },
     },
     preview: {
       port,
       host: "0.0.0.0",
       allowedHosts: true as true,
+      proxy: {
+        "/api": {
+          target: process.env.VITE_API_URL || "http://localhost:5000",
+          changeOrigin: true,
+        },
+      },
     },
   };
 });
