@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { API_BASE } from "@/lib/api";
 
 function OctopusIcon({ size = 72 }: { size?: number }) {
   return (
@@ -50,10 +51,9 @@ export function LoginPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
-    const BASE = import.meta.env.BASE_URL.replace(/\/$/, "");
     try {
       if (mode === "signup") {
-        const res = await fetch(`${BASE}/api/auth/register`, {
+        const res = await fetch(`${API_BASE}/auth/register`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password, name }),
