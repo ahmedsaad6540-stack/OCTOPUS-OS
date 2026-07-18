@@ -1,6 +1,6 @@
 // API base — uses the real backend in production, falls back to /api for local dev
 const envUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "");
-const API_BASE = envUrl ? (envUrl.endsWith("/api") ? envUrl : `${envUrl}/api`) : "/api";
+export const API_BASE = envUrl ? (envUrl.endsWith("/api") ? envUrl : `${envUrl}/api`) : "/api";
 
 function getToken(): string | null {
   return localStorage.getItem("octopus_token");

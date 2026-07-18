@@ -1,7 +1,7 @@
 {
   "version": 2,
   "installCommand": "pnpm install --no-frozen-lockfile",
-  "buildCommand": "pnpm --filter @workspace/mockup-sandbox run build",
-  "outputDirectory": "artifacts/mockup-sandbox/dist",
+  "buildCommand": "pnpm --filter @workspace/octopus-os run build",
+  "outputDirectory": "artifacts/octopus-os/dist",
   "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
 }
