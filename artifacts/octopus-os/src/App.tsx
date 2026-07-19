@@ -91,7 +91,8 @@ function OS() {
       </div>
 
       <div className="flex h-screen overflow-hidden bg-[#06020f] text-[#e2d9f3]">
-        <div className={`fixed inset-y-0 left-0 z-20 ${mobileOpen ? "block" : "hidden"} md:block`}>
+        {/* Desktop Sidebar (Flex Item) */}
+        <div className="hidden md:block shrink-0">
           <Sidebar
             currentPage={page}
             onNavigate={p => {
@@ -100,7 +101,25 @@ function OS() {
             }}
           />
         </div>
-        <main className="flex-1 overflow-y-auto">
+
+        {/* Mobile Overlay Sidebar */}
+        {mobileOpen && (
+          <div className="md:hidden fixed inset-0 z-50 flex">
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)}></div>
+            <div className="relative z-10 flex h-full">
+              <Sidebar
+                currentPage={page}
+                onNavigate={p => {
+                  setPage(p);
+                  setMobileOpen(false);
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Main Content */}
+        <main className="flex-1 overflow-y-auto relative w-full h-full">
           {renderPage()}
         </main>
       </div>

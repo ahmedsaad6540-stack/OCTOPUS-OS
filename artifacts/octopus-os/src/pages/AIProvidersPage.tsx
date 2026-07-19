@@ -50,7 +50,8 @@ export function AIProvidersPage() {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
+      const raw = await res.json();
+      const data = Array.isArray(raw) ? raw : (raw.configs || raw.data || []);
       
       if (data.length > 0) {
         setProviders(data.map((p: any, idx: number) => ({
@@ -92,7 +93,8 @@ export function AIProvidersPage() {
           headers: { "Authorization": `Bearer ${token}` }
         });
         if (reFetch.ok) {
-          const freshData = await reFetch.json();
+          const freshRaw = await reFetch.json();
+          const freshData = Array.isArray(freshRaw) ? freshRaw : (freshRaw.configs || freshRaw.data || []);
           setProviders(freshData.map((p: any, idx: number) => ({
             id: p.id,
             name: p.name,
