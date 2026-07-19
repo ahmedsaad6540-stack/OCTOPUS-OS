@@ -17,6 +17,7 @@ interface Campaign {
 interface NewCampaignForm {
   name: string;
   platform: string;
+  affiliateNetwork: string;
 }
 
 const PLATFORMS = ["TikTok", "Instagram", "YouTube", "Pinterest", "Amazon", "ClickBank", "Other"];
@@ -27,13 +28,11 @@ export function CampaignsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState<NewCampaignForm>({ name: "", platform: "TikTok" });
   const [submitting, setSubmitting] = useState(false);
-  const [deletingId, setDeletingId] = useState<number | string | null>(null);
-
-  // Profit Engine State
+  const [form, setForm] = useState<NewCampaignForm>({ name: "", platform: "TikTok", affiliateNetwork: "Digistore24" });
   const [engineRunning, setEngineRunning] = useState(false);
-  const [engineResult, setEngineResult] = useState<any>(null);
+  const [engineResult, setEngineResult] = useState<{ success: boolean; message: string; result?: any } | null>(null);
+  const [deletingId, setDeletingId] = useState<number | string | null>(null);
 
   const headers = {
     Authorization: `Bearer ${token}`,
@@ -97,12 +96,12 @@ export function CampaignsPage() {
       const res = await fetch(`${API_BASE}/campaigns`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ name: form.name.trim(), platform: form.platform }),
+        body: JSON.stringify({ name: form.name.trim(), platform: form.platform, affiliateNetwork: form.affiliateNetwork }),
       });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
-      const created: Campaign = await res.json();
-      setCampaigns((prev) => [created, ...prev]);
-      setForm({ name: "", platform: "TikTok" });
+      const created = await res.json();
+      setCampaigns((prev) => [created.campaign || created, ...prev]);
+      setForm({ name: "", platform: "TikTok", affiliateNetwork: "Digistore24" });
       setShowForm(false);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create campaign");
@@ -227,50 +226,105 @@ export function CampaignsPage() {
 
       {/* New campaign form */}
       {showForm && (
-        <form
-          onSubmit={handleCreate}
-          className="glass-card p-5 rounded-xl mb-6 space-y-4"
-        >
-          <h2 className="text-sm font-bold text-white mb-2">Create Campaign</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-[10px] text-purple-400/60 uppercase font-semibold tracking-wider block mb-1">
-                Campaign Name
-              </label>
-              <input
-                type="text"
-                required
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="e.g. Summer TikTok Drop"
-                className="w-full px-3 py-2 rounded-lg bg-black/40 border border-purple-800/40 text-white text-xs focus:outline-none focus:border-purple-500 placeholder-purple-400/30"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] text-purple-400/60 uppercase font-semibold tracking-wider block mb-1">
-                Platform
-              </label>
-              <select
-                value={form.platform}
-                onChange={(e) => setForm((f) => ({ ...f, platform: e.target.value }))}
-                className="w-full px-3 py-2 rounded-lg bg-black/40 border border-purple-800/40 text-white text-xs focus:outline-none focus:border-purple-500"
-              >
-                {PLATFORMS.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <button
-            type="submit"
-            disabled={submitting}
-            className="px-5 py-2 rounded-xl text-xs font-semibold text-white gradient-purple glow-purple disabled:opacity-50"
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <form
+            onSubmit={handleCreate}
+            className="w-full max-w-lg glass-card p-8 rounded-3xl space-y-6 border border-purple-500/20 shadow-[0_0_50px_rgba(139,92,246,0.15)] relative overflow-hidden"
           >
-            {submitting ? "Creating…" : "Create Campaign"}
-          </button>
-        </form>
+            {/* Background Glows */}
+            <div className="absolute -top-20 -right-20 w-40 h-40 bg-purple-600/20 rounded-full blur-3xl"></div>
+            <div className="absolute -bottom-20 -left-20 w-40 h-40 bg-indigo-600/20 rounded-full blur-3xl"></div>
+            
+            <div className="relative z-10 flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-2xl font-black text-white font-heading">✨ Create AI Campaign</h2>
+                <p className="text-purple-400/60 text-xs mt-1">Configure your Profit Engine target</p>
+              </div>
+              <button 
+                type="button" 
+                onClick={() => setShowForm(false)}
+                className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-colors"
+              >✕</button>
+            </div>
+
+            <div className="relative z-10 space-y-5">
+              <div>
+                <label className="text-[10px] text-purple-400/60 uppercase font-black tracking-wider block mb-2 ml-1">
+                  Campaign Name
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-50">🎯</span>
+                  <input
+                    type="text"
+                    required
+                    value={form.name}
+                    onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="e.g. Summer Fitness Routine"
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/40 border border-purple-800/40 text-white text-sm focus:outline-none focus:border-purple-500 focus:bg-black/60 transition-all placeholder-purple-400/20 shadow-inner"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] text-purple-400/60 uppercase font-black tracking-wider block mb-2 ml-1">
+                    Platform
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50 text-sm">📱</span>
+                    <select
+                      value={form.platform}
+                      onChange={(e) => setForm((f) => ({ ...f, platform: e.target.value }))}
+                      className="w-full pl-9 pr-4 py-3 rounded-xl bg-black/40 border border-purple-800/40 text-white text-sm focus:outline-none focus:border-purple-500 transition-all appearance-none"
+                    >
+                      {PLATFORMS.map((p) => (
+                        <option key={p} value={p}>{p}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <div>
+                  <label className="text-[10px] text-purple-400/60 uppercase font-black tracking-wider block mb-2 ml-1">
+                    Affiliate Network
+                  </label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 opacity-50 text-sm">💰</span>
+                    <select
+                      value={form.affiliateNetwork}
+                      onChange={(e) => setForm((f) => ({ ...f, affiliateNetwork: e.target.value }))}
+                      className="w-full pl-9 pr-4 py-3 rounded-xl bg-black/40 border border-purple-800/40 text-white text-sm focus:outline-none focus:border-purple-500 transition-all appearance-none"
+                    >
+                      {['Digistore24', 'Amazon', 'ClickBank', 'Impact'].map((n) => (
+                        <option key={n} value={n}>{n}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="relative z-10 pt-4 mt-6 border-t border-purple-500/10 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="px-6 py-2.5 rounded-xl text-sm font-semibold text-purple-300 hover:text-white bg-purple-900/20 hover:bg-purple-900/40 border border-transparent transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="px-8 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-[0_0_20px_rgba(139,92,246,0.3)] transition-all hover:scale-105 hover:shadow-[0_0_30px_rgba(139,92,246,0.5)] disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2"
+              >
+                {submitting ? (
+                  <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin"></span> Launching...</>
+                ) : (
+                  "Create & Start Engine 🚀"
+                )}
+              </button>
+            </div>
+          </form>
+        </div>
       )}
 
       {/* Loading state */}
