@@ -30,7 +30,7 @@ export function CommandCenter() {
           fetch(`${API_BASE}/system/status`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${API_BASE}/agents`, { headers: { Authorization: `Bearer ${token}` } }),
           fetch(`${API_BASE}/tasks`, { headers: { Authorization: `Bearer ${token}` } }),
-          fetch(`${API_BASE}/workflows`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE}/campaigns`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
 
         if (statusRes.ok) {
@@ -52,13 +52,13 @@ export function CommandCenter() {
           totalTasks = Array.isArray(tasks) ? tasks.length : (tasks.tasks?.length ?? 0);
         }
 
-        let totalWorkflows = 0;
+        let totalCampaigns = 0;
         if (workflowsRes.ok) {
-          const wf = await workflowsRes.json();
-          totalWorkflows = Array.isArray(wf) ? wf.length : (wf.workflows?.length ?? 0);
+          const c = await workflowsRes.json();
+          totalCampaigns = Array.isArray(c) ? c.length : (c.campaigns?.length ?? 0);
         }
 
-        setMetrics({ totalAgents, activeAgents, totalTasks, totalWorkflows });
+        setMetrics({ totalAgents, activeAgents, totalTasks, totalWorkflows: totalCampaigns });
       } catch (err) {
         console.error("Error fetching system data:", err);
       }
