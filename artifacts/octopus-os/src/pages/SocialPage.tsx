@@ -65,22 +65,23 @@ export function SocialPage() {
   const [publishing, setPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState<string | null>(null);
 
-  // Fetch connected providers on mount
+  // Fetch connected social accounts on mount
   useEffect(() => {
-    const fetchProviders = async () => {
+    const fetchSocialAccounts = async () => {
       if (!token) return;
       try {
-        const res = await fetch(`${API_BASE}/providers`, {
+        const res = await fetch(`${API_BASE}/social`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
-          const data: ProviderRecord[] = await res.json();
+          const data = await res.json();
+          const accounts = data.accounts || data || [];
           const map: Record<string, ProviderRecord> = {};
-          for (const p of data) {
+          for (const p of accounts) {
             const platformId = PLATFORMS.find(
               pl =>
-                pl.id === p.providerName.toLowerCase() ||
-                pl.name.toLowerCase() === p.providerName.toLowerCase()
+                pl.id === p.platform?.toLowerCase() ||
+                pl.name.toLowerCase() === p.platform?.toLowerCase()
             )?.id;
             if (platformId) {
               map[platformId] = p;
@@ -89,12 +90,12 @@ export function SocialPage() {
           setConnectedMap(map);
         }
       } catch (err) {
-        console.error("Failed to fetch providers:", err);
+        console.error("Failed to fetch social accounts:", err);
       } finally {
         setLoadingProviders(false);
       }
     };
-    fetchProviders();
+    fetchSocialAccounts();
   }, [token]);
 
   const platforms = PLATFORMS.map(p => ({
@@ -115,34 +116,30 @@ export function SocialPage() {
     if (!token) return;
     setSaving(true);
     setSaveMsg("");
-    const platformData = PLATFORMS.find(p => p.id === selected)!;
-    const credFields = fields.filter(Boolean);
-    const apiKey = values[selected]?.[credFields[0]] || "";
-
     try {
-      const res = await fetch(`${API_BASE}/providers`, {
+      const res = await fetch(`${API_BASE}/social`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`
         },
         body: JSON.stringify({
-          providerName: selected,
-          displayName: platformData.name,
-          apiKey,
-          model: "social",
-          status: "active",
+          platform: selected,
+          apiKey: values[selected]?.[FIELDS[selected]?.[0] || ""] || "",
+          apiSecret: values[selected]?.[FIELDS[selected]?.[1] || ""] || "",
+          status: "configured",
+          displayName: `${selected.toUpperCase()} Account`,
+          username: "Unknown"
         }),
       });
-
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
-        throw new Error(err.message || "Failed to connect");
+        throw new Error(err.error || "Failed to save config");
       }
-
-      const created: ProviderRecord = await res.json();
-      setConnectedMap(prev => ({ ...prev, [selected]: created }));
-      setSaveMsg("✅ Connected successfully");
+      const data = await res.json();
+      const account = data.account || data;
+      setConnectedMap(prev => ({ ...prev, [selected]: account }));
+      setSaveMsg("✅ Configuration saved successfully");
     } catch (err: any) {
       setSaveMsg(`❌ ${err.message}`);
     } finally {
@@ -158,7 +155,7 @@ export function SocialPage() {
     setSaveMsg("");
 
     try {
-      const res = await fetch(`${API_BASE}/providers/${record.id}`, {
+      const res = await fetch(`${API_BASE}/social/${record.id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
