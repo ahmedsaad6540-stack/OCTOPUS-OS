@@ -17,15 +17,21 @@ router.get("/oauth/:platform/connect", async (req, res) => {
   }
 
   try {
-    // Retrieve the user's configured developer Client ID (apiKey) from DB
-    const [config] = await db
-      .select({ apiKey: socialAccountsTable.apiKey })
-      .from(socialAccountsTable)
-      .where(and(eq(socialAccountsTable.platform, platform), eq(socialAccountsTable.userId, userId)))
-      .limit(1);
+    // Retrieve the user's configured developer Client ID (apiKey) from DB (best effort)
+    let dbApiKey: string | null = null;
+    try {
+      const [config] = await db
+        .select({ apiKey: socialAccountsTable.apiKey })
+        .from(socialAccountsTable)
+        .where(and(eq(socialAccountsTable.platform, platform), eq(socialAccountsTable.userId, userId)))
+        .limit(1);
+      dbApiKey = config?.apiKey || null;
+    } catch {
+      // Invalid UUID or DB error - proceed with env fallback
+    }
 
-    // Fallback to Railway env vars (set via railway variables set ...)
-    let clientId = config?.apiKey || "";
+    // Use env vars injected via Railway (set via railway variables set ...)
+    let clientId = dbApiKey || "";
     if (!clientId) {
       if (platform === "tiktok") clientId = process.env.TIKTOK_CLIENT_KEY || "";
       else if (platform === "youtube") clientId = process.env.YOUTUBE_CLIENT_ID || "";
@@ -44,6 +50,11 @@ router.get("/oauth/:platform/connect", async (req, res) => {
       authUrl = `https://www.facebook.com/v18.0/dialog/oauth?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&scope=pages_show_list,instagram_basic,instagram_content_publish&state=${encodeURIComponent(state)}`;
     } else {
       res.status(400).send("Unsupported platform for OAuth redirect");
+      return;
+    }
+
+    if (!clientId) {
+      res.status(400).send(`OAuth not configured for platform: ${platform}. Please add credentials in the Social Hub settings.`);
       return;
     }
 
