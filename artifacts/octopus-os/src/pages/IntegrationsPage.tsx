@@ -95,7 +95,7 @@ export function IntegrationsPage() {
       } else {
         // Disconnect: Send DELETE request to remove provider configuration
         if (item.dbRowId) {
-          const res = await fetch(`/api/providers/${item.dbRowId}`, {
+          const res = await fetch(`${API_BASE}/providers/${item.dbRowId}`, {
             method: "DELETE",
             headers: { "Authorization": `Bearer ${token}` }
           });

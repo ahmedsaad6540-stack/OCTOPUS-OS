@@ -174,7 +174,7 @@ export function ChatPage() {
 
     // Agent-based invoke
     try {
-      const res = await fetch(`/api/agents/${selectedAgentId}/invoke`, {
+      const res = await fetch(`${API_BASE}/agents/${selectedAgentId}/invoke`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

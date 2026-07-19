@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 // ── Toast helper ──────────────────────────────────────────────────────────────
@@ -90,7 +91,7 @@ export function SecurityPage() {
   useEffect(() => {
     if (!token) return;
     const headers = { Authorization: `Bearer ${token}` };
-    fetch('/api/security', { headers })
+    fetch(`${API_BASE}/security`, { headers })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();
@@ -107,7 +108,7 @@ export function SecurityPage() {
     if (!token) return;
     setAuditLoading(true);
     setAuditError(null);
-    fetch('/api/audit-log', { headers: { Authorization: `Bearer ${token}` } })
+    fetch(`${API_BASE}/audit-log`, { headers: { Authorization: `Bearer ${token}` } })
       .then(res => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();

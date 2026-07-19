@@ -125,7 +125,7 @@ export function AIProvidersPage() {
     if (!token) return;
     const nextStatus = currentStatus === "active" ? "disabled" : "active";
     try {
-      const res = await fetch(`/api/provider-configs/${id}`, {
+      const res = await fetch(`${API_BASE}/provider-configs/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

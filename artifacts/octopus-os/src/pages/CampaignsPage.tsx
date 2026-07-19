@@ -85,7 +85,7 @@ export function CampaignsPage() {
   const handleDelete = async (id: number | string) => {
     setDeletingId(id);
     try {
-      const res = await fetch(`/api/campaigns/${id}`, {
+      const res = await fetch(`${API_BASE}/campaigns/${id}`, {
         method: "DELETE",
         headers,
       });
@@ -107,21 +107,21 @@ export function CampaignsPage() {
     );
     try {
       if (newStatus === "active") {
-        const res = await fetch(`/api/production/launch-campaign/${campaign.id}`, {
+        const res = await fetch(`${API_BASE}/production/launch-campaign/${campaign.id}`, {
           method: "POST",
           headers,
         });
         if (res.ok) {
           alert(`🚀 [REAL PRODUCTION LAUNCH]\n\nتم تفعيل حملة "${campaign.name}" وبدء إنتاج رندر الفيديو الحقيقي عبر HeyGen/AI والإعداد للنشر المباشر على منصة ${campaign.platform || 'تيك توك'}!`);
         } else {
-          await fetch(`/api/campaigns/${campaign.id}`, {
+          await fetch(`${API_BASE}/campaigns/${campaign.id}`, {
             method: "PATCH",
             headers,
             body: JSON.stringify({ status: newStatus }),
           });
         }
       } else {
-        await fetch(`/api/campaigns/${campaign.id}`, {
+        await fetch(`${API_BASE}/campaigns/${campaign.id}`, {
           method: "PATCH",
           headers,
           body: JSON.stringify({ status: newStatus }),

@@ -55,7 +55,7 @@ export function PromptStudioPage() {
       const defaultConfig = Array.isArray(configs) ? configs.find((c: any) => c.isDefault) ?? configs[0] : null;
 
       if (defaultConfig) {
-        const res = await fetch(`/api/provider-configs/${defaultConfig.id}/complete`, {
+        const res = await fetch(`${API_BASE}/provider-configs/${defaultConfig.id}/complete`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify({

@@ -121,7 +121,7 @@ export function WorkflowBuilderPage() {
     if (!token) return;
     if (!window.confirm("Delete this workflow?")) return;
     try {
-      const res = await fetch(`/api/workflows/${id}`, {
+      const res = await fetch(`${API_BASE}/workflows/${id}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` },
       });
@@ -148,7 +148,7 @@ export function WorkflowBuilderPage() {
 
     // Try server-side run first
     try {
-      const res = await fetch(`/api/workflows/${activeWorkflow.id}/run`, {
+      const res = await fetch(`${API_BASE}/workflows/${activeWorkflow.id}/run`, {
         method: "POST",
         headers: authHeaders,
       });

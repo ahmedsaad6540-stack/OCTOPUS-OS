@@ -84,7 +84,8 @@ export function AgentsPage() {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
+      const raw = await res.json();
+      const data = Array.isArray(raw) ? raw : (raw.agents || raw.data || []);
 
       if (data.length > 0) {
         setAgents(data.map((w: any) => ({
@@ -119,7 +120,8 @@ export function AgentsPage() {
           headers: { "Authorization": `Bearer ${token}` }
         });
         if (reFetch.ok) {
-          const freshData = await reFetch.json();
+          const freshRaw = await reFetch.json();
+          const freshData = Array.isArray(freshRaw) ? freshRaw : (freshRaw.agents || freshRaw.data || []);
           setAgents(freshData.map((w: any) => ({
             id: w.id,
             name: w.name,
@@ -233,7 +235,7 @@ export function AgentsPage() {
     for (let i = 0; i < active.length; i++) {
       const agent = active[i];
       try {
-        const res = await fetch(`/api/agents/${agent.id}/invoke`, {
+        const res = await fetch(`${API_BASE}/agents/${agent.id}/invoke`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

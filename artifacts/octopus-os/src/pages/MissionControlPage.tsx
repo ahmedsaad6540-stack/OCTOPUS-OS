@@ -90,7 +90,7 @@ export function MissionControlPage() {
   const toggleJob = async (id: string, currentStatus: "active" | "paused") => {
     if (!token) return;
     const isEnabling = currentStatus !== "active";
-    const endpoint = `/api/scheduled-jobs/${id}/${isEnabling ? "enable" : "disable"}`;
+    const endpoint = `${API_BASE}/scheduled-jobs/${id}/${isEnabling ? "enable" : "disable"}`;
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -116,7 +116,7 @@ export function MissionControlPage() {
     }
     for (const task of tasks) {
       if (task.status === "running") {
-        await fetch(`/api/tasks/${task.id}/cancel`, {
+        await fetch(`${API_BASE}/tasks/${task.id}/cancel`, {
           method: "POST",
           headers: { "Authorization": `Bearer ${token}` }
         }).catch(() => {});

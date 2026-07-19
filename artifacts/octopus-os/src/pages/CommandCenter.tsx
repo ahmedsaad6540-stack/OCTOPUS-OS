@@ -40,7 +40,8 @@ export function CommandCenter() {
 
         let activeAgents = 0, totalAgents = 0;
         if (agentsRes.ok) {
-          const agents = await agentsRes.json();
+          const agentsRaw = await agentsRes.json();
+          const agents = Array.isArray(agentsRaw) ? agentsRaw : (agentsRaw.agents || agentsRaw.data || []);
           totalAgents = agents.length;
           activeAgents = agents.filter((a: any) => a.status === "active").length;
         }

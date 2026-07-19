@@ -51,8 +51,9 @@ export function WorkforcePage() {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      
+      const raw = await res.json();
+      const data = Array.isArray(raw) ? raw : (raw.agents || raw.data || []);
+
       if (data.length > 0) {
         setWorkers(data.map((w: any) => ({
           id: w.id,
@@ -89,7 +90,8 @@ export function WorkforcePage() {
           headers: { "Authorization": `Bearer ${token}` }
         });
         if (reFetch.ok) {
-          const freshData = await reFetch.json();
+          const freshRaw = await reFetch.json();
+          const freshData = Array.isArray(freshRaw) ? freshRaw : (freshRaw.agents || freshRaw.data || []);
           setWorkers(freshData.map((w: any) => ({
             id: w.id,
             name: w.name,
@@ -119,7 +121,7 @@ export function WorkforcePage() {
   const handleToggleStatus = async (worker: Worker) => {
     if (!token) return;
     const isActivating = worker.status !== "active";
-    const endpoint = `/api/agents/${worker.id}/${isActivating ? "enable" : "disable"}`;
+    const endpoint = `${API_BASE}/agents/${worker.id}/${isActivating ? "enable" : "disable"}`;
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -146,7 +148,7 @@ export function WorkforcePage() {
   const handleSaveInstructions = async (id: string) => {
     if (!token) return;
     try {
-      const res = await fetch(`/api/agents/${id}`, {
+      const res = await fetch(`${API_BASE}/agents/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -190,7 +192,7 @@ export function WorkforcePage() {
   const handleDeleteWorker = async (id: string) => {
     if (!token) return;
     try {
-      const res = await fetch(`/api/agents/${id}`, {
+      const res = await fetch(`${API_BASE}/agents/${id}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       });

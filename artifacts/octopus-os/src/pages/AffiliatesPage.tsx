@@ -74,7 +74,7 @@ export function AffiliatesPage() {
     try {
       if (isConnected && existing) {
         // Disconnect
-        await fetch(`/api/affiliates/${existing.id}`, {
+        await fetch(`${API_BASE}/affiliates/${existing.id}`, {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
         });
