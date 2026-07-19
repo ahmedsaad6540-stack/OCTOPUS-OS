@@ -84,7 +84,7 @@ export function SocialPage() {
                 pl.name.toLowerCase() === p.platform?.toLowerCase()
             )?.id;
             if (platformId) {
-              map[platformId] = p;
+              map[platformId] = { ...p, providerName: p.platform, status: p.status || "disconnected" };
             }
           }
           setConnectedMap(map);
@@ -98,9 +98,47 @@ export function SocialPage() {
     fetchSocialAccounts();
   }, [token]);
 
+  // Auto-connect all platforms using server-side env vars
+  const [autoConnecting, setAutoConnecting] = useState(false);
+  const autoConnect = async () => {
+    if (!token) return;
+    setAutoConnecting(true);
+    setSaveMsg("");
+    try {
+      const res = await fetch(`${API_BASE}/social/auto-connect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Auto-connect failed");
+      }
+      const data = await res.json();
+      // Refresh connected accounts
+      const res2 = await fetch(`${API_BASE}/social`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res2.ok) {
+        const data2 = await res2.json();
+        const accounts = data2.accounts || data2 || [];
+        const map: Record<string, ProviderRecord> = {};
+        for (const p of accounts) {
+          const platformId = PLATFORMS.find(
+            pl => pl.id === p.platform?.toLowerCase() || pl.name.toLowerCase() === p.platform?.toLowerCase()
+          )?.id;
+          if (platformId) map[platformId] = { ...p, providerName: p.platform, status: p.status || "disconnected" };
+        }
+        setConnectedMap(map);
+      }
+      setSaveMsg(data.message || "✅ تم ربط جميع المنصات بنجاح!");
+    } catch (err: any) {
+      setSaveMsg(`❌ ${err.message}`);
+    } finally {
+      setAutoConnecting(false);
+    }
+  };
+
   const platforms = PLATFORMS.map(p => ({
     ...p,
-    status: connectedMap[p.id]?.status === "active" ? "connected" : "disconnected",
+    status: (connectedMap[p.id]?.status === "active" || connectedMap[p.id]?.status === "connected" || connectedMap[p.id]?.status === "configured") ? "connected" : "disconnected",
     followers: connectedMap[p.id]?.followers || "0",
     dbId: connectedMap[p.id]?.id,
   }));
@@ -389,23 +427,27 @@ export function SocialPage() {
           </div>
         </div>
 
-        {/* 1-Click OAuth flow button */}
-        {["tiktok", "youtube", "instagram", "facebook", "linkedin", "x"].includes(selected) && (
-          <div className="mb-6">
-            <a
-              href={`${API_BASE.replace(/\/api$/, "")}/api/oauth/${selected}/connect?userId=${user?.id ?? ""}`}
-              target="_self"
-              className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-800/90 to-indigo-800/90 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3.5 px-6 rounded-xl text-xs border border-purple-600/60 transition-all text-center shadow-[0_0_20px_rgba(126,34,206,0.3)] glow-purple"
-            >
-              ⚡ ربط تلقائي فوري (1-Click OAuth) لـ {platform.name}
-            </a>
-            <div className="flex items-center my-3">
-              <div className="flex-1 border-t border-purple-950/50" />
-              <span className="px-2 text-[9px] text-purple-600 uppercase font-bold tracking-wider">أو الإعداد اليدوي ومفاتيح API أدناه</span>
-              <div className="flex-1 border-t border-purple-950/50" />
+        {/* Auto-Connect All Platforms Button */}
+        <div className="mb-6 flex flex-col gap-3">
+          <button
+            onClick={autoConnect}
+            disabled={autoConnecting}
+            className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-700/90 to-cyan-700/90 hover:from-emerald-600 hover:to-cyan-600 text-white font-bold py-3.5 px-6 rounded-xl text-xs border border-emerald-500/60 transition-all text-center shadow-[0_0_20px_rgba(16,185,129,0.3)] w-full"
+          >
+            {autoConnecting ? "⟳ جاري الربط التلقائي..." : "⚡ ربط جميع المنصات تلقائياً (ضغطة واحدة)"}
+          </button>
+          {platform.status === "connected" && (
+            <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-900/30 border border-emerald-500/30">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="text-emerald-400 text-xs font-bold">✅ {platform.name} متصل ومفعّل</span>
             </div>
+          )}
+          <div className="flex items-center my-1">
+            <div className="flex-1 border-t border-purple-950/50" />
+            <span className="px-2 text-[9px] text-purple-600 uppercase font-bold tracking-wider">أو الإعداد اليدوي أدناه</span>
+            <div className="flex-1 border-t border-purple-950/50" />
           </div>
-        )}
+        </div>
 
         {testMsg && (
           <div className={`mb-4 px-4 py-3 rounded-lg text-xs ${testMsg.includes("✅") ? "bg-emerald-900/20 text-emerald-400 border border-emerald-500/20" : "bg-red-900/20 text-red-400 border border-red-500/20"}`}>

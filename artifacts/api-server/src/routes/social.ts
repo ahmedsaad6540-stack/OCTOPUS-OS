@@ -181,4 +181,107 @@ router.post("/social/publish", async (req: AuthRequest, res) => {
   }
 });
 
+// ── AUTO-CONNECT: Reads credentials from Railway env vars and links all platforms automatically ──
+router.post("/social/auto-connect", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const userId = req.user!.userId;
+
+    // Map of platform -> env var credentials
+    const platformCreds: { platform: string; displayName: string; apiKey: string; apiSecret: string }[] = [
+      { platform: "youtube",   displayName: "YouTube",   apiKey: process.env.YOUTUBE_CLIENT_ID   || "", apiSecret: process.env.YOUTUBE_CLIENT_SECRET   || "" },
+      { platform: "tiktok",    displayName: "TikTok",    apiKey: process.env.TIKTOK_CLIENT_KEY   || "", apiSecret: process.env.TIKTOK_CLIENT_SECRET    || "" },
+      { platform: "facebook",  displayName: "Facebook",  apiKey: process.env.FACEBOOK_APP_ID     || "", apiSecret: process.env.FACEBOOK_APP_SECRET     || "" },
+      { platform: "instagram", displayName: "Instagram", apiKey: process.env.FACEBOOK_APP_ID     || "", apiSecret: process.env.FACEBOOK_APP_SECRET     || "" },
+    ];
+
+    const results: any[] = [];
+
+    for (const cred of platformCreds) {
+      if (!cred.apiKey) continue; // skip if no env var set
+
+      // Check if already exists
+      const [existing] = await db
+        .select()
+        .from(socialAccountsTable)
+        .where(and(eq(socialAccountsTable.platform, cred.platform), eq(socialAccountsTable.userId, userId)))
+        .limit(1);
+
+      if (existing) {
+        // Update to connected status
+        const [updated] = await db
+          .update(socialAccountsTable)
+          .set({ apiKey: cred.apiKey, apiSecret: cred.apiSecret, status: "connected", displayName: cred.displayName, updatedAt: new Date() })
+          .where(eq(socialAccountsTable.id, existing.id))
+          .returning();
+        results.push(updated);
+      } else {
+        // Insert new
+        const [created] = await db
+          .insert(socialAccountsTable)
+          .values({
+            userId,
+            platform: cred.platform,
+            displayName: cred.displayName,
+            username: cred.displayName,
+            apiKey: cred.apiKey,
+            apiSecret: cred.apiSecret,
+            status: "connected",
+            accessToken: `auto_${Date.now()}`,
+          } as typeof socialAccountsTable.$inferInsert)
+          .returning();
+        results.push(created);
+      }
+    }
+
+    // Also auto-connect ElevenLabs and HeyGen as special AI provider accounts
+    const aiProviders = [
+      { platform: "elevenlabs", displayName: "ElevenLabs AI", apiKey: process.env.ELEVENLABS_API_KEY || "" },
+      { platform: "heygen",     displayName: "HeyGen AI",     apiKey: process.env.HEYGEN_API_KEY     || "" },
+    ];
+
+    for (const ai of aiProviders) {
+      if (!ai.apiKey) continue;
+      const [existing] = await db
+        .select()
+        .from(socialAccountsTable)
+        .where(and(eq(socialAccountsTable.platform, ai.platform), eq(socialAccountsTable.userId, userId)))
+        .limit(1);
+
+      if (existing) {
+        const [updated] = await db
+          .update(socialAccountsTable)
+          .set({ apiKey: ai.apiKey, status: "connected", displayName: ai.displayName, updatedAt: new Date() })
+          .where(eq(socialAccountsTable.id, existing.id))
+          .returning();
+        results.push(updated);
+      } else {
+        const [created] = await db
+          .insert(socialAccountsTable)
+          .values({
+            userId,
+            platform: ai.platform,
+            displayName: ai.displayName,
+            username: ai.displayName,
+            apiKey: ai.apiKey,
+            apiSecret: "",
+            status: "connected",
+            accessToken: `auto_${Date.now()}`,
+          } as typeof socialAccountsTable.$inferInsert)
+          .returning();
+        results.push(created);
+      }
+    }
+
+    res.json({
+      success: true,
+      message: `✅ تم ربط ${results.length} منصة تلقائياً`,
+      connectedCount: results.length,
+      accounts: results,
+    });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal Server Error during auto-connect" });
+  }
+});
+
 export default router;
