@@ -31,9 +31,39 @@ export function CampaignsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState<number | string | null>(null);
 
+  // Profit Engine State
+  const [engineRunning, setEngineRunning] = useState(false);
+  const [engineResult, setEngineResult] = useState<any>(null);
+
   const headers = {
     Authorization: `Bearer ${token}`,
     "Content-Type": "application/json",
+  };
+
+  /* ── Profit Engine Trigger ── */
+  const startProfitEngine = async () => {
+    if (!token) return;
+    setEngineRunning(true);
+    setEngineResult(null);
+    try {
+      const res = await fetch(`${API_BASE}/social/publish`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          title: "Viral TikTok & YouTube Shorts for Affiliate Links",
+          description: "Auto-generated promotional content by Profit Engine",
+          platforms: ["all"],
+          aiOptimize: true
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to start engine");
+      setEngineResult({ success: true, message: data.summary || "تم نشر وتوزيع الحملات بنجاح!" });
+    } catch (err: any) {
+      setEngineResult({ success: false, message: err.message });
+    } finally {
+      setEngineRunning(false);
+    }
   };
 
   /* ── Fetch campaigns on mount ── */
@@ -142,20 +172,48 @@ export function CampaignsPage() {
   return (
     <div className="p-6 min-h-screen" style={{ background: "#0a0614" }}>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl font-bold text-white">📣 Campaigns</h1>
-          <p className="text-purple-400/60 text-xs mt-1">
-            {loading ? "Loading…" : `${activeCampaigns} active`}
+          <h1 className="text-3xl font-black text-white font-heading">🚀 الحملات ومحرك الأرباح</h1>
+          <p className="text-purple-400 font-semibold text-sm mt-1">
+            إدارة الحملات التسويقية ونظام Profit Engine الآلي
           </p>
         </div>
-        <button
-          onClick={() => setShowForm((v) => !v)}
-          className="px-4 py-2 rounded-xl text-xs font-semibold text-white gradient-purple glow-purple"
-        >
-          {showForm ? "✕ Cancel" : "+ New Campaign"}
-        </button>
+        <div className="flex gap-3">
+          <button
+            onClick={() => setShowForm(!showForm)}
+            className="px-5 py-2.5 rounded-xl font-bold transition-all text-sm bg-purple-900/40 text-purple-300 border border-purple-500/30 hover:bg-purple-800/60"
+          >
+            {showForm ? "✕ Cancel" : "+ New Campaign"}
+          </button>
+          <button
+            onClick={startProfitEngine}
+            disabled={engineRunning}
+            className="px-6 py-2.5 rounded-xl font-bold transition-all text-sm bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 text-white shadow-[0_0_20px_rgba(16,185,129,0.4)] border border-emerald-400/50 flex items-center gap-2"
+          >
+            {engineRunning ? (
+              <>
+                <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin"></span>
+                جاري توليد ونشر الفيديوهات...
+              </>
+            ) : (
+              <>
+                <span className="text-lg">💰</span> Start Profit Engine (محرك الأرباح)
+              </>
+            )}
+          </button>
+        </div>
       </div>
+
+      {/* Engine Result Notification */}
+      {engineResult && (
+        <div className={`my-4 p-4 rounded-xl border ${engineResult.success ? "bg-emerald-900/30 border-emerald-500/50 text-emerald-300" : "bg-red-900/30 border-red-500/50 text-red-300"}`}>
+          <div className="font-bold flex items-center gap-2">
+            {engineResult.success ? "✅ اكتملت المهمة بنجاح!" : "❌ حدث خطأ:"}
+          </div>
+          <p className="mt-1 text-sm opacity-90">{engineResult.message}</p>
+        </div>
+      )}
 
       {/* Error banner */}
       {error && (
