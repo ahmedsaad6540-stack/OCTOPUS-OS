@@ -24,12 +24,12 @@ router.get("/oauth/:platform/connect", async (req, res) => {
       .where(and(eq(socialAccountsTable.platform, platform), eq(socialAccountsTable.userId, userId)))
       .limit(1);
 
-    // Fallback default keys if the user hasn't input their own developer credentials yet
+    // Fallback to Railway env vars (set via railway variables set ...)
     let clientId = config?.apiKey || "";
     if (!clientId) {
-      if (platform === "tiktok") clientId = "aw8u32aflj90";
-      else if (platform === "youtube") clientId = "1092839281-youtube.apps.googleusercontent.com";
-      else if (platform === "instagram" || platform === "facebook") clientId = "5819283928192";
+      if (platform === "tiktok") clientId = process.env.TIKTOK_CLIENT_KEY || "";
+      else if (platform === "youtube") clientId = process.env.YOUTUBE_CLIENT_ID || "";
+      else if (platform === "instagram" || platform === "facebook") clientId = process.env.FACEBOOK_APP_ID || "";
     }
 
     const callbackUrl = `https://api-server-production-4801.up.railway.app/api/oauth/${platform}/callback`;
@@ -80,8 +80,21 @@ router.get("/oauth/:platform/callback", async (req, res) => {
       .where(and(eq(socialAccountsTable.platform, platform), eq(socialAccountsTable.userId, userId)))
       .limit(1);
 
-    const clientId = accConfig?.apiKey || "";
-    const clientSecret = accConfig?.apiSecret || "";
+    let clientId = accConfig?.apiKey || "";
+    let clientSecret = accConfig?.apiSecret || "";
+    // Fallback to Railway env vars if DB doesn't have the credentials
+    if (!clientId || !clientSecret) {
+      if (platform === "tiktok") {
+        clientId = clientId || process.env.TIKTOK_CLIENT_KEY || "";
+        clientSecret = clientSecret || process.env.TIKTOK_CLIENT_SECRET || "";
+      } else if (platform === "youtube") {
+        clientId = clientId || process.env.YOUTUBE_CLIENT_ID || "";
+        clientSecret = clientSecret || process.env.YOUTUBE_CLIENT_SECRET || "";
+      } else if (platform === "instagram" || platform === "facebook") {
+        clientId = clientId || process.env.FACEBOOK_APP_ID || "";
+        clientSecret = clientSecret || process.env.FACEBOOK_APP_SECRET || "";
+      }
+    }
     const callbackUrl = `https://api-server-production-4801.up.railway.app/api/oauth/${platform}/callback`;
 
     let accessToken = "act_" + Math.random().toString(36).substring(2);
