@@ -12,6 +12,7 @@ interface Campaign {
   posts?: number;
   productUrl?: string;
   affiliateNetwork?: string;
+  createdAt?: string;
 }
 
 interface NewCampaignForm {
