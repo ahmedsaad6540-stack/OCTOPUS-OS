@@ -35,24 +35,8 @@ export function ChatPage() {
 
   // Check if any AI provider config exists
   useEffect(() => {
-    const checkProviderConfig = async () => {
-      if (!token) return;
-      try {
-        const res = await fetch(`${API_BASE}/provider-configs`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          // data is an array; if non-empty, a config exists
-          setHasProviderConfig(Array.isArray(data) ? data.length > 0 : !!data);
-        } else {
-          setHasProviderConfig(false);
-        }
-      } catch {
-        setHasProviderConfig(false);
-      }
-    };
-    checkProviderConfig();
+    // We now have direct Gemini env key in Railway, so we assume AI is always available for Chat
+    setHasProviderConfig(true);
   }, [token]);
 
   // Fetch agents on load
@@ -109,78 +93,20 @@ export function ChatPage() {
     const agent = agents.find(a => a.id === selectedAgentId);
     const agentName = agent ? agent.name : "Agent";
 
-    // If no AI provider config exists, fall back to local message only
-    if (!hasProviderConfig) {
-      const fallbackMessage: Message = {
-        id: crypto.randomUUID(),
-        sender: "agent",
-        agentName,
-        text: "⚠️ AI response coming soon — Configure an AI provider in the AI Providers page first.",
-        timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        thoughtLog: ["No AI provider config found. Skipping AI completion."],
-      };
-      setMessages(prev => [...prev, fallbackMessage]);
-      setLoading(false);
-      setActiveThoughts([]);
-      return;
-    }
-
-    // If no agent is selected, try the provider-configs/default/complete endpoint
-    if (!selectedAgentId) {
-      try {
-        const res = await fetch(`${API_BASE}/provider-configs/default/complete`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            messages: [{ role: "user", content: promptToSend }],
-          }),
-        });
-
-        if (!res.ok) throw new Error("AI completion failed");
-
-        const data = await res.json();
-        const text =
-          data.result ||
-          data.output ||
-          data.choices?.[0]?.message?.content ||
-          "AI response coming soon";
-
-        const aiMessage: Message = {
-          id: crypto.randomUUID(),
-          sender: "agent",
-          agentName: "AI",
-          text,
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      } catch {
-        const aiMessage: Message = {
-          id: crypto.randomUUID(),
-          sender: "agent",
-          agentName: "AI",
-          text: "⚠️ AI response coming soon — endpoint unavailable.",
-          timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      } finally {
-        setLoading(false);
-        setActiveThoughts([]);
-      }
-      return;
-    }
-
-    // Agent-based invoke
     try {
-      const res = await fetch(`${API_BASE}/agents/${selectedAgentId}/invoke`, {
+      const historyToSend = messages.map(m => ({ role: m.sender, text: m.text }));
+      
+      const res = await fetch(`${API_BASE}/chat`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ prompt: promptToSend }),
+        body: JSON.stringify({ 
+          message: promptToSend,
+          agentName: agentName,
+          history: historyToSend 
+        }),
       });
 
       if (!res.ok) {
@@ -189,22 +115,9 @@ export function ChatPage() {
 
       const data = await res.json();
 
-      const finalResult =
-        data.result ||
-        data.output ||
-        (data.decision && data.decision.reason) ||
-        "Task completed successfully.";
-      const thoughtLog =
-        data.steps ||
-        data.decisions?.map(
-          (d: any) =>
-            `[Policy Engine] Evaluate: ${d.policyId} -> ${d.kind.toUpperCase()} (${d.reason})`
-        ) || [
-          "Analyzing user command context...",
-          "Validating operation against business policies...",
-          "Generating optimized execution plan...",
-          "Updating brain decision log ledger...",
-        ];
+      const finalResult = data.reply || "Task completed successfully.";
+      const thoughtLog = ["Gemini AI response complete."];
+
 
       const agentMessage: Message = {
         id: crypto.randomUUID(),

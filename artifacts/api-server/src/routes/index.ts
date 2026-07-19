@@ -29,6 +29,7 @@ import autonomousRouter from "./autonomous.js";
 import youtubeOauthRouter from "./youtube-oauth.js";
 import oauthProvidersRouter from "./oauth-providers.js";
 import productionEngineRouter from "./production-engine.js";
+import { geminiChatRouter } from "./gemini-chat.js";
 
 const router: IRouter = Router();
 
@@ -62,5 +63,6 @@ router.use(notificationsRouter);
 router.use(systemStatusRouter);
 router.use(auditLogRouter);
 router.use(settingsRouter);
+router.use(geminiChatRouter);
 
 export default router;
