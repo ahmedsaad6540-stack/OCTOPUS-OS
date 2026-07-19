@@ -390,7 +390,7 @@ export function CampaignsPage() {
                       <span>{c.platform || "Multi-Channel"} • {c.affiliateNetwork || "Network"}</span>
                     </p>
                     <p className="text-[10px] text-purple-400/40 mt-1 flex items-center gap-1">
-                      <span className="opacity-50">🗓️</span> {new Date(c.createdAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
+                      <span className="opacity-50">🗓️</span> {new Date(c.createdAt || Date.now()).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
                     </p>
                   </div>
                   <div className="shrink-0">

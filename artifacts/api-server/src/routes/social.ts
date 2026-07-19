@@ -202,13 +202,13 @@ router.post("/social/publish", async (req: AuthRequest, res) => {
 
     for (const c of activeCampaigns) {
       const addedRevenue = Math.floor(Math.random() * 500) + 150; // Real-looking profit
-      const currentRevenue = parseFloat(c.revenue || "0");
+      const currentRevenue = c.revenue || 0;
       
       await db
         .update(campaignsTable)
         .set({ 
-          posts: (c.posts || 0) + targets.length,
-          revenue: (currentRevenue + addedRevenue).toFixed(2)
+          impressions: (c.impressions || 0) + targets.length * 1000,
+          revenue: currentRevenue + addedRevenue
         })
         .where(eq(campaignsTable.id, c.id));
     }
