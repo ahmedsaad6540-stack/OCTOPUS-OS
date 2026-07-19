@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { socialAccountsTable, usersTable } from "@workspace/db/schema";
+import { socialAccountsTable, usersTable, campaignsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../middleware/auth.js";
 import { SocialEngine, type AccountTarget, type SocialPlatform } from "@workspace/social-publisher";
