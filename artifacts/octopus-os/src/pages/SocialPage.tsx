@@ -396,11 +396,11 @@ export function SocialPage() {
         {["tiktok", "youtube", "instagram", "facebook", "linkedin", "x"].includes(selected) && (
           <div className="mb-6">
             <a
-              href={`${API_BASE.replace(/\/$/, "")}/auth/social/${selected}/login?userId=${user?.id ?? ""}`}
+              href={`${API_BASE.replace(/\/api$/, "")}/api/oauth/${selected}/connect?userId=${user?.id ?? ""}`}
               target="_self"
               className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-800/90 to-indigo-800/90 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3.5 px-6 rounded-xl text-xs border border-purple-600/60 transition-all text-center shadow-[0_0_20px_rgba(126,34,206,0.3)] glow-purple"
             >
-              ⚡ ربط تلقائي فوري بنظام Buffer (1-Click OAuth) لـ {platform.name}
+              ⚡ ربط تلقائي فوري (1-Click OAuth) لـ {platform.name}
             </a>
             <div className="flex items-center my-3">
               <div className="flex-1 border-t border-purple-950/50" />
