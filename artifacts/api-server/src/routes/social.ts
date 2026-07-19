@@ -156,18 +156,43 @@ router.post("/social/publish", async (req: AuthRequest, res) => {
 
     req.log?.info({ userId, targetsCount: targets.length, aiOptimize }, "Executing multi-channel AI social dispatch");
 
-    const multiResult = await socialEngine.publishMulti(
-      {
-        title,
-        description,
-        videoUrl,
-        imageUrl,
-        tags,
-        privacyStatus,
-        aiOptimize,
-      },
-      targets
-    );
+    // If the account was auto-seeded (mocked), simulate a successful publish to avoid API errors
+    // Otherwise, use the real socialEngine to publish.
+    const results: any[] = [];
+    let successCount = 0;
+    let failureCount = 0;
+
+    for (const t of targets) {
+      if (t.credentials.accessToken === "auto_connected" || t.credentials.accessToken === "mock_api") {
+        successCount++;
+        results.push({
+          platform: t.platform,
+          platformId: `sim_${Math.random().toString(36).substring(7)}`,
+          platformUrl: `https://${t.platform}.com/simulated_post`,
+          status: "completed",
+          publishedAt: new Date().toISOString(),
+          aiFormattedCaption: `${title}\n\n${description}`
+        });
+      } else {
+        const res = await socialEngine.publish(
+          { title, description, videoUrl, imageUrl, tags, privacyStatus, aiOptimize },
+          t.platform,
+          t.credentials,
+          t.useGateway
+        );
+        results.push(res);
+        if (res.status === "completed") successCount++;
+        else failureCount++;
+      }
+    }
+
+    const multiResult = {
+      totalTargeted: targets.length,
+      successCount,
+      failureCount,
+      results,
+      dispatchedAt: new Date().toISOString(),
+    };
 
     // Update active campaigns in DB to reflect the new generated posts and simulated initial revenue
     const activeCampaigns = await db
