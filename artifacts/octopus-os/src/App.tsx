@@ -2,6 +2,10 @@ import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { LanguageProvider } from "@/context/LanguageContext";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { LoginPage } from "@/pages/LoginPage";
+import { LandingPage } from "@/pages/LandingPage";
+import { PrivacyPolicyPage } from "@/pages/PrivacyPolicyPage";
+import { TermsOfServicePage } from "@/pages/TermsOfServicePage";
+import { DemoShowcasePage } from "@/pages/DemoShowcasePage";
 import { CommandCenter } from "@/pages/CommandCenter";
 import { MissionControlPage } from "@/pages/MissionControlPage";
 import { WorkforcePage } from "@/pages/WorkforcePage";
@@ -25,6 +29,7 @@ import { DeploymentPage } from "@/pages/DeploymentPage";
 import { SaaSPage } from "@/pages/SaaSPage";
 import { CampaignsPage } from "@/pages/CampaignsPage";
 import { useState } from "react";
+import { Switch, Route, useLocation } from "wouter";
 
 export type Page =
   | "command-center" | "agents" | "workforce" | "memory" | "prompt-studio"
@@ -37,7 +42,8 @@ export type Page =
 function OS() {
   const { user, isLoading } = useAuth();
   const [page, setPage] = useState<Page>("command-center");
-const [mobileOpen, setMobileOpen] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [, navigate] = useLocation();
 
   if (isLoading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#06020f]">
@@ -78,14 +84,13 @@ const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
     <>
-      {/* Mobile top bar – visible on small screens */}
+      {/* Mobile top bar */}
       <div className="md:hidden flex items-center justify-between px-4 py-2 bg-[#06020f] text-[#e2d9f3]">
         <button onClick={() => setMobileOpen(true)} className="text-2xl">☰</button>
         <span className="font-bold text-sm">OCTOPUS</span>
       </div>
 
       <div className="flex h-screen overflow-hidden bg-[#06020f] text-[#e2d9f3]">
-        {/* Sidebar – overlay on mobile, fixed on larger screens */}
         <div className={`fixed inset-y-0 left-0 z-20 ${mobileOpen ? "block" : "hidden"} md:block`}>
           <Sidebar
             currentPage={page}
@@ -95,7 +100,6 @@ const [mobileOpen, setMobileOpen] = useState(false);
             }}
           />
         </div>
-        {/* Main content */}
         <main className="flex-1 overflow-y-auto">
           {renderPage()}
         </main>
@@ -108,7 +112,16 @@ export default function App() {
   return (
     <LanguageProvider>
       <AuthProvider>
-        <OS />
+        <Switch>
+          {/* Public landing, demo, legal pages — visible WITHOUT login */}
+          <Route path="/" component={LandingPage} />
+          <Route path="/demo" component={DemoShowcasePage} />
+          <Route path="/privacy" component={PrivacyPolicyPage} />
+          <Route path="/terms" component={TermsOfServicePage} />
+          {/* Login + full OS — all /login and everything else */}
+          <Route path="/login" component={() => <OS />} />
+          <Route component={() => <OS />} />
+        </Switch>
       </AuthProvider>
     </LanguageProvider>
   );

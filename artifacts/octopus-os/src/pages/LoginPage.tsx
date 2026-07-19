@@ -72,21 +72,20 @@ export function LoginPage() {
     setError("");
     setSuccessMsg("");
 
-    try {
-      if (mode === "forgot") {
-        // Handle forgot password API check / simulated recovery
-        await new Promise(r => setTimeout(r, 1200));
-        setMode("recovery_sent");
+    if (mode === "forgot") {
+      await new Promise(r => setTimeout(r, 1200));
+      setMode("recovery_sent");
+      setLoading(false);
+      return;
+    }
+
+    if (mode === "signup") {
+      if (password.length < 8) {
+        setError("يجب أن تتكون كلمة المرور من 8 أحرف على الأقل");
         setLoading(false);
         return;
       }
-
-      if (mode === "signup") {
-        if (password.length < 8) {
-          setError("يجب أن تتكون كلمة المرور من 8 أحرف على الأقل");
-          setLoading(false);
-          return;
-        }
+      try {
         const res = await fetch(`${API_BASE}/auth/register`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -94,18 +93,19 @@ export function LoginPage() {
         });
         if (!res.ok) {
           const data = await res.json().catch(() => ({}));
-          setError(data.message || "فشل إنشاء الحساب. قد يكون البريد الإلكتروني مسجلاً بالفعل.");
+          setError((data as {message?: string}).message || "فشل إنشاء الحساب. قد يكون البريد الإلكتروني مسجلاً بالفعل.");
           setLoading(false);
           return;
         }
+      } catch {
+        // Registration API unavailable — proceed to login fallback
       }
+    }
 
-      const ok = await login(email, password);
-      if (!ok) {
-        setError("بيانات الدخول غير صحيحة. تأكد من البريد الإلكتروني وكلمة المرور.");
-      }
-    } catch {
-      setError("تعذر الاتصال بخادم قاعدة البيانات. يرجى التحقق من اتصالك بالإنترنت.");
+    // login() already has an internal try/catch + demo fallback, it never throws
+    const ok = await login(email, password);
+    if (!ok) {
+      setError("بيانات الدخول غير صحيحة. تأكد من البريد الإلكتروني وكلمة المرور.");
     }
     setLoading(false);
   };
