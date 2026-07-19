@@ -275,97 +275,111 @@ export function CampaignsPage() {
 
       {/* Loading state */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+        <div className="flex items-center justify-center py-32">
+          <div className="w-12 h-12 border-4 border-purple-500 border-t-transparent rounded-full animate-spin glow-purple" />
         </div>
       ) : campaigns.length === 0 ? (
         /* Empty state */
-        <div className="glass-card rounded-xl py-20 flex flex-col items-center justify-center gap-4 text-center">
-          <span className="text-5xl opacity-20">📣</span>
-          <p className="text-purple-300/60 text-sm font-semibold">No campaigns yet.</p>
-          <p className="text-purple-400/40 text-xs">Create your first campaign to start tracking performance.</p>
+        <div className="glass-card rounded-2xl py-32 flex flex-col items-center justify-center gap-6 text-center border border-purple-500/10">
+          <div className="w-24 h-24 rounded-full bg-purple-900/20 flex items-center justify-center shadow-[0_0_50px_rgba(139,92,246,0.1)]">
+            <span className="text-6xl opacity-40">📢</span>
+          </div>
+          <div>
+            <h3 className="text-xl font-bold text-white mb-2 font-heading">No Campaigns Yet</h3>
+            <p className="text-purple-400/60 text-sm max-w-sm mx-auto">
+              Your profit engine needs fuel. Create your first campaign to start generating automated content and revenue.
+            </p>
+          </div>
           <button
             onClick={() => setShowForm(true)}
-            className="mt-2 px-5 py-2 rounded-xl text-xs font-semibold text-white gradient-purple glow-purple"
+            className="mt-4 px-8 py-3 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 shadow-[0_0_20px_rgba(139,92,246,0.4)] transition-all hover:scale-105"
           >
-            + New Campaign
+            + Create First Campaign
           </button>
         </div>
       ) : (
-        /* Campaign table */
-        <div className="card-os overflow-hidden">
-          <table className="w-full text-xs">
-            <thead>
-              <tr style={{ borderBottom: "1px solid rgba(139,92,246,0.15)" }}>
-                {["Campaign", "Platform", "Status", "Revenue", "ROI", "Posts", "Actions"].map(
-                  (h) => (
-                    <th
-                      key={h}
-                      className="text-left px-4 py-3 text-purple-400/60 font-medium"
-                    >
-                      {h}
-                    </th>
-                  )
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {campaigns.map((c) => (
-                <tr
-                  key={c.id}
-                  style={{ borderBottom: "1px solid rgba(139,92,246,0.06)" }}
-                  className="hover:bg-purple-900/10"
-                >
-                  <td className="px-4 py-3 font-semibold text-white">{c.name}</td>
-                  <td className="px-4 py-3 text-purple-300">{c.platform}</td>
-                  <td className="px-4 py-3">
+        /* Premium Campaign Cards Grid */
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {campaigns.map((c) => (
+            <div
+              key={c.id}
+              className="group relative glass-card rounded-2xl p-6 border border-purple-500/10 hover:border-purple-500/40 transition-all duration-300 hover:-translate-y-1 overflow-hidden"
+            >
+              {/* Animated background glow on hover */}
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 to-emerald-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+              
+              <div className="relative z-10">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="flex-1 min-w-0 pr-4">
+                    <h3 className="text-lg font-bold text-white truncate font-heading group-hover:text-purple-300 transition-colors">
+                      {c.name}
+                    </h3>
+                    <p className="text-xs text-purple-400/60 mt-1 uppercase tracking-wider font-semibold">
+                      {c.platform || "Multi-Channel"} • {c.affiliateNetwork || "Network"}
+                    </p>
+                  </div>
+                  <div className="shrink-0">
                     <span
-                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black tracking-wide shadow-sm ${
                         c.status === "active"
-                          ? "bg-emerald-900/50 text-emerald-400"
-                          : "bg-yellow-900/50 text-yellow-400"
+                          ? "bg-emerald-950/60 text-emerald-400 border border-emerald-500/30 shadow-[0_0_10px_rgba(16,185,129,0.2)]"
+                          : "bg-yellow-950/60 text-yellow-400 border border-yellow-500/30"
                       }`}
                     >
+                      {c.status === "active" && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      )}
                       {c.status.toUpperCase()}
                     </span>
-                  </td>
-                  <td className="px-4 py-3 text-emerald-400 font-bold">
-                    {c.revenue ?? "—"}
-                  </td>
-                  <td className="px-4 py-3 text-purple-300">{c.roi ?? "—"}</td>
-                  <td className="px-4 py-3 text-white">{c.posts ?? 0}</td>
-                  <td className="px-4 py-3 flex items-center gap-2">
-                    <button
-                      onClick={() => handleToggle(c)}
-                      className={`px-2 py-1 rounded-md text-[10px] ${
-                        c.status === "active"
-                          ? "bg-yellow-900/40 text-yellow-400 hover:bg-yellow-900/60"
-                          : "bg-emerald-900/40 text-emerald-400 hover:bg-emerald-900/60"
-                      }`}
-                    >
-                      {c.status === "active" ? "Pause" : "Activate"}
-                    </button>
-                    <a
-                      href={c.productUrl || (c.affiliateNetwork?.toLowerCase().includes("impact") ? "https://app.impact.com/secure/advertiser/checklist/checklist-instance.ihtml" : c.affiliateNetwork?.toLowerCase().includes("amazon") ? "https://affiliate-program.amazon.com/" : "https://www.digistore24.com/vendor/cockpit")}
-                      target="_blank"
-                      rel="noreferrer"
-                      title={`فتح صفحة منتج الحملة وحسابك في ${c.affiliateNetwork || 'Amazon'}`}
-                      className="px-2 py-1 rounded-md text-[10px] bg-indigo-950/50 text-indigo-300 border border-indigo-600/40 hover:bg-indigo-900/60 hover:text-white flex items-center gap-1"
-                    >
-                      <span>🔗</span> <span>{c.affiliateNetwork || 'amazon'}</span>
-                    </a>
-                    <button
-                      onClick={() => handleDelete(c.id)}
-                      disabled={deletingId === c.id}
-                      className="px-2 py-1 rounded-md text-[10px] bg-red-950/40 text-red-400 hover:bg-red-950/60 disabled:opacity-40"
-                    >
-                      {deletingId === c.id ? "…" : "Delete"}
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-6 mt-6 p-4 rounded-xl bg-black/20 border border-purple-500/5">
+                  <div>
+                    <div className="text-[10px] text-purple-400/50 uppercase font-bold tracking-wider mb-1">Revenue</div>
+                    <div className="text-xl font-black text-emerald-400 font-mono">
+                      {c.revenue ? `$${c.revenue}` : "$0.00"}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-[10px] text-purple-400/50 uppercase font-bold tracking-wider mb-1">Generated Posts</div>
+                    <div className="text-xl font-black text-white font-mono">
+                      {c.posts ?? 0}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3 mt-auto pt-4 border-t border-purple-500/10">
+                  <button
+                    onClick={() => handleToggle(c)}
+                    className={`flex-1 px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+                      c.status === "active"
+                        ? "bg-yellow-950/30 text-yellow-400 border border-yellow-500/20 hover:bg-yellow-900/50 hover:border-yellow-400/50"
+                        : "bg-emerald-950/30 text-emerald-400 border border-emerald-500/20 hover:bg-emerald-900/50 hover:border-emerald-400/50"
+                    }`}
+                  >
+                    {c.status === "active" ? "⏸ Pause" : "▶ Activate"}
+                  </button>
+                  <a
+                    href={c.productUrl || "https://www.digistore24.com/"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 px-4 py-2 rounded-lg text-xs font-bold text-white bg-purple-900/30 border border-purple-500/20 hover:bg-purple-800/50 transition-all flex items-center justify-center gap-2"
+                  >
+                    🔗 Affiliate Link
+                  </a>
+                  <button
+                    onClick={() => handleDelete(c.id)}
+                    disabled={deletingId === c.id}
+                    className="p-2 rounded-lg text-red-400/60 bg-red-950/20 border border-red-500/10 hover:bg-red-900/40 hover:text-red-300 transition-colors disabled:opacity-50"
+                    title="Delete Campaign"
+                  >
+                    🗑
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
