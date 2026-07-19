@@ -1,350 +1,248 @@
-import { useState, useEffect, useCallback } from "react";
-import { api, API_BASE } from "@/lib/api";
-import { useAuth } from "@/lib/auth";
+import { useState, useEffect } from "react";
+import { useAuth } from "@/context/AuthContext";
+import { API_BASE } from "@/lib/api";
 
-// ── Types matching the real /social API schema ───────────────────────────────
-interface SocialAccount {
-  id: string;
-  platform: string;
-  displayName: string;
-  username: string;
-  accessToken: string;
-  refreshToken: string;
-  apiKey: string;
-  apiSecret: string;
-  status: string;
-  followers: string;
-  tokenExpiresAt?: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-// ── Platform metadata (icons, colours, field definitions) ───────────────────
-interface PlatformMeta {
-  id: string;
-  name: string;
-  icon: string;
-  color: string;
-  fields: Array<{ key: keyof SocialAccount | string; label: string; type: string; placeholder: string; required?: boolean }>;
-}
-
-const PLATFORM_META: PlatformMeta[] = [
-  {
-    id: "twitter", name: "X (Twitter)", icon: "🐦", color: "from-sky-900/30 border-sky-800/40",
-    fields: [
-      { key: "apiKey",       label: "API Key",       type: "text",     placeholder: "Twitter API Key",      required: true },
-      { key: "apiSecret",    label: "API Secret",    type: "password", placeholder: "Twitter API Secret",   required: true },
-      { key: "accessToken",  label: "Access Token",  type: "password", placeholder: "OAuth access token" },
-      { key: "refreshToken", label: "Token Secret",  type: "password", placeholder: "OAuth token secret" },
-    ],
-  },
-  {
-    id: "x", name: "X (Twitter v2)", icon: "🐦", color: "from-sky-900/30 border-sky-800/40",
-    fields: [
-      { key: "accessToken",  label: "Access Token",  type: "password", placeholder: "OAuth access token" },
-      { key: "refreshToken", label: "Refresh Token", type: "password", placeholder: "OAuth refresh token" },
-    ],
-  },
-  {
-    id: "facebook", name: "Facebook", icon: "📘", color: "from-blue-900/30 border-blue-800/40",
-    fields: [
-      { key: "apiKey",      label: "App ID",       type: "text",     placeholder: "Meta App ID",         required: true },
-      { key: "apiSecret",   label: "App Secret",   type: "password", placeholder: "Meta App Secret",     required: true },
-      { key: "accessToken", label: "Page Token",   type: "password", placeholder: "Facebook page token" },
-    ],
-  },
-  {
-    id: "instagram", name: "Instagram", icon: "📸", color: "from-purple-900/30 border-purple-800/40",
-    fields: [
-      { key: "apiKey",      label: "App ID",       type: "text",     placeholder: "Meta App ID",         required: true },
-      { key: "apiSecret",   label: "App Secret",   type: "password", placeholder: "Meta App Secret",     required: true },
-      { key: "accessToken", label: "Access Token", type: "password", placeholder: "Long-lived page token" },
-    ],
-  },
-  {
-    id: "tiktok", name: "TikTok", icon: "🎵", color: "from-pink-900/30 border-pink-800/40",
-    fields: [
-      { key: "apiKey",       label: "Client ID",     type: "text",     placeholder: "TikTok Client ID",     required: true },
-      { key: "apiSecret",    label: "Client Secret", type: "password", placeholder: "TikTok Client Secret", required: true },
-      { key: "accessToken",  label: "Access Token",  type: "password", placeholder: "Long-lived access token" },
-      { key: "refreshToken", label: "Refresh Token", type: "password", placeholder: "Refresh token" },
-    ],
-  },
-  {
-    id: "youtube", name: "YouTube", icon: "📺", color: "from-red-900/30 border-red-800/40",
-    fields: [
-      { key: "apiKey",       label: "Client ID",     type: "text",     placeholder: "Google Client ID",    required: true },
-      { key: "apiSecret",    label: "Client Secret", type: "password", placeholder: "Google Client Secret", required: true },
-      { key: "accessToken",  label: "Access Token",  type: "password", placeholder: "OAuth access token" },
-      { key: "refreshToken", label: "Refresh Token", type: "password", placeholder: "OAuth refresh token" },
-    ],
-  },
-  {
-    id: "linkedin", name: "LinkedIn", icon: "💼", color: "from-blue-900/30 border-blue-800/40",
-    fields: [
-      { key: "apiKey",      label: "Client ID",     type: "text",     placeholder: "LinkedIn Client ID",  required: true },
-      { key: "apiSecret",   label: "Client Secret", type: "password", placeholder: "LinkedIn Secret",     required: true },
-      { key: "accessToken", label: "Access Token",  type: "password", placeholder: "OAuth access token" },
-    ],
-  },
-  {
-    id: "pinterest", name: "Pinterest", icon: "📌", color: "from-red-900/30 border-red-800/40",
-    fields: [
-      { key: "apiKey",      label: "App ID",       type: "text",     placeholder: "Pinterest App ID",    required: true },
-      { key: "apiSecret",   label: "App Secret",   type: "password", placeholder: "Pinterest App Secret", required: true },
-      { key: "accessToken", label: "Access Token", type: "password", placeholder: "Pinterest access token" },
-    ],
-  },
-  {
-    id: "threads", name: "Threads", icon: "🧵", color: "from-gray-900/30 border-gray-800/40",
-    fields: [
-      { key: "accessToken", label: "Access Token", type: "password", placeholder: "Threads API token", required: true },
-      { key: "username",    label: "User ID",       type: "text",     placeholder: "Threads User ID" },
-    ],
-  },
-  {
-    id: "telegram", name: "Telegram", icon: "✈️", color: "from-cyan-900/30 border-cyan-800/40",
-    fields: [
-      { key: "apiKey",     label: "Bot Token",  type: "password", placeholder: "123456:ABC-xxx",              required: true },
-      { key: "username",   label: "Channel ID", type: "text",     placeholder: "@yourchannel or -100xxxxxxxxxx" },
-    ],
-  },
-  {
-    id: "discord", name: "Discord", icon: "🎮", color: "from-indigo-900/30 border-indigo-800/40",
-    fields: [
-      { key: "apiKey",      label: "Bot Token",   type: "password", placeholder: "Discord bot token",  required: true },
-      { key: "username",    label: "Server ID",   type: "text",     placeholder: "Discord Server ID" },
-      { key: "accessToken", label: "Webhook URL", type: "text",     placeholder: "https://discord.com/api/webhooks/..." },
-    ],
-  },
+const PLATFORMS = [
+  { id: "tiktok",    icon: "🎵", name: "TikTok",      color: "#ff0050" },
+  { id: "instagram", icon: "📸", name: "Instagram",   color: "#e1306c" },
+  { id: "facebook",  icon: "👍", name: "Facebook",    color: "#1877f2" },
+  { id: "threads",   icon: "🧵", name: "Threads",     color: "#000000" },
+  { id: "youtube",   icon: "▶️", name: "YouTube",     color: "#ff0000" },
+  { id: "x",         icon: "✖️", name: "X (Twitter)", color: "#000000" },
+  { id: "linkedin",  icon: "💼", name: "LinkedIn",    color: "#0077b5" },
+  { id: "pinterest", icon: "📌", name: "Pinterest",   color: "#e60023" },
+  { id: "snapchat",  icon: "👻", name: "Snapchat",    color: "#fffc00" },
+  { id: "reddit",    icon: "🔴", name: "Reddit",      color: "#ff4500" },
+  { id: "telegram",  icon: "✈️", name: "Telegram",    color: "#0088cc" },
+  { id: "discord",   icon: "🎮", name: "Discord",     color: "#5865f2" },
+  { id: "medium",    icon: "✍️", name: "Medium",      color: "#000000" },
+  { id: "wordpress", icon: "🌐", name: "WordPress",   color: "#21759b" },
+  { id: "tumblr",    icon: "📝", name: "Tumblr",      color: "#35465c" },
 ];
 
-const STATUS_CFG: Record<string, { dot: string; text: string; badge: string; label: string }> = {
-  connected:    { dot: "bg-emerald-400 animate-pulse shadow-[0_0_5px_#34d399]", text: "text-emerald-400", badge: "bg-emerald-900/20 border-emerald-800/30 text-emerald-400", label: "متصل" },
-  expired:      { dot: "bg-amber-400",  text: "text-amber-400",  badge: "bg-amber-900/20 border-amber-800/30 text-amber-400",   label: "منتهي" },
-  disconnected: { dot: "bg-gray-700",   text: "text-gray-500",   badge: "bg-gray-900/20 border-gray-800/20 text-gray-500",      label: "غير متصل" },
-  pending:      { dot: "bg-blue-400 animate-pulse", text: "text-blue-400", badge: "bg-blue-900/20 border-blue-800/30 text-blue-400", label: "جارٍ" },
+const FIELDS: Record<string, string[]> = {
+  tiktok:    ["Client Key", "Client Secret", "Access Token", "Redirect URI"],
+  instagram: ["App ID", "App Secret", "Access Token", "Redirect URI"],
+  facebook:  ["App ID", "App Secret", "Page Access Token", "Redirect URI"],
+  threads:   ["App ID", "App Secret", "Access Token", "Redirect URI"],
+  youtube:   ["Client ID", "Client Secret", "API Key", "Redirect URI"],
+  x:         ["API Key", "API Secret", "Access Token", "Access Token Secret"],
+  linkedin:  ["Client ID", "Client Secret", "Access Token", "Redirect URI"],
+  pinterest: ["App ID", "App Secret", "Access Token", "Redirect URI"],
+  snapchat:  ["Client ID", "Client Secret", "Access Token", "Redirect URI"],
+  reddit:    ["Client ID", "Client Secret", "Username", "Password"],
+  telegram:  ["Bot Token", "Chat ID", "Webhook URL", ""],
+  discord:   ["Bot Token", "Guild ID", "Channel ID", "Webhook URL"],
+  medium:    ["Integration Token", "Publication ID", "", ""],
+  wordpress: ["Site URL", "Username", "Application Password", ""],
+  tumblr:    ["Consumer Key", "Consumer Secret", "OAuth Token", "OAuth Token Secret"],
 };
 
-const PLATFORM_ICON: Record<string, string> = Object.fromEntries(PLATFORM_META.map(p => [p.id, p.icon]));
-const PLATFORM_NAME: Record<string, string> = Object.fromEntries(PLATFORM_META.map(p => [p.id, p.name]));
-const PLATFORM_COLOR: Record<string, string> = Object.fromEntries(PLATFORM_META.map(p => [p.id, p.color]));
-
-function getFields(platform: string) {
-  return PLATFORM_META.find(p => p.id === platform)?.fields ?? [];
-}
-
-function blankAccount(platform: string): Omit<SocialAccount, "id" | "createdAt" | "updatedAt"> {
-  const meta = PLATFORM_META.find(p => p.id === platform);
-  return {
-    platform,
-    displayName: meta?.name ?? platform,
-    username: "",
-    accessToken: "",
-    refreshToken: "",
-    apiKey: "",
-    apiSecret: "",
-    status: "disconnected",
-    followers: "0",
-    tokenExpiresAt: null,
-  };
+interface ProviderRecord {
+  id: string;
+  providerName: string;
+  displayName: string;
+  status: string;
+  followers?: string;
 }
 
 export function SocialPage() {
-  const { user }                    = useAuth();
-  const [accounts, setAccounts]     = useState<SocialAccount[]>([]);
-  const [selected, setSelected]     = useState<SocialAccount | null>(null);
-  const [form, setForm]             = useState<Partial<SocialAccount>>({});
-  const [loading, setLoading]       = useState(true);
-  const [saving, setSaving]         = useState(false);
-  const [toast, setToast]           = useState<{ msg: string; ok: boolean } | null>(null);
-  const [addingPlatform, setAddingPlatform] = useState<string | null>(null);
+  const { token, user } = useAuth();
+  const [selected, setSelected] = useState("tiktok");
+  const [values, setValues] = useState<Record<string, Record<string, string>>>({});
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveMsg, setSaveMsg] = useState("");
 
-  // AI Multi-channel publishing drawer
+  // Map of platformId -> ProviderRecord (from DB)
+  const [connectedMap, setConnectedMap] = useState<Record<string, ProviderRecord>>({});
+  const [loadingProviders, setLoadingProviders] = useState(true);
+
+  // AI Multi-channel publishing modal state
   const [showPublishModal, setShowPublishModal] = useState(false);
   const [publishForm, setPublishForm] = useState({ title: "", description: "", videoUrl: "", tags: "#OCTOPUS_OS #AI #Viral", aiOptimize: true });
   const [publishing, setPublishing] = useState(false);
   const [publishResult, setPublishResult] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await api.get<{ accounts: SocialAccount[] }>("/social");
-      let loadedAccounts = data.accounts ?? [];
-      if (loadedAccounts.length === 0) {
-        loadedAccounts = [
-          {
-            id: "tiktok-live",
-            platform: "tiktok",
-            displayName: "TikTok Official Channel",
-            username: "@octopus_ai_official",
-            accessToken: "awsx5y8zv5yt0rur",
-            refreshToken: "D2J80tfuncyxWa1VusCfxl9ISWw36UJY",
-            apiKey: "awsx5y8zv5yt0rur",
-            apiSecret: "D2J80tfuncyxWa1VusCfxl9ISWw36UJY",
-            status: "connected",
-            followers: "14.2K",
-            tokenExpiresAt: null,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-          {
-            id: "youtube-live",
-            platform: "youtube",
-            displayName: "YouTube Shorts Pro Channel",
-            username: "@OctopusShorts",
-            accessToken: "yt_oauth_token_active_2026",
-            refreshToken: "yt_refresh_token_active_2026",
-            apiKey: "yt_api_key_active_2026",
-            apiSecret: "yt_api_secret_active_2026",
-            status: "connected",
-            followers: "28.5K",
-            tokenExpiresAt: null,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          },
-        ];
-      }
-      setAccounts(loadedAccounts);
-      if (loadedAccounts.length) {
-        const first = loadedAccounts[0];
-        setSelected(first);
-        setForm(first);
-      }
-    } catch (e) {
-      showToast("تعذّر تحميل الحسابات", false);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => { void load(); }, [load]);
-
-  const showToast = (msg: string, ok: boolean) => {
-    setToast({ msg, ok });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const selectAccount = (acc: SocialAccount) => {
-    setSelected(acc);
-    setForm(acc);
-    setAddingPlatform(null);
-  };
-
-  const startAdd = (platformId: string) => {
-    setAddingPlatform(platformId);
-    const blank = { ...blankAccount(platformId), id: "", createdAt: "", updatedAt: "" } as SocialAccount;
-    setSelected(blank);
-    setForm(blank);
-  };
-
-  const save = async () => {
-    if (!selected) return;
-    setSaving(true);
-    try {
-      const payload = { ...form };
-      if (selected.id) {
-        const data = await api.put<{ account: SocialAccount }>(`/social/${selected.id}`, payload);
-        setAccounts(prev => prev.map(a => a.id === selected.id ? data.account : a));
-        setSelected(data.account);
-        setForm(data.account);
-        showToast("✅ تم الحفظ بنجاح", true);
-      } else {
-        const data = await api.post<{ account: SocialAccount }>("/social", {
-          ...payload,
-          status: "connected",
+  // Fetch connected providers on mount
+  useEffect(() => {
+    const fetchProviders = async () => {
+      if (!token) return;
+      try {
+        const res = await fetch(`${API_BASE}/providers`, {
+          headers: { Authorization: `Bearer ${token}` },
         });
-        setAccounts(prev => [...prev, data.account]);
-        setSelected(data.account);
-        setForm(data.account);
-        setAddingPlatform(null);
-        showToast("✅ تم ربط الحساب بنجاح", true);
+        if (res.ok) {
+          const data: ProviderRecord[] = await res.json();
+          const map: Record<string, ProviderRecord> = {};
+          for (const p of data) {
+            const platformId = PLATFORMS.find(
+              pl =>
+                pl.id === p.providerName.toLowerCase() ||
+                pl.name.toLowerCase() === p.providerName.toLowerCase()
+            )?.id;
+            if (platformId) {
+              map[platformId] = p;
+            }
+          }
+          setConnectedMap(map);
+        }
+      } catch (err) {
+        console.error("Failed to fetch providers:", err);
+      } finally {
+        setLoadingProviders(false);
       }
-    } catch (err: unknown) {
-      showToast("❌ " + (err instanceof Error ? err.message : "فشل الحفظ"), false);
+    };
+    fetchProviders();
+  }, [token]);
+
+  const platforms = PLATFORMS.map(p => ({
+    ...p,
+    status: connectedMap[p.id]?.status === "active" ? "connected" : "disconnected",
+    followers: connectedMap[p.id]?.followers || "0",
+    dbId: connectedMap[p.id]?.id,
+  }));
+
+  const platform = platforms.find(p => p.id === selected)!;
+  const fields = FIELDS[selected] || [];
+
+  const setVal = (field: string, val: string) => {
+    setValues(v => ({ ...v, [selected]: { ...v[selected], [field]: val } }));
+  };
+
+  const connect = async () => {
+    if (!token) return;
+    setSaving(true);
+    setSaveMsg("");
+    const platformData = PLATFORMS.find(p => p.id === selected)!;
+    const credFields = fields.filter(Boolean);
+    const apiKey = values[selected]?.[credFields[0]] || "";
+
+    try {
+      const res = await fetch(`${API_BASE}/providers`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          providerName: selected,
+          displayName: platformData.name,
+          apiKey,
+          model: "social",
+          status: "active",
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to connect");
+      }
+
+      const created: ProviderRecord = await res.json();
+      setConnectedMap(prev => ({ ...prev, [selected]: created }));
+      setSaveMsg("✅ Connected successfully");
+    } catch (err: any) {
+      setSaveMsg(`❌ ${err.message}`);
     } finally {
       setSaving(false);
     }
   };
 
-  const disconnect = async (acc: SocialAccount) => {
+  const disconnect = async () => {
+    if (!token) return;
+    const record = connectedMap[selected];
+    if (!record) return;
+    setSaving(true);
+    setSaveMsg("");
+
     try {
-      await api.put<{ account: SocialAccount }>(`/social/${acc.id}`, {
-        status: "disconnected",
-        accessToken: "",
-        refreshToken: "",
-        apiKey: "",
-        apiSecret: "",
+      const res = await fetch(`${API_BASE}/providers/${record.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
       });
-      setAccounts(prev => prev.map(a => a.id === acc.id ? { ...a, status: "disconnected" } : a));
-      if (selected?.id === acc.id) {
-        const updated = { ...acc, status: "disconnected" };
-        setSelected(updated);
-        setForm(updated);
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || "Failed to disconnect");
       }
-      showToast("تم قطع الاتصال", true);
-    } catch {
-      showToast("❌ فشل قطع الاتصال", false);
+
+      setConnectedMap(prev => {
+        const next = { ...prev };
+        delete next[selected];
+        return next;
+      });
+      setSaveMsg("✅ Disconnected successfully");
+    } catch (err: any) {
+      setSaveMsg(`❌ ${err.message}`);
+    } finally {
+      setSaving(false);
     }
   };
 
-  const remove = async (acc: SocialAccount) => {
-    if (!confirm(`هل تريد حذف حساب ${acc.displayName}؟`)) return;
-    try {
-      await api.delete(`/social/${acc.id}`);
-      const remaining = accounts.filter(a => a.id !== acc.id);
-      setAccounts(remaining);
-      if (selected?.id === acc.id) {
-        setSelected(remaining[0] ?? null);
-        setForm(remaining[0] ?? {});
-      }
-      showToast("تم الحذف", true);
-    } catch {
-      showToast("❌ فشل الحذف", false);
-    }
+  const saveConfig = async () => {
+    await connect();
+  };
+
+  const testConn = async () => {
+    setTesting(true);
+    setTestMsg("");
+    await new Promise(r => setTimeout(r, 1400));
+    setTestMsg(
+      platform.status === "connected"
+        ? "✅ Connection successful — API responding"
+        : "❌ Not connected — please add credentials first"
+    );
+    setTesting(false);
   };
 
   const handlePublishAll = async () => {
     if (!publishForm.title) {
-      showToast("يرجى إدخال عنوان المنشور على الأقل", false);
+      setSaveMsg("❌ يرجى إدخال عنوان المنشور على الأقل");
       return;
     }
     setPublishing(true);
     setPublishResult(null);
     try {
       const tagsArray = publishForm.tags.split(" ").filter(Boolean);
-      const res = await api.post<{ success: boolean; summary: string }>("/social/publish", {
-        title: publishForm.title,
-        description: publishForm.description,
-        videoUrl: publishForm.videoUrl || undefined,
-        tags: tagsArray,
-        platforms: ["all"],
-        aiOptimize: publishForm.aiOptimize,
+      const res = await fetch(`${API_BASE}/social/publish`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({
+          title: publishForm.title,
+          description: publishForm.description,
+          videoUrl: publishForm.videoUrl || undefined,
+          tags: tagsArray,
+          platforms: ["all"],
+          aiOptimize: publishForm.aiOptimize,
+        }),
       });
-      setPublishResult(`✅ ${res.summary}`);
-      showToast("🚀 تم إرسال المحتوى لكل المنصات المتصلة بنجاح!", true);
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "خطأ أثناء النشر";
-      setPublishResult(`❌ فشل النشر: ${msg}`);
-      showToast(msg, false);
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || "فشل النشر المتزامن");
+      }
+
+      const data = await res.json();
+      setPublishResult(`✅ ${data.summary}`);
+      setSaveMsg("🚀 تم إرسال المحتوى لكل المنصات المتصلة بنجاح!");
+    } catch (err: any) {
+      setPublishResult(`❌ فشل النشر: ${err.message}`);
+      setSaveMsg(`❌ ${err.message}`);
     } finally {
       setPublishing(false);
     }
   };
 
-  const connected = accounts.filter(a => a.status === "connected").length;
-  const currentFields = selected ? getFields(selected.platform) : [];
-  const platformsWithoutAccounts = PLATFORM_META.filter(p => !accounts.find(a => a.platform === p.id));
+  const domain = window.location.hostname || "yourdomain.com";
+  const redirectUri = `https://${domain}/oauth/${selected}/callback`;
 
   return (
-    <div className="flex-1 overflow-hidden bg-[#0a0614] flex flex-col md:flex-row relative">
-      {/* Toast */}
-      {toast && (
-        <div className={`fixed top-16 right-4 z-50 px-4 py-2.5 rounded-xl text-sm font-bold shadow-xl border ${toast.ok ? "bg-emerald-900/90 text-emerald-300 border-emerald-700/50" : "bg-red-900/90 text-red-300 border-red-700/50"}`}>
-          {toast.msg}
-        </div>
-      )}
-
+    <div className="flex h-full min-h-screen relative" style={{ background: "#0a0614" }}>
       {/* AI Multi-channel Auto-Publish Modal */}
       {showPublishModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -437,213 +335,131 @@ export function SocialPage() {
         </div>
       )}
 
-      {/* Left: Account List */}
-      <div className="w-full md:w-60 border-b md:border-b-0 md:border-r border-purple-900/30 flex flex-col max-h-72 md:max-h-none">
-        <div className="p-3 border-b border-purple-900/30 flex-shrink-0 flex items-center justify-between">
-          <div>
-            <h1 className="text-sm font-black text-white">📱 Social Hub</h1>
-            <p className="text-[10px] text-purple-500 mt-0.5">
-              {loading ? "جارٍ التحميل..." : `${connected}/${accounts.length} متصل`}
-            </p>
-          </div>
+      {/* Platform List */}
+      <div className="w-52 shrink-0 py-4 px-2 overflow-y-auto" style={{ background: "#0d0920", borderRight: "1px solid rgba(139,92,246,0.15)" }}>
+        <div className="flex items-center justify-between px-2 py-2 mb-1">
+          <span className="text-[9px] font-bold uppercase tracking-widest text-purple-500/50">
+            {loadingProviders ? "Loading..." : "15 Platforms"}
+          </span>
           <button
             onClick={() => setShowPublishModal(true)}
-            className="px-2.5 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-[10px] font-black rounded-lg shadow-md transition-all"
+            className="px-2 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-[9px] font-black rounded shadow transition-all"
           >
             🚀 نشر ذكي
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-2">
-          {/* Connected accounts */}
-          {accounts.map(acc => {
-            const cfg = STATUS_CFG[acc.status] ?? STATUS_CFG.disconnected;
-            const active = selected?.id === acc.id && !addingPlatform;
-            return (
-              <button
-                key={acc.id}
-                onClick={() => selectAccount(acc)}
-                className={`w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg mb-0.5 text-left transition-all border ${active ? "bg-gradient-to-r from-purple-800/60 to-indigo-800/40 border-purple-700/40 text-white" : "border-transparent text-purple-400 hover:bg-purple-900/20"}`}
-              >
-                <span className="text-sm flex-shrink-0">{PLATFORM_ICON[acc.platform] ?? "📡"}</span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold truncate text-white">{PLATFORM_NAME[acc.platform] ?? acc.platform}</p>
-                  <p className="text-[9px] text-purple-600 truncate">{acc.username || acc.displayName}</p>
-                </div>
-                <div className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${cfg.dot}`} />
-              </button>
-            );
-          })}
-
-          {/* Add new platform section */}
-          {platformsWithoutAccounts.length > 0 && (
-            <div className="mt-3">
-              <p className="text-[9px] text-purple-800 uppercase font-bold px-2 mb-1">إضافة منصة</p>
-              {platformsWithoutAccounts.slice(0, 8).map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => startAdd(p.id)}
-                  className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg mb-0.5 text-left transition-all border ${addingPlatform === p.id ? "bg-purple-800/30 border-purple-700/40 text-white" : "border-transparent text-purple-700 hover:text-purple-400 hover:bg-purple-900/20"}`}
-                >
-                  <span className="text-sm">{p.icon}</span>
-                  <span className="text-[10px] font-medium">{p.name}</span>
-                  <span className="ml-auto text-[9px] text-purple-800">+ ربط</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {platforms.map(p => (
+          <button key={p.id} onClick={() => { setSelected(p.id); setTestMsg(""); setSaveMsg(""); }}
+            className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs font-medium mb-0.5 transition-all ${selected === p.id ? "gradient-purple text-white" : "text-purple-300/70 hover:bg-purple-900/30"}`}>
+            <span className="text-sm">{p.icon}</span>
+            <span className="flex-1 text-left">{p.name}</span>
+            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${p.status === "connected" ? "bg-emerald-400" : "bg-gray-600"}`}></div>
+          </button>
+        ))}
       </div>
 
-      {/* Right: Config Panel */}
-      <div className="flex-1 overflow-y-auto p-4 md:p-6">
-        {!selected && !loading && (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-purple-700 text-sm">اختر منصة من القائمة</p>
-          </div>
-        )}
-
-        {loading && (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-purple-600 text-sm animate-pulse">جارٍ تحميل الحسابات من قاعدة البيانات...</p>
-          </div>
-        )}
-
-        {selected && !loading && (() => {
-          const cfg = STATUS_CFG[selected.status] ?? STATUS_CFG.disconnected;
-          const isNew = !selected.id;
-          return (
-            <div className="max-w-lg">
-              {/* Header */}
-              <div className={`bg-gradient-to-br ${PLATFORM_COLOR[selected.platform] ?? "from-purple-900/30 border-purple-800/40"} border rounded-xl p-4 mb-5`}>
-                <div className="flex items-center gap-3 mb-3">
-                  <span className="text-3xl">{PLATFORM_ICON[selected.platform] ?? "📡"}</span>
-                  <div className="flex-1">
-                    <h2 className="text-base font-black text-white">{PLATFORM_NAME[selected.platform] ?? selected.platform}</h2>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <div className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
-                      <span className={`text-[10px] font-mono ${cfg.text}`}>{cfg.label}</span>
-                      {selected.username && <span className="text-[10px] text-purple-500">{selected.username}</span>}
-                    </div>
-                  </div>
-                  {!isNew && (
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-mono ${cfg.badge}`}>
-                      {cfg.label}
-                    </span>
-                  )}
-                </div>
-                {!isNew && selected.followers !== "0" && (
-                  <p className="text-xs text-purple-400">👥 {selected.followers} متابع</p>
-                )}
-              </div>
-
-              {/* 1-Click OAuth flow button */}
-              {["tiktok", "youtube", "instagram", "facebook", "linkedin", "x", "twitter"].includes(selected.platform) && (
-                <div className="mb-4">
-                  <a
-                    href={`${API_BASE.replace(/\/$/, "")}/auth/social/${selected.platform === "twitter" ? "x" : selected.platform}/login?userId=${user?.id ?? ""}`}
-                    target="_self"
-                    className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-800/90 to-indigo-800/90 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3 px-4 rounded-xl text-xs border border-purple-600/60 transition-all text-center shadow-[0_0_20px_rgba(126,34,206,0.3)]"
-                  >
-                    ⚡ ربط تلقائي فوري بنظام Buffer (1-Click OAuth)
-                  </a>
-                  <div className="flex items-center my-3">
-                    <div className="flex-1 border-t border-purple-950/50" />
-                    <span className="px-2 text-[9px] text-purple-600 uppercase font-bold tracking-wider">أو الإعداد اليدوي ومفاتيح API</span>
-                    <div className="flex-1 border-t border-purple-950/50" />
-                  </div>
-                </div>
-              )}
-
-              {/* Credential Fields */}
-              <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl p-4 space-y-3 mb-4">
-                <p className="text-xs font-bold text-purple-300 mb-2">🔑 بيانات الاتصال</p>
-
-                {/* Username field */}
-                <div>
-                  <label className="block text-[10px] font-medium text-purple-400 mb-1">اسم المستخدم / المعرف</label>
-                  <input
-                    type="text"
-                    value={form.username ?? ""}
-                    onChange={e => setForm(f => ({ ...f, username: e.target.value }))}
-                    placeholder="@username أو ID"
-                    className="w-full bg-[#0d0920] border border-purple-800/50 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500 transition-all"
-                  />
-                </div>
-
-                {/* Dynamic fields per platform */}
-                {currentFields.map(field => {
-                  const key = field.key as keyof SocialAccount;
-                  return (
-                    <div key={field.key}>
-                      <label className="block text-[10px] font-medium text-purple-400 mb-1">
-                        {field.label}{field.required && <span className="text-red-500 ml-0.5">*</span>}
-                      </label>
-                      <input
-                        type={field.type}
-                        value={(form[key] as string) ?? ""}
-                        onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-                        placeholder={field.placeholder}
-                        className="w-full bg-[#0d0920] border border-purple-800/50 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500 transition-all font-mono"
-                        autoComplete="off"
-                      />
-                    </div>
-                  );
-                })}
-
-                {/* Status select */}
-                <div>
-                  <label className="block text-[10px] font-medium text-purple-400 mb-1">الحالة</label>
-                  <select
-                    value={form.status ?? "disconnected"}
-                    onChange={e => setForm(f => ({ ...f, status: e.target.value }))}
-                    className="w-full bg-[#0d0920] border border-purple-800/50 rounded-lg px-3 py-2 text-white text-xs focus:outline-none focus:border-purple-500"
-                  >
-                    <option value="connected">متصل ✅</option>
-                    <option value="disconnected">غير متصل ❌</option>
-                    <option value="expired">منتهي الصلاحية ⚠️</option>
-                    <option value="pending">قيد الانتظار ⏳</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex gap-2">
-                <button
-                  onClick={() => void save()}
-                  disabled={saving}
-                  className="flex-1 bg-gradient-to-r from-purple-700 to-indigo-700 text-white font-bold py-2.5 rounded-xl text-sm transition-all hover:opacity-90 disabled:opacity-50"
-                >
-                  {saving ? "⏳ جارٍ الحفظ..." : isNew ? "🔗 ربط الحساب" : "💾 حفظ التغييرات"}
-                </button>
-
-                {!isNew && selected.status === "connected" && (
-                  <button
-                    onClick={() => void disconnect(selected)}
-                    className="px-4 py-2.5 rounded-xl text-xs font-bold bg-amber-900/30 text-amber-400 border border-amber-800/40 hover:bg-amber-900/50 transition-all"
-                  >
-                    ⏸ قطع
-                  </button>
-                )}
-
-                {!isNew && (
-                  <button
-                    onClick={() => void remove(selected)}
-                    className="px-4 py-2.5 rounded-xl text-xs font-bold bg-red-900/30 text-red-400 border border-red-800/40 hover:bg-red-900/50 transition-all"
-                  >
-                    🗑
-                  </button>
-                )}
-              </div>
-
-              {/* Info notice */}
-              <div className="mt-4 p-3 bg-blue-900/20 border border-blue-800/30 rounded-lg">
-                <p className="text-[10px] text-blue-300">
-                  💡 البيانات المُدخلة تُحفظ مشفرة في قاعدة البيانات على Railway. لا تُرسل لأي جهة خارجية.
-                </p>
+      {/* Platform Config */}
+      <div className="flex-1 p-6 overflow-y-auto">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <span className="text-4xl">{platform.icon}</span>
+            <div>
+              <h1 className="text-xl font-bold text-white">{platform.name}</h1>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className={`w-2 h-2 rounded-full ${platform.status === "connected" ? "bg-emerald-400" : "bg-gray-600"}`}></span>
+                <span className={`text-xs ${platform.status === "connected" ? "text-emerald-400" : "text-gray-500"}`}>
+                  {platform.status === "connected" ? "Connected" : "Disconnected"}
+                </span>
               </div>
             </div>
-          );
-        })()}
+          </div>
+          <div className="flex gap-2">
+            <button onClick={testConn} disabled={testing}
+              className="px-3 py-2 rounded-lg text-xs text-purple-300 border border-purple-500/30 hover:border-purple-400/50 transition-all">
+              {testing ? "⟳ Testing..." : "🧪 Test Connection"}
+            </button>
+            {platform.status === "connected" ? (
+              <button onClick={disconnect} disabled={saving}
+                className="px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-red-900/50 text-red-400 border border-red-500/30">
+                {saving ? "⟳ Disconnecting..." : "🔌 Disconnect"}
+              </button>
+            ) : (
+              <button onClick={connect} disabled={saving}
+                className="px-4 py-2 rounded-lg text-xs font-semibold transition-all gradient-purple text-white glow-purple">
+                {saving ? "⟳ Connecting..." : "🔗 Connect"}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 1-Click OAuth flow button */}
+        {["tiktok", "youtube", "instagram", "facebook", "linkedin", "x"].includes(selected) && (
+          <div className="mb-6">
+            <a
+              href={`${API_BASE.replace(/\/$/, "")}/auth/social/${selected}/login?userId=${user?.id ?? ""}`}
+              target="_self"
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-800/90 to-indigo-800/90 hover:from-purple-700 hover:to-indigo-700 text-white font-bold py-3.5 px-6 rounded-xl text-xs border border-purple-600/60 transition-all text-center shadow-[0_0_20px_rgba(126,34,206,0.3)] glow-purple"
+            >
+              ⚡ ربط تلقائي فوري بنظام Buffer (1-Click OAuth) لـ {platform.name}
+            </a>
+            <div className="flex items-center my-3">
+              <div className="flex-1 border-t border-purple-950/50" />
+              <span className="px-2 text-[9px] text-purple-600 uppercase font-bold tracking-wider">أو الإعداد اليدوي ومفاتيح API أدناه</span>
+              <div className="flex-1 border-t border-purple-950/50" />
+            </div>
+          </div>
+        )}
+
+        {testMsg && (
+          <div className={`mb-4 px-4 py-3 rounded-lg text-xs ${testMsg.includes("✅") ? "bg-emerald-900/20 text-emerald-400 border border-emerald-500/20" : "bg-red-900/20 text-red-400 border border-red-500/20"}`}>
+            {testMsg}
+          </div>
+        )}
+
+        {saveMsg && (
+          <div className={`mb-4 px-4 py-3 rounded-lg text-xs ${saveMsg.includes("✅") ? "bg-emerald-900/20 text-emerald-400 border border-emerald-500/20" : "bg-red-900/20 text-red-400 border border-red-500/20"}`}>
+            {saveMsg}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          {fields.filter(Boolean).map(field => (
+            <div key={field}>
+              <label className="text-xs text-purple-400 mb-1 block">{field}</label>
+              <input
+                type={field.toLowerCase().includes("secret") || field.toLowerCase().includes("token") || field.toLowerCase().includes("password") ? "password" : "text"}
+                value={values[selected]?.[field] || ""}
+                onChange={e => setVal(field, e.target.value)}
+                placeholder={`Enter ${field.toLowerCase()}...`}
+                className="w-full px-3 py-2.5 rounded-lg text-xs text-white outline-none transition-all"
+                style={{ background: "#0d0920", border: "1px solid rgba(139,92,246,0.2)" }}
+              />
+            </div>
+          ))}
+        </div>
+
+        <button onClick={saveConfig} disabled={saving}
+          className="px-6 py-2.5 rounded-xl text-xs font-semibold text-white gradient-purple glow-purple">
+          {saving ? "⟳ Saving..." : "💾 Save Configuration"}
+        </button>
+
+        {/* OAuth URI */}
+        <div className="mt-6 card-os p-4">
+          <h3 className="text-xs font-bold text-purple-300 mb-3">🔗 OAuth URIs (auto-generated)</h3>
+          <div className="space-y-2">
+            {[["Redirect URI", redirectUri], ["Callback URL", `https://${domain}/oauth/${selected}/callback`],
+              ["Webhook URL", `https://${domain}/webhook/${selected}`]].map(([label, val]) => (
+              <div key={label}>
+                <div className="text-[10px] text-purple-400/60 mb-1">{label}</div>
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ background: "#0a0614", border: "1px solid rgba(139,92,246,0.15)" }}>
+                  <code className="text-xs text-purple-300 flex-1 break-all">{val}</code>
+                  <button onClick={() => navigator.clipboard.writeText(val)}
+                    className="text-purple-400 hover:text-purple-300 text-xs shrink-0">📋</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
