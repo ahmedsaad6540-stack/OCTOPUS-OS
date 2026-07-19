@@ -18,6 +18,7 @@ interface NewCampaignForm {
   name: string;
   platform: string;
   affiliateNetwork: string;
+  productUrl: string;
 }
 
 const PLATFORMS = ["TikTok", "Instagram", "YouTube", "Pinterest", "Amazon", "ClickBank", "Other"];
@@ -29,7 +30,7 @@ export function CampaignsPage() {
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [form, setForm] = useState<NewCampaignForm>({ name: "", platform: "TikTok", affiliateNetwork: "Digistore24" });
+  const [form, setForm] = useState<NewCampaignForm>({ name: "", platform: "TikTok", affiliateNetwork: "Digistore24", productUrl: "" });
   const [engineRunning, setEngineRunning] = useState(false);
   const [engineResult, setEngineResult] = useState<{ success: boolean; message: string; result?: any } | null>(null);
   const [deletingId, setDeletingId] = useState<number | string | null>(null);
@@ -96,12 +97,12 @@ export function CampaignsPage() {
       const res = await fetch(`${API_BASE}/campaigns`, {
         method: "POST",
         headers,
-        body: JSON.stringify({ name: form.name.trim(), platform: form.platform, affiliateNetwork: form.affiliateNetwork }),
+        body: JSON.stringify({ name: form.name.trim(), platform: form.platform, affiliateNetwork: form.affiliateNetwork, productUrl: form.productUrl.trim() }),
       });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const created = await res.json();
       setCampaigns((prev) => [created.campaign || created, ...prev]);
-      setForm({ name: "", platform: "TikTok", affiliateNetwork: "Digistore24" });
+      setForm({ name: "", platform: "TikTok", affiliateNetwork: "Digistore24", productUrl: "" });
       setShowForm(false);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Failed to create campaign");
@@ -299,6 +300,22 @@ export function CampaignsPage() {
                       ))}
                     </select>
                   </div>
+                </div>
+              </div>
+
+              <div>
+                <label className="text-[10px] text-purple-400/60 uppercase font-black tracking-wider block mb-2 ml-1">
+                  Affiliate Link (Product URL)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-1/2 -translate-y-1/2 opacity-50">🔗</span>
+                  <input
+                    type="url"
+                    value={form.productUrl}
+                    onChange={(e) => setForm((f) => ({ ...f, productUrl: e.target.value }))}
+                    placeholder="https://www.digistore24.com/redir/..."
+                    className="w-full pl-10 pr-4 py-3 rounded-xl bg-black/40 border border-purple-800/40 text-white text-sm focus:outline-none focus:border-purple-500 focus:bg-black/60 transition-all placeholder-purple-400/20 shadow-inner"
+                  />
                 </div>
               </div>
             </div>
