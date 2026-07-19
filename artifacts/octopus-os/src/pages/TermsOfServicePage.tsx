@@ -1,25 +1,26 @@
-import React from "react";
+import { useLocation } from "wouter";
 
 export function TermsOfServicePage() {
+  const [, navigate] = useLocation();
   return (
     <div className="min-h-screen bg-[#0a0614] text-white flex flex-col font-sans">
       {/* Header */}
       <header className="border-b border-purple-900/40 bg-[#0d0920]/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
-        <a href="/" className="flex items-center gap-3">
-          <img src="/logo-1024.jpg" alt="OCTOPUS Logo" className="w-9 h-9 rounded-xl border border-purple-500/30 shadow-lg shadow-purple-500/20 object-cover" />
+        <button onClick={() => navigate("/")} className="flex items-center gap-3 cursor-pointer bg-transparent border-0 p-0">
+          <div className="w-9 h-9 rounded-xl border border-purple-500/30 bg-gradient-to-br from-purple-600 to-indigo-900 flex items-center justify-center text-xl">🐙</div>
           <div>
             <span className="font-black text-lg bg-gradient-to-r from-purple-400 via-indigo-300 to-cyan-400 bg-clip-text text-transparent tracking-wider">
               OCTOPUS
             </span>
             <span className="text-[10px] text-purple-400 block font-mono -mt-1 tracking-widest">AUTONOMOUS AI OS</span>
           </div>
-        </a>
+        </button>
         <div className="flex items-center gap-4 text-sm">
-          <a href="/" className="text-purple-300 hover:text-white transition-colors">الرئيسية</a>
-          <a href="/privacy" className="text-purple-300 hover:text-white transition-colors">سياسة الخصوصية</a>
-          <a href="/login" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold px-4 py-2 rounded-xl transition-all shadow-md shadow-purple-900/30">
+          <button onClick={() => navigate("/")} className="text-purple-300 hover:text-white transition-colors cursor-pointer bg-transparent border-0 p-0">الرئيسية</button>
+          <button onClick={() => navigate("/privacy")} className="text-purple-300 hover:text-white transition-colors cursor-pointer bg-transparent border-0 p-0">سياسة الخصوصية</button>
+          <button onClick={() => navigate("/login")} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold px-4 py-2 rounded-xl transition-all shadow-md shadow-purple-900/30 cursor-pointer">
             تسجيل الدخول
-          </a>
+          </button>
         </div>
       </header>
 

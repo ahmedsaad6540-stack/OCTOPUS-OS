@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 
 const DEMO_STEPS = [
   {
@@ -196,6 +197,7 @@ const DEMO_STEPS = [
 ];
 
 export function DemoShowcasePage() {
+  const [, navigate] = useLocation();
   const [currentTime, setCurrentTime] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
 
@@ -216,7 +218,7 @@ export function DemoShowcasePage() {
     <div className="min-h-screen bg-[#0a0614] text-white flex flex-col font-sans">
       {/* Header */}
       <header className="border-b border-purple-900/40 bg-[#0d0920]/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
-        <a href="/" className="flex items-center gap-3">
+        <button onClick={() => navigate("/")} className="flex items-center gap-3 cursor-pointer bg-transparent border-0 p-0">
           <img src="/logo-1024.jpg" alt="OCTOPUS Logo" className="w-9 h-9 rounded-xl border border-purple-500/30 shadow-lg shadow-purple-500/20 object-cover" />
           <div>
             <span className="font-black text-lg bg-gradient-to-r from-purple-400 via-indigo-300 to-cyan-400 bg-clip-text text-transparent tracking-wider">
@@ -224,14 +226,14 @@ export function DemoShowcasePage() {
             </span>
             <span className="text-[10px] text-purple-400 block font-mono -mt-1 tracking-widest">INTERACTIVE 1-MIN DEMO</span>
           </div>
-        </a>
+        </button>
         <div className="flex items-center gap-4 text-sm">
-          <a href="/" className="text-purple-300 hover:text-white transition-colors">الرئيسية</a>
-          <a href="/privacy" className="text-purple-300 hover:text-white transition-colors">سياسة الخصوصية</a>
-          <a href="/terms" className="text-purple-300 hover:text-white transition-colors">شروط الاستخدام</a>
-          <a href="/login" className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold px-4 py-2 rounded-xl transition-all shadow-md shadow-purple-900/30">
+          <button onClick={() => navigate("/")} className="text-purple-300 hover:text-white transition-colors cursor-pointer bg-transparent border-0 p-0">الرئيسية</button>
+          <button onClick={() => navigate("/privacy")} className="text-purple-300 hover:text-white transition-colors cursor-pointer bg-transparent border-0 p-0">سياسة الخصوصية</button>
+          <button onClick={() => navigate("/terms")} className="text-purple-300 hover:text-white transition-colors cursor-pointer bg-transparent border-0 p-0">شروط الاستخدام</button>
+          <button onClick={() => navigate("/login")} className="bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold px-4 py-2 rounded-xl transition-all shadow-md shadow-purple-900/30 cursor-pointer">
             تسجيل الدخول
-          </a>
+          </button>
         </div>
       </header>
 
