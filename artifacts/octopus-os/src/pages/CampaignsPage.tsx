@@ -385,8 +385,11 @@ export function CampaignsPage() {
                     <h3 className="text-lg font-bold text-white truncate font-heading group-hover:text-purple-300 transition-colors">
                       {c.name}
                     </h3>
-                    <p className="text-xs text-purple-400/60 mt-1 uppercase tracking-wider font-semibold">
-                      {c.platform || "Multi-Channel"} • {c.affiliateNetwork || "Network"}
+                    <p className="text-xs text-purple-400/60 mt-1 uppercase tracking-wider font-semibold flex items-center gap-2">
+                      <span>{c.platform || "Multi-Channel"} • {c.affiliateNetwork || "Network"}</span>
+                    </p>
+                    <p className="text-[10px] text-purple-400/40 mt-1 flex items-center gap-1">
+                      <span className="opacity-50">🗓️</span> {new Date(c.createdAt).toLocaleString('en-US', { dateStyle: 'medium', timeStyle: 'short' })}
                     </p>
                   </div>
                   <div className="shrink-0">
