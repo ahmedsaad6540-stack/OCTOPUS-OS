@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 
@@ -41,8 +42,8 @@ export function AnalyticsPage() {
       setLoading(true);
       try {
         const [tasksRes, agentsRes] = await Promise.allSettled([
-          fetch("/api/tasks", { headers }),
-          fetch("/api/agents", { headers }),
+          fetch(`${API_BASE}/tasks`, { headers }),
+          fetch(`${API_BASE}/agents`, { headers }),
         ]);
 
         let taskCount = 0;

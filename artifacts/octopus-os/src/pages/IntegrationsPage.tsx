@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 interface Integration {
@@ -41,7 +42,7 @@ export function IntegrationsPage() {
   const fetchIntegrations = async () => {
     if (!token) return;
     try {
-      const res = await fetch("/api/providers", {
+      const res = await fetch(`${API_BASE}/providers`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (!res.ok) throw new Error("Failed to fetch");
@@ -74,7 +75,7 @@ export function IntegrationsPage() {
     try {
       if (isConnecting) {
         // Connect: Send POST request to create provider configuration
-        const res = await fetch("/api/providers", {
+        const res = await fetch(`${API_BASE}/providers`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

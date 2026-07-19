@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -21,7 +22,7 @@ export function MissionControlPage() {
     if (!token) return;
     try {
       // 1. Fetch system events / live logs
-      const eventsRes = await fetch("/api/system/events", {
+      const eventsRes = await fetch(`${API_BASE}/system/events`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (eventsRes.ok) {
@@ -30,7 +31,7 @@ export function MissionControlPage() {
       }
 
       // 2. Fetch tasks
-      const tasksRes = await fetch("/api/tasks", {
+      const tasksRes = await fetch(`${API_BASE}/tasks`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (tasksRes.ok) {
@@ -46,7 +47,7 @@ export function MissionControlPage() {
       }
 
       // 3. Fetch workflows
-      const workflowsRes = await fetch("/api/workflows", {
+      const workflowsRes = await fetch(`${API_BASE}/workflows`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (workflowsRes.ok) {
@@ -55,7 +56,7 @@ export function MissionControlPage() {
       }
 
       // 4. Fetch scheduled jobs
-      const jobsRes = await fetch("/api/scheduled-jobs", {
+      const jobsRes = await fetch(`${API_BASE}/scheduled-jobs`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (jobsRes.ok) {
@@ -104,7 +105,7 @@ export function MissionControlPage() {
   const handleEmergencyStop = async () => {
     if (!token) return;
     try {
-      const res = await fetch("/api/autonomous/stop", {
+      const res = await fetch(`${API_BASE}/autonomous/stop`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }
       });

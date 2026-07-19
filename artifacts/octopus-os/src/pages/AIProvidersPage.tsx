@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 interface ProviderConfig {
@@ -45,7 +46,7 @@ export function AIProvidersPage() {
   const fetchProviders = async () => {
     if (!token) return;
     try {
-      const res = await fetch("/api/provider-configs", {
+      const res = await fetch(`${API_BASE}/provider-configs`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (!res.ok) throw new Error("Failed to fetch");
@@ -70,7 +71,7 @@ export function AIProvidersPage() {
       } else {
         // Seed default provider configurations
         for (const prov of DEFAULT_PROVIDERS) {
-          await fetch("/api/provider-configs", {
+          await fetch(`${API_BASE}/provider-configs`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -87,7 +88,7 @@ export function AIProvidersPage() {
           });
         }
         // Fetch again
-        const reFetch = await fetch("/api/provider-configs", {
+        const reFetch = await fetch(`${API_BASE}/provider-configs`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
         if (reFetch.ok) {

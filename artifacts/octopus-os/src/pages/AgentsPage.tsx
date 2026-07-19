@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { API_BASE } from "@/lib/api";
 
 interface Agent {
   id: string;
@@ -47,7 +48,7 @@ export function AgentsPage() {
     setCreating(true);
     try {
       const caps = createForm.capabilities.split(",").map(c => c.trim()).filter(Boolean);
-      const res = await fetch("/api/agents", {
+      const res = await fetch(`${API_BASE}/agents`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -79,12 +80,12 @@ export function AgentsPage() {
   const fetchAgents = async () => {
     if (!token) return;
     try {
-      const res = await fetch("/api/agents", {
+      const res = await fetch(`${API_BASE}/agents`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
-      
+
       if (data.length > 0) {
         setAgents(data.map((w: any) => ({
           id: w.id,
@@ -99,7 +100,7 @@ export function AgentsPage() {
       } else {
         // Seed default agents in database
         for (const agent of DEFAULT_AGENTS) {
-          await fetch("/api/agents", {
+          await fetch(`${API_BASE}/agents`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -114,7 +115,7 @@ export function AgentsPage() {
           });
         }
         // Fetch again
-        const reFetch = await fetch("/api/agents", {
+        const reFetch = await fetch(`${API_BASE}/agents`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
         if (reFetch.ok) {
@@ -133,6 +134,17 @@ export function AgentsPage() {
       }
     } catch (err) {
       console.error(err);
+      // Fallback to default agents if API unreachable
+      setAgents(DEFAULT_AGENTS.map((a, i) => ({
+        id: `local-${i}`,
+        name: a.name,
+        icon: a.icon,
+        status: "active" as const,
+        task: a.task,
+        cpu: a.cpu,
+        requests: a.requests,
+        description: a.desc
+      })));
     } finally {
       setLoading(false);
     }
@@ -145,7 +157,7 @@ export function AgentsPage() {
   const toggleAgent = async (id: string, currentStatus: string) => {
     if (!token) return;
     const isActivating = currentStatus !== "active";
-    const endpoint = `/api/agents/${id}/${isActivating ? "enable" : "disable"}`;
+    const endpoint = `${API_BASE}/agents/${id}/${isActivating ? "enable" : "disable"}`;
     try {
       const res = await fetch(endpoint, {
         method: "POST",
@@ -174,7 +186,7 @@ export function AgentsPage() {
       steps: [{ agentName: targetAgent?.name || id, status: "running" }]
     });
     try {
-      const res = await fetch(`/api/agents/${id}/invoke`, {
+      const res = await fetch(`${API_BASE}/agents/${id}/invoke`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

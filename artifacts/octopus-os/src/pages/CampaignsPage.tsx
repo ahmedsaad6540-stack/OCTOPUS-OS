@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 interface Campaign {
@@ -45,7 +46,7 @@ export function CampaignsPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/campaigns", { headers });
+      const res = await fetch(`${API_BASE}/campaigns`, { headers });
       if (!res.ok) throw new Error(`Server error ${res.status}`);
       const data = await res.json();
       const list: Campaign[] = Array.isArray(data) ? data : data.campaigns ?? [];
@@ -63,7 +64,7 @@ export function CampaignsPage() {
     if (!form.name.trim()) return;
     setSubmitting(true);
     try {
-      const res = await fetch("/api/campaigns", {
+      const res = await fetch(`${API_BASE}/campaigns`, {
         method: "POST",
         headers,
         body: JSON.stringify({ name: form.name.trim(), platform: form.platform }),

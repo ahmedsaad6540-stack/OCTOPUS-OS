@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 // ── Toast helper ─────────────────────────────────────────────────────────────
@@ -63,7 +64,7 @@ export function SettingsPage() {
   useEffect(() => {
     if (!token) return;
     setLoading(true);
-    fetch("/api/settings", {
+    fetch(`${API_BASE}/settings`, {
       headers: { "Authorization": `Bearer ${token}` }
     })
       .then(res => res.ok ? res.json() : Promise.reject(res))
@@ -98,7 +99,7 @@ export function SettingsPage() {
     if (!token) return;
     setSaving(true);
     try {
-      const res = await fetch("/api/settings", {
+      const res = await fetch(`${API_BASE}/settings`, {
         method: "PUT",
         headers: {
           "Authorization": `Bearer ${token}`,

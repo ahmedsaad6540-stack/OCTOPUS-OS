@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -44,7 +45,7 @@ export function MemoryPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/brain/decisions", {
+      const res = await fetch(`${API_BASE}/brain/decisions`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
       if (res.ok) {
@@ -64,7 +65,7 @@ export function MemoryPage() {
   const fetchAgents = async () => {
     if (!token) return;
     try {
-      const res = await fetch("/api/agents", {
+      const res = await fetch(`${API_BASE}/agents`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
       if (res.ok) {
@@ -79,7 +80,7 @@ export function MemoryPage() {
   const fetchMemoryStats = async () => {
     if (!token) return;
     try {
-      const res = await fetch("/api/memory", {
+      const res = await fetch(`${API_BASE}/memory`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
       if (res.ok) {
@@ -101,7 +102,7 @@ export function MemoryPage() {
     if (!window.confirm("Are you sure you want to clear all decision memory? This cannot be undone.")) return;
     setClearing(true);
     try {
-      const res = await fetch("/api/brain/decisions", {
+      const res = await fetch(`${API_BASE}/brain/decisions`, {
         method: "DELETE",
         headers: authHeaders,
       });
@@ -109,7 +110,7 @@ export function MemoryPage() {
         setDecisions([]);
       } else {
         // Fallback: try PATCH reset endpoint
-        const patchRes = await fetch("/api/brain/decisions/reset", {
+        const patchRes = await fetch(`${API_BASE}/brain/decisions/reset`, {
           method: "PATCH",
           headers: authHeaders,
         });

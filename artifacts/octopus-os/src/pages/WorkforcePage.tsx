@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -46,7 +47,7 @@ export function WorkforcePage() {
   const fetchWorkers = async () => {
     if (!token) return;
     try {
-      const res = await fetch("/api/agents", {
+      const res = await fetch(`${API_BASE}/agents`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (!res.ok) throw new Error("Failed to fetch");
@@ -69,7 +70,7 @@ export function WorkforcePage() {
       } else {
         // Seed initial agents in the database
         for (const agent of DEFAULT_AGENTS) {
-          await fetch("/api/agents", {
+          await fetch(`${API_BASE}/agents`, {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -84,7 +85,7 @@ export function WorkforcePage() {
           });
         }
         // Fetch again
-        const reFetch = await fetch("/api/agents", {
+        const reFetch = await fetch(`${API_BASE}/agents`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
         if (reFetch.ok) {
@@ -165,7 +166,7 @@ export function WorkforcePage() {
   const handleCloneWorker = async (w: Worker) => {
     if (!token) return;
     try {
-      const res = await fetch("/api/agents", {
+      const res = await fetch(`${API_BASE}/agents`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

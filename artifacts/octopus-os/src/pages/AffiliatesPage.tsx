@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -38,7 +39,7 @@ export function AffiliatesPage() {
   const fetchAffiliates = async () => {
     if (!token) return;
     try {
-      const res = await fetch("/api/affiliates", { headers: { Authorization: `Bearer ${token}` } });
+      const res = await fetch(`${API_BASE}/affiliates`, { headers: { Authorization: `Bearer ${token}` } });
       if (res.ok) {
         const data = await res.json();
         const list: Affiliate[] = (Array.isArray(data) ? data : data.networks ?? []).map((a: any) => ({
@@ -79,7 +80,7 @@ export function AffiliatesPage() {
         });
       } else {
         // Connect - POST with credentials
-        await fetch("/api/affiliates", {
+        await fetch(`${API_BASE}/affiliates`, {
           method: "POST",
           headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
           body: JSON.stringify({

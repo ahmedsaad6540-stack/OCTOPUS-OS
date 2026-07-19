@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -37,7 +38,7 @@ export function ChatPage() {
     const checkProviderConfig = async () => {
       if (!token) return;
       try {
-        const res = await fetch("/api/provider-configs", {
+        const res = await fetch(`${API_BASE}/provider-configs`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
@@ -59,7 +60,7 @@ export function ChatPage() {
     const fetchAgents = async () => {
       if (!token) return;
       try {
-        const res = await fetch("/api/agents", {
+        const res = await fetch(`${API_BASE}/agents`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.ok) {
@@ -127,7 +128,7 @@ export function ChatPage() {
     // If no agent is selected, try the provider-configs/default/complete endpoint
     if (!selectedAgentId) {
       try {
-        const res = await fetch("/api/provider-configs/default/complete", {
+        const res = await fetch(`${API_BASE}/provider-configs/default/complete`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

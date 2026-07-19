@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 
@@ -26,10 +27,10 @@ export function CommandCenter() {
     const fetchStatus = async () => {
       try {
         const [statusRes, agentsRes, tasksRes, workflowsRes] = await Promise.all([
-          fetch("/api/system/status", { headers: { Authorization: `Bearer ${token}` } }),
-          fetch("/api/agents", { headers: { Authorization: `Bearer ${token}` } }),
-          fetch("/api/tasks", { headers: { Authorization: `Bearer ${token}` } }),
-          fetch("/api/workflows", { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE}/system/status`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE}/agents`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE}/tasks`, { headers: { Authorization: `Bearer ${token}` } }),
+          fetch(`${API_BASE}/workflows`, { headers: { Authorization: `Bearer ${token}` } }),
         ]);
 
         if (statusRes.ok) {
@@ -196,10 +197,10 @@ export function CommandCenter() {
                   setAutoMode(next);
                   try {
                     if (next) {
-                      await fetch("/api/autonomous/start", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` } });
+                      await fetch(`${API_BASE}/autonomous/start`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` } });
                       alert("⚡ تم تفعيل محرك التشغيل الذاتي (Autonomous 24/7 Engine) بنجاح وبدء دورة العمليات الفورية!");
                     } else {
-                      await fetch("/api/autonomous/stop", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` } });
+                      await fetch(`${API_BASE}/autonomous/stop`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` } });
                       alert("⏸ تم إيقاف التشغيل الذاتي بنجاح.");
                     }
                   } catch (e: any) {
@@ -213,7 +214,7 @@ export function CommandCenter() {
                   if (!token) return;
                   setAutoMode(false);
                   try {
-                    const res = await fetch("/api/autonomous/stop", { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` } });
+                    const res = await fetch(`${API_BASE}/autonomous/stop`, { method: "POST", headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` } });
                     const d = await res.json();
                     alert(d.message || "🛑 تم إيقاف التشغيل الذاتي وتجميد جميع الحملات وعمليات الرندر بنجاح!");
                   } catch (e: any) {

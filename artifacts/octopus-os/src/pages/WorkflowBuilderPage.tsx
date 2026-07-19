@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 interface WorkflowStep {
@@ -59,7 +60,7 @@ export function WorkflowBuilderPage() {
     setLoadingWorkflows(true);
     setError(null);
     try {
-      const res = await fetch("/api/workflows", {
+      const res = await fetch(`${API_BASE}/workflows`, {
         headers: { "Authorization": `Bearer ${token}` },
       });
       if (res.ok) {
@@ -91,7 +92,7 @@ export function WorkflowBuilderPage() {
     if (!token || !newName.trim()) return;
     setCreating(true);
     try {
-      const res = await fetch("/api/workflows", {
+      const res = await fetch(`${API_BASE}/workflows`, {
         method: "POST",
         headers: authHeaders,
         body: JSON.stringify({ name: newName.trim(), description: newDesc.trim(), steps: [] }),

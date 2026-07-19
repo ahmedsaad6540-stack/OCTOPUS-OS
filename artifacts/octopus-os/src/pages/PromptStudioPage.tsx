@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 
 const DEFAULT_PROMPTS = [
@@ -47,7 +48,7 @@ export function PromptStudioPage() {
     setTesting(true); setTestOutput(""); setError("");
     try {
       // Try real AI completion via backend provider-configs
-      const configsRes = await fetch("/api/provider-configs", {
+      const configsRes = await fetch(`${API_BASE}/provider-configs`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const configs = configsRes.ok ? await configsRes.json() : [];
