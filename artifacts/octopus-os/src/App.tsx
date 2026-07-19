@@ -32,7 +32,7 @@ import { useState } from "react";
 import { Switch, Route, useLocation } from "wouter";
 
 export type Page =
-  | "command-center" | "agents" | "workforce" | "memory" | "prompt-studio"
+  | "command-center" | "mission-control" | "chat" | "agents" | "workforce" | "memory" | "prompt-studio"
   | "video-factory" | "workflow-builder" | "marketplace"
   | "providers" | "social" | "affiliates" | "integrations"
   | "analytics" | "campaigns"
@@ -59,6 +59,8 @@ function OS() {
   const renderPage = () => {
     switch (page) {
       case "command-center":    return <CommandCenter />;
+      case "mission-control":   return <MissionControlPage />;
+      case "chat":              return <ChatPage />;
       case "agents":            return <AgentsPage />;
       case "workforce":         return <WorkforcePage />;
       case "memory":            return <MemoryPage />;

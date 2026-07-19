@@ -6,9 +6,11 @@ import type { Page } from "@/App";
 interface NavItem { id: Page; icon: string; labelKey: string; groupKey: string; }
 
 const NAV: NavItem[] = [
-  { id: "command-center",   icon: "🖥️",  labelKey: "homeWorkspace",    groupKey: "osCore" },
-  { id: "agents",           icon: "🤖",  labelKey: "aiAgents",         groupKey: "osCore" },
-  { id: "workforce",        icon: "👥",  labelKey: "aiWorkforce",      groupKey: "osCore" },
+  { id: "command-center",   icon: "🐙",  labelKey: "commandCenter",    groupKey: "osCore" },
+  { id: "mission-control",  icon: "🛸",  labelKey: "missionControlRoom", groupKey: "osCore" },
+  { id: "chat",             icon: "💬",  labelKey: "chatConsole",      groupKey: "osCore" },
+  { id: "agents",           icon: "🤖",  labelKey: "agents",           groupKey: "osCore" },
+  { id: "workforce",        icon: "👥",  labelKey: "workforce",        groupKey: "osCore" },
   { id: "memory",           icon: "🧠",  labelKey: "memoryEngine",     groupKey: "osCore" },
   { id: "prompt-studio",    icon: "✍️",  labelKey: "promptStudio",     groupKey: "osCore" },
 
