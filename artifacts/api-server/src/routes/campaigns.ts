@@ -23,6 +23,12 @@ router.get("/campaigns", requireAuth, async (req: AuthRequest, res) => {
 router.post("/campaigns", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { id: _id, userId: _uid, createdAt: _ca, updatedAt: _ua, ...cleanBody } = req.body as Record<string, any>;
+    
+    // Ensure productName is provided to satisfy NOT NULL constraint
+    if (!cleanBody.productName) {
+      cleanBody.productName = cleanBody.name || "Auto-Selected Product";
+    }
+
     const [row] = await db
       .insert(campaignsTable)
       .values({ ...cleanBody, userId: req.user!.userId } as typeof campaignsTable.$inferInsert)
