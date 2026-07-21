@@ -1,104 +1,120 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { API_BASE } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
 
-const WEEKS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
+const PERIODS = ["1d", "7d", "30d", "90d"] as const;
+type Period = typeof PERIODS[number];
 type Mode = "business" | "system";
 
-interface SummaryData {
-  agentCount: number;
-  taskCount: number;
-  activeTasks: number;
-  completedTasks: number;
+interface DailyData { day: string; revenue: number; clicks: number; conversions: number; }
+
+interface AnalyticsSummary {
+  revenue: number;
+  clicks: number;
+  conversions: number;
+  spent: number;
+  roi: number;
+  activeCampaigns: number;
+  totalCampaigns: number;
+  videos: { total: number; done: number; failed: number; rendering: number };
 }
 
 export function AnalyticsPage() {
   const { t } = useLanguage();
   const { token } = useAuth();
-  const [period, setPeriod] = useState("7d");
+  const [period, setPeriod] = useState<Period>("7d");
   const [mode, setMode] = useState<Mode>("business");
-  const [summary, setSummary] = useState<SummaryData>({
-    agentCount: 0,
-    taskCount: 0,
-    activeTasks: 0,
-    completedTasks: 0,
-  });
   const [loading, setLoading] = useState(true);
 
-  // Bar chart arrays — all zeroes by default; populated from real data when available
-  const [revenueChart] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
-  const [clicksChart] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
-  const [tokensChart] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
-  const [latencyChart] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
+  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const [daily, setDaily] = useState<DailyData[]>([]);
 
-  useEffect(() => {
+  // System-mode task/agent counters
+  const [agentCount, setAgentCount] = useState(0);
+  const [taskCount, setTaskCount] = useState(0);
+  const [activeTasks, setActiveTasks] = useState(0);
+  const [completedTasks, setCompletedTasks] = useState(0);
+
+  const fetchAnalytics = useCallback(async () => {
     if (!token) return;
-
+    setLoading(true);
     const headers = { Authorization: `Bearer ${token}` };
 
-    const fetchAll = async () => {
-      setLoading(true);
-      try {
-        const [tasksRes, agentsRes] = await Promise.allSettled([
-          fetch(`${API_BASE}/tasks`, { headers }),
-          fetch(`${API_BASE}/agents`, { headers }),
-        ]);
-
-        let taskCount = 0;
-        let activeTasks = 0;
-        let completedTasks = 0;
-        let agentCount = 0;
-
-        if (tasksRes.status === "fulfilled" && tasksRes.value.ok) {
-          const data = await tasksRes.value.json();
-          const tasks: { status: string }[] = Array.isArray(data)
-            ? data
-            : data.tasks ?? [];
-          taskCount = tasks.length;
-          activeTasks = tasks.filter(
-            (t) => t.status === "running" || t.status === "active"
-          ).length;
-          completedTasks = tasks.filter((t) => t.status === "completed").length;
+    try {
+      // Real analytics from new endpoint
+      const res = await fetch(`${API_BASE}/analytics/summary?period=${period}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success) {
+          setSummary(data.summary);
+          setDaily(data.daily ?? []);
         }
-
-        if (agentsRes.status === "fulfilled" && agentsRes.value.ok) {
-          const data = await agentsRes.value.json();
-          const agents = Array.isArray(data) ? data : data.agents ?? [];
-          agentCount = agents.length;
-        }
-
-        setSummary({ agentCount, taskCount, activeTasks, completedTasks });
-      } catch (err) {
-        console.error("Analytics fetch error:", err);
-      } finally {
-        setLoading(false);
       }
-    };
 
-    fetchAll();
-  }, [token]);
+      // System panel — real counts
+      const [tasksRes, agentsRes] = await Promise.allSettled([
+        fetch(`${API_BASE}/tasks`, { headers }),
+        fetch(`${API_BASE}/agents`, { headers }),
+      ]);
+
+      if (tasksRes.status === "fulfilled" && tasksRes.value.ok) {
+        const data = await tasksRes.value.json();
+        const tasks: { status: string }[] = Array.isArray(data) ? data : data.tasks ?? [];
+        setTaskCount(tasks.length);
+        setActiveTasks(tasks.filter(t => t.status === "running" || t.status === "active").length);
+        setCompletedTasks(tasks.filter(t => t.status === "completed").length);
+      }
+
+      if (agentsRes.status === "fulfilled" && agentsRes.value.ok) {
+        const data = await agentsRes.value.json();
+        const agents = Array.isArray(data) ? data : data.agents ?? [];
+        setAgentCount(agents.length);
+      }
+    } catch (err) {
+      console.error("Analytics fetch error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [token, period]);
+
+  // Re-fetch when period changes (period selector is now functional)
+  useEffect(() => { fetchAnalytics(); }, [fetchAnalytics]);
+
+  // Build bar chart arrays from daily data (last 7 points)
+  const last7 = daily.slice(-7);
+  const revenueChart = last7.map(d => d.revenue);
+  const clicksChart = last7.map(d => d.clicks);
+  const labels = last7.map(d => {
+    const date = new Date(d.day);
+    return date.toLocaleDateString("en-US", { weekday: "short" });
+  });
+
+  // Pad to 7 if fewer days
+  while (revenueChart.length < 7) { revenueChart.unshift(0); labels.unshift("—"); }
+  while (clicksChart.length < 7) { clicksChart.unshift(0); }
 
   const maxRev = Math.max(...revenueChart, 1);
   const maxClicks = Math.max(...clicksChart, 1);
-  const maxTokens = Math.max(...tokensChart, 1);
-  const maxLatency = Math.max(...latencyChart, 1);
+
+  const fmt$ = (n: number) => n >= 1000 ? `$${(n / 1000).toFixed(1)}K` : `$${n.toFixed(2)}`;
 
   return (
     <div className="p-6 space-y-6 min-h-screen" style={{ background: "#06020f" }}>
-      {/* Page Header */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
             📊 {t("analyticsTitle")}
           </h1>
-          <p className="text-purple-400/60 text-xs mt-1">{t("analyticsDesc")}</p>
+          <p className="text-purple-400/60 text-xs mt-1">
+            {loading ? "جاري تحميل البيانات..." : `بيانات حقيقية — الفترة: ${period} | من PostgreSQL`}
+          </p>
         </div>
 
-        {/* Period selection */}
+        {/* Period selection — NOW FUNCTIONAL */}
         <div className="flex gap-1 p-1 rounded-xl bg-black/40 border border-purple-950">
-          {["24h", "7d", "30d", "90d"].map((p) => (
+          {PERIODS.map((p) => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
@@ -114,36 +130,19 @@ export function AnalyticsPage() {
         </div>
       </div>
 
-      {/* Info note */}
-      <div className="glass-card px-4 py-2.5 rounded-xl flex items-center gap-2 border border-purple-500/20">
-        <span className="text-base">💡</span>
-        <p className="text-purple-300/70 text-xs">
-          Analytics data is populated as you use the system. Charts will fill in as agents run tasks and campaigns generate activity.
-        </p>
-      </div>
-
-      {/* Mode Switcher Tabs */}
+      {/* Mode Switcher */}
       <div className="flex gap-1 p-1 rounded-xl w-fit bg-black/40 border border-purple-950">
-        <button
-          onClick={() => setMode("business")}
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-            mode === "business"
-              ? "gradient-purple text-white shadow-md"
-              : "text-purple-400 hover:text-purple-300"
-          }`}
-        >
-          {t("businessPerformance")}
-        </button>
-        <button
-          onClick={() => setMode("system")}
-          className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
-            mode === "system"
-              ? "gradient-purple text-white shadow-md"
-              : "text-purple-400 hover:text-purple-300"
-          }`}
-        >
-          {t("systemObservability")}
-        </button>
+        {(["business", "system"] as Mode[]).map((m) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+              mode === m ? "gradient-purple text-white shadow-md" : "text-purple-400 hover:text-purple-300"
+            }`}
+          >
+            {m === "business" ? t("businessPerformance") : t("systemObservability")}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -152,96 +151,72 @@ export function AnalyticsPage() {
         </div>
       ) : mode === "business" ? (
         <>
-          {/* KPI Grid — real counts from DB */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* Real KPI Grid */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              {
-                label: t("totalRevenue"),
-                value: "$0",
-                delta: "No data yet",
-                icon: "💰",
-                up: true,
-              },
-              {
-                label: t("totalClicks"),
-                value: String(summary.taskCount),
-                delta: "Total tasks",
-                icon: "👆",
-                up: true,
-              },
-              {
-                label: t("conversions"),
-                value: String(summary.completedTasks),
-                delta: "Completed tasks",
-                icon: "✅",
-                up: true,
-              },
-              {
-                label: t("avgRoi"),
-                value: `${summary.agentCount} agents`,
-                delta: `${summary.activeTasks} active tasks`,
-                icon: "📈",
-                up: true,
-              },
+              { label: t("totalRevenue"), value: fmt$(summary?.revenue ?? 0), delta: `ROI: ${summary?.roi ?? 0}%`, icon: "💰", up: (summary?.roi ?? 0) > 0 },
+              { label: t("totalClicks"), value: (summary?.clicks ?? 0).toLocaleString(), delta: `${period} فترة`, icon: "👆", up: true },
+              { label: t("conversions"), value: String(summary?.conversions ?? 0), delta: `من ${summary?.totalCampaigns ?? 0} حملة`, icon: "✅", up: true },
+              { label: t("avgRoi"), value: `${summary?.roi ?? 0}%`, delta: `Spent: ${fmt$(summary?.spent ?? 0)}`, icon: "📈", up: (summary?.roi ?? 0) > 0 },
             ].map((k) => (
               <div key={k.label} className="glass-card p-4 rounded-xl">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-2xl">{k.icon}</span>
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-full font-bold ${
-                      k.up
-                        ? "bg-emerald-950/40 text-emerald-400 border border-emerald-500/20"
-                        : "bg-red-950/40 text-red-400 border border-red-500/20"
-                    }`}
-                  >
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${
+                    k.up ? "bg-emerald-950/40 text-emerald-400 border border-emerald-500/20"
+                         : "bg-red-950/40 text-red-400 border border-red-500/20"
+                  }`}>
                     {k.delta}
                   </span>
                 </div>
-                <div className="text-xl font-black text-white font-heading">
-                  {k.value}
-                </div>
+                <div className="text-xl font-black text-white font-heading">{k.value}</div>
                 <div className="text-xs text-purple-400/60 mt-0.5">{k.label}</div>
               </div>
             ))}
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Revenue Chart */}
+            {/* Revenue Chart — real daily data */}
             <div className="lg:col-span-2 glass-card p-5 rounded-xl">
               <h3 className="text-xs font-bold uppercase tracking-wider text-purple-300 mb-1 font-heading">
-                {t("revenue7d")}
+                {t("revenue7d")} — {period}
               </h3>
               <p className="text-[10px] text-purple-400/40 mb-4">
-                Populates as campaigns generate revenue
+                {revenueChart.every(v => v === 0) ? "لا توجد إيرادات مسجلة في هذه الفترة بعد" : "بيانات حقيقية من PostgreSQL"}
               </p>
-              <div className="flex items-end gap-3 h-36 mt-4">
+              <div className="flex items-end gap-2 h-36 mt-4">
                 {revenueChart.map((val, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                  <div key={i} className="flex-1 flex flex-col items-center gap-1">
                     <span className="text-[9px] text-purple-400/60 font-mono">
-                      {val > 0 ? `$${val}` : "—"}
+                      {val > 0 ? `$${val.toFixed(0)}` : "—"}
                     </span>
                     <div
-                      className="w-full rounded-t-lg gradient-purple shadow-md glow-purple opacity-40"
-                      style={{ height: `${(val / maxRev) * 100}%`, minHeight: 6 }}
+                      className="w-full rounded-t-lg gradient-purple shadow-md glow-purple"
+                      style={{ height: `${(val / maxRev) * 100}%`, minHeight: 4, opacity: val > 0 ? 1 : 0.15 }}
                     />
-                    <span className="text-[9px] text-purple-400/60 font-mono">
-                      {WEEKS[i]}
-                    </span>
+                    <span className="text-[9px] text-purple-400/60 font-mono">{labels[i]}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Platform Breakdown — empty state */}
+            {/* Campaign breakdown */}
             <div className="glass-card p-5 rounded-xl">
               <h3 className="text-xs font-bold uppercase tracking-wider text-purple-300 mb-4 font-heading">
                 {t("byPlacement")}
               </h3>
-              <div className="flex flex-col items-center justify-center h-32 text-center gap-2">
-                <span className="text-3xl opacity-30">📊</span>
-                <p className="text-[11px] text-purple-400/50">
-                  Platform breakdown appears after campaigns post content
-                </p>
+              <div className="space-y-3">
+                {[
+                  { label: "حملات نشطة", value: summary?.activeCampaigns ?? 0, color: "#10b981" },
+                  { label: "إجمالي الحملات", value: summary?.totalCampaigns ?? 0, color: "#a855f7" },
+                  { label: "فيديوهات مكتملة", value: summary?.videos.done ?? 0, color: "#3b82f6" },
+                  { label: "فيديوهات فاشلة", value: summary?.videos.failed ?? 0, color: "#ef4444" },
+                ].map(item => (
+                  <div key={item.label} className="flex items-center justify-between">
+                    <span className="text-xs" style={{ color: "#7c6f9a" }}>{item.label}</span>
+                    <span className="text-sm font-bold" style={{ color: item.color }}>{item.value}</span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -249,18 +224,16 @@ export function AnalyticsPage() {
           {/* Clicks Chart */}
           <div className="glass-card p-5 rounded-xl">
             <h3 className="text-xs font-bold uppercase tracking-wider text-purple-300 mb-4 font-heading">
-              {t("clicks7d")}
+              {t("clicks7d")} — {period}
             </h3>
-            <div className="flex items-end gap-3 h-24 mt-4">
+            <div className="flex items-end gap-2 h-24 mt-4">
               {clicksChart.map((val, i) => (
-                <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                <div key={i} className="flex-1 flex flex-col items-center gap-1">
                   <div
-                    className="w-full rounded-t-lg bg-indigo-500/25 border border-indigo-500/20"
-                    style={{ height: `${(val / maxClicks) * 100}%`, minHeight: 6 }}
+                    className="w-full rounded-t-lg bg-indigo-500/50 border border-indigo-500/30"
+                    style={{ height: `${(val / maxClicks) * 100}%`, minHeight: 4, opacity: val > 0 ? 1 : 0.15 }}
                   />
-                  <span className="text-[9px] text-purple-400/60 font-mono">
-                    {WEEKS[i]}
-                  </span>
+                  <span className="text-[9px] text-purple-400/60 font-mono">{labels[i]}</span>
                 </div>
               ))}
             </div>
@@ -268,102 +241,43 @@ export function AnalyticsPage() {
         </>
       ) : (
         <>
-          {/* System Vitals KPIs — real counts */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {/* System Vitals — real counts */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
-              {
-                label: t("requestsToday"),
-                value: `${summary.taskCount} tasks`,
-                delta: "from /api/tasks",
-                icon: "🔮",
-              },
-              {
-                label: t("tokenConsumption"),
-                value: "0 tokens",
-                delta: "No data yet",
-                icon: "🪙",
-              },
-              {
-                label: t("cpuLoad"),
-                value: `${summary.agentCount} agents`,
-                delta: "from /api/agents",
-                icon: "🖥️",
-              },
-              {
-                label: t("memoryFootprint"),
-                value: `${summary.activeTasks} active`,
-                delta: `${summary.completedTasks} done`,
-                icon: "🧠",
-              },
+              { label: t("requestsToday"), value: `${taskCount} tasks`, delta: "from /api/tasks", icon: "🔮" },
+              { label: "Videos Rendered", value: `${summary?.videos.done ?? 0} done`, delta: `${summary?.videos.rendering ?? 0} in progress`, icon: "🎬" },
+              { label: t("cpuLoad"), value: `${agentCount} agents`, delta: "from /api/agents", icon: "🖥️" },
+              { label: t("memoryFootprint"), value: `${activeTasks} active`, delta: `${completedTasks} done`, icon: "🧠" },
             ].map((k, idx) => (
               <div key={idx} className="glass-card p-4 rounded-xl">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-2xl">{k.icon}</span>
-                  {k.delta && (
-                    <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-purple-950/40 text-purple-400 border border-purple-500/20 font-mono">
-                      {k.delta}
-                    </span>
-                  )}
+                  <span className="text-[9px] px-2 py-0.5 rounded-full font-bold bg-purple-950/40 text-purple-400 border border-purple-500/20 font-mono">
+                    {k.delta}
+                  </span>
                 </div>
-                <div className="text-lg font-black text-white font-heading">
-                  {k.value}
-                </div>
+                <div className="text-lg font-black text-white font-heading">{k.value}</div>
                 <div className="text-xs text-purple-400/60 mt-0.5">{k.label}</div>
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Tokens Chart */}
-            <div className="lg:col-span-2 glass-card p-5 rounded-xl">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-300 mb-1 font-heading">
-                {t("tokenConsumption")}
-              </h3>
-              <p className="text-[10px] text-purple-400/40 mb-4">
-                Populates as agents consume LLM tokens
-              </p>
-              <div className="flex items-end gap-3 h-36 mt-4">
-                {tokensChart.map((val, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                    <span className="text-[9px] text-purple-400/60 font-mono">
-                      {val > 0 ? `${val}k` : "—"}
-                    </span>
-                    <div
-                      className="w-full rounded-t-lg bg-pink-500/40 shadow-inner glow-pink opacity-40"
-                      style={{ height: `${(val / maxTokens) * 100}%`, minHeight: 6 }}
-                    />
-                    <span className="text-[9px] text-purple-400/60 font-mono">
-                      {WEEKS[i]}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Latency History */}
-            <div className="glass-card p-5 rounded-xl">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-purple-300 mb-1 font-heading">
-                {t("latency7d")}
-              </h3>
-              <p className="text-[10px] text-purple-400/40 mb-4">
-                Tracks API response times over time
-              </p>
-              <div className="flex items-end gap-3 h-36 mt-4">
-                {latencyChart.map((val, i) => (
-                  <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                    <span className="text-[9px] text-purple-400/60 font-mono">
-                      {val > 0 ? `${val}ms` : "—"}
-                    </span>
-                    <div
-                      className="w-full rounded-t-lg bg-purple-500/40 glow-purple opacity-40"
-                      style={{ height: `${(val / maxLatency) * 100}%`, minHeight: 6 }}
-                    />
-                    <span className="text-[9px] text-purple-400/60 font-mono">
-                      {WEEKS[i]}
-                    </span>
-                  </div>
-                ))}
-              </div>
+          <div className="glass-card p-5 rounded-xl">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-purple-300 mb-4 font-heading">
+              Videos Pipeline Status
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {[
+                { label: "إجمالي الفيديوهات", value: summary?.videos.total ?? 0, color: "#a855f7" },
+                { label: "مكتملة", value: summary?.videos.done ?? 0, color: "#10b981" },
+                { label: "قيد الرندر", value: summary?.videos.rendering ?? 0, color: "#f59e0b" },
+                { label: "فاشلة", value: summary?.videos.failed ?? 0, color: "#ef4444" },
+              ].map(item => (
+                <div key={item.label} className="text-center p-3 rounded-lg" style={{ background: "#1a0d38" }}>
+                  <div className="text-2xl font-bold" style={{ color: item.color }}>{item.value}</div>
+                  <div className="text-xs mt-1" style={{ color: "#7c6f9a" }}>{item.label}</div>
+                </div>
+              ))}
             </div>
           </div>
         </>

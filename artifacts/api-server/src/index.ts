@@ -20,6 +20,7 @@ import { registerRealToolHandlers, ensureRealToolsRegistered } from "./lib/real-
 import { scheduler } from "./lib/scheduler";
 import { startAutonomousDaemon } from "./lib/autonomous-daemon";
 import "./lib/notification-manager";
+import { CampaignWorker } from "./lib/campaign-worker.js";
 import bcrypt from "bcryptjs";
 import { db } from "@workspace/db";
 import { usersTable } from "@workspace/db/schema";
@@ -74,6 +75,7 @@ async function startServer() {
     // Start ticking the Scheduler once everything it can dispatch to is wired up.
     scheduler.start();
     startAutonomousDaemon();
+    CampaignWorker.start();
 
     const rawPort = process.env.PORT ?? "5173";
     const port = Number(rawPort);
@@ -148,6 +150,7 @@ async function shutdown(signal: string): Promise<void> {
 
   clearInterval(reclaimStaleInterval);
   scheduler.stop();
+  CampaignWorker.stop();
 
   await eventBus.publish("system.shutdown", "api-server", { signal });
   await eventBus.drain();

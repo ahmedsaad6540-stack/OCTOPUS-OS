@@ -47,6 +47,56 @@ export function registerRealToolHandlers(): void {
     },
   });
 
+  // 5. tavily_search handler
+  toolManager.registerHandler("tavily_search_handler", {
+    async execute(input: any) {
+      logger.info({ input }, "Executing real tool handler: tavily_search_handler");
+      try {
+        const apiKey = process.env.TAVILY_API_KEY;
+        if (!apiKey) return { error: "TAVILY_API_KEY is not set" };
+        const response = await fetch("https://api.tavily.com/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ api_key: apiKey, query: input.query, search_depth: "basic" })
+        });
+        return await response.json();
+      } catch (err: any) {
+        return { error: err.message };
+      }
+    },
+  });
+
+  // 6. web_scraper handler
+  toolManager.registerHandler("web_scraper_handler", {
+    async execute(input: any) {
+      logger.info({ input }, "Executing real tool handler: web_scraper_handler");
+      try {
+        const response = await fetch(input.url);
+        if (!response.ok) return { error: `HTTP ${response.status}` };
+        const text = await response.text();
+        return { content: text.substring(0, 2000) + "..." }; // mock extraction
+      } catch (err: any) {
+        return { error: err.message };
+      }
+    },
+  });
+
+  // 7. system_stats handler
+  toolManager.registerHandler("system_stats_handler", {
+    async execute() {
+      logger.info({}, "Executing real tool handler: system_stats_handler");
+      const os = await import("os");
+      return {
+        platform: os.platform(),
+        arch: os.arch(),
+        freemem: os.freemem(),
+        totalmem: os.totalmem(),
+        uptime: os.uptime(),
+        cpus: os.cpus().length
+      };
+    },
+  });
+
   logger.info("Registered real tool handlers: render_video_handler, generate_voiceover_handler, upload_youtube_video_handler, upload_tiktok_video_handler");
 }
 
@@ -106,6 +156,40 @@ export async function ensureRealToolsRegistered(): Promise<void> {
           title: { type: "string" },
         },
         required: ["title"],
+      },
+    },
+    {
+      name: "tavily_search",
+      description: "Search the web using Tavily API.",
+      handlerName: "tavily_search_handler",
+      inputSchema: {
+        type: "object",
+        properties: {
+          query: { type: "string" },
+        },
+        required: ["query"],
+      },
+    },
+    {
+      name: "web_scraper",
+      description: "Scrape content from a URL.",
+      handlerName: "web_scraper_handler",
+      inputSchema: {
+        type: "object",
+        properties: {
+          url: { type: "string" },
+        },
+        required: ["url"],
+      },
+    },
+    {
+      name: "system_stats",
+      description: "Get OS system stats (CPU, memory usage).",
+      handlerName: "system_stats_handler",
+      inputSchema: {
+        type: "object",
+        properties: {},
+        required: [],
       },
     },
   ];

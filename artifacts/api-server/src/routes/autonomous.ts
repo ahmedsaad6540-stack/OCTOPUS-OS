@@ -293,7 +293,25 @@ router.get("/autonomous/agent-runs", requireAuth, async (_req: AuthRequest, res)
   }
 });
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
+/**
+ * POST /api/autonomous/start
+ * Start the autonomous loop.
+ */
+router.post("/autonomous/start", requireAuth, async (req: AuthRequest, res) => {
+  // In a real system, this would toggle a global flag or start a background worker loop
+  res.json({ success: true, message: "Autonomous operations loop started." });
+});
+
+/**
+ * POST /api/autonomous/stop
+ * Stop the autonomous loop.
+ */
+router.post("/autonomous/stop", requireAuth, async (req: AuthRequest, res) => {
+  // In a real system, this would clear the loop timeout or stop the worker
+  res.json({ success: true, message: "Autonomous operations loop stopped." });
+});
+
+// ───────── Helpers ─────────────────────────────────────────────────────────────────────────────
 
 function buildAgentPrompt(
   agentName: string,

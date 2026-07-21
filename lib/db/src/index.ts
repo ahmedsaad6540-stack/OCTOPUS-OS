@@ -3,18 +3,29 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import pg from "pg";
 import * as schema from "./schema";
 
-const { Pool } = pg;
+import { drizzle as drizzlePgLite } from "drizzle-orm/pglite";
+import { PGlite } from "@electric-sql/pglite";
 
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+const { Pool } = pg;
+let dbInstance: any;
+export let pgClient: any = null;
+export const pool = new Pool({ connectionString: process.env.DATABASE_URL || "postgres://test:test@localhost:5432/test" });
+
+if (process.env.USE_PGLITE === "true") {
+  pgClient = new PGlite();
+  dbInstance = drizzlePgLite(pgClient, { schema });
+} else {
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL must be set. Did you forget to provision a database?",
+    );
+  }
+  pool.on("error", (err) => {
+    console.error("[Database Pool Error] Caught unexpected error on idle PostgreSQL client:", err.message || err);
+  });
+  dbInstance = drizzle(pool, { schema });
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-pool.on("error", (err) => {
-  console.error("[Database Pool Error] Caught unexpected error on idle PostgreSQL client:", err.message || err);
-});
-export const db = drizzle(pool, { schema });
+export const db = dbInstance;
 
 export * from "./schema";

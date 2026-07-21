@@ -15,6 +15,7 @@ interface OpenAiRequestBody {
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
   max_tokens?: number;
   temperature?: number;
+  response_format?: { type: "text" | "json_object" };
 }
 
 export function buildOpenAiRequest(
@@ -41,6 +42,18 @@ export function buildOpenAiRequest(
 
   if (request.temperature !== undefined) {
     body.temperature = request.temperature;
+  }
+  if (request.jsonSchema) {
+    body.response_format = {
+      type: "json_schema",
+      json_schema: {
+        name: "structured_output",
+        schema: request.jsonSchema,
+        strict: true
+      }
+    } as any;
+  } else if (request.responseFormat) {
+    body.response_format = { type: request.responseFormat };
   }
 
   return {
@@ -87,6 +100,8 @@ export function parseOpenAiResponse(body: OpenAiResponseBody): CompletionRespons
   };
 }
 
+import type { ImageGenerationRequest, ImageGenerationResponse } from "./types.js";
+
 export class OpenAiProviderClient implements ProviderClient {
   constructor(
     private readonly config: AiProviderConfig,
@@ -102,14 +117,62 @@ export class OpenAiProviderClient implements ProviderClient {
     }
 
     const { url, init } = buildOpenAiRequest(this.config, request, apiKey);
-    const response = await this.fetchFn(url, init);
+    
+    const controller = new AbortController();
+    if (request.timeoutMs) {
+      setTimeout(() => controller.abort(), request.timeoutMs);
+    }
+    init.signal = controller.signal;
+
+    try {
+      const response = await this.fetchFn(url, init);
+
+      if (!response.ok) {
+        const bodyText = await response.text();
+        throw new Error(`OpenAI API request failed (${response.status}): ${bodyText}`);
+      }
+
+      const json = (await response.json()) as OpenAiResponseBody;
+      return parseOpenAiResponse(json);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        throw new Error(`OpenAI API request timed out after ${request.timeoutMs}ms`);
+      }
+      throw err;
+    }
+  }
+
+  async generateImage(request: ImageGenerationRequest): Promise<ImageGenerationResponse> {
+    const apiKey = process.env[this.config.apiKeyEnvVar];
+    if (!apiKey) {
+      throw new Error(`Environment variable "${this.config.apiKeyEnvVar}" is not set.`);
+    }
+
+    const baseUrl = this.config.baseUrl ?? DEFAULT_BASE_URL;
+    const url = `${baseUrl}/images/generations`;
+
+    const body = {
+      model: "dall-e-3", // Default image model for OpenAI
+      prompt: request.prompt,
+      n: request.n ?? 1,
+      size: request.size ?? "1024x1024",
+      quality: request.quality ?? "standard"
+    };
+
+    const response = await this.fetchFn(url, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify(body)
+    });
 
     if (!response.ok) {
       const bodyText = await response.text();
-      throw new Error(`OpenAI API request failed (${response.status}): ${bodyText}`);
+      throw new Error(`OpenAI API Image request failed (${response.status}): ${bodyText}`);
     }
 
-    const json = (await response.json()) as OpenAiResponseBody;
-    return parseOpenAiResponse(json);
+    return (await response.json()) as ImageGenerationResponse;
   }
 }

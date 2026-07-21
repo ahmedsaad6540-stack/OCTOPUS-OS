@@ -38,7 +38,8 @@ router.get("/oauth/:platform/connect", async (req, res) => {
       else if (platform === "instagram" || platform === "facebook") clientId = process.env.FACEBOOK_APP_ID || "";
     }
 
-    const callbackUrl = `https://api-server-production-4801.up.railway.app/api/oauth/${platform}/callback`;
+    const apiUrl = process.env.API_URL || `${req.protocol}://${req.get("host")}`;
+    const callbackUrl = `${apiUrl}/oauth/${platform}/callback`;
     const state = JSON.stringify({ userId });
 
     let authUrl = "";
@@ -70,9 +71,10 @@ router.get("/oauth/:platform/callback", async (req, res) => {
   const { platform } = req.params;
   const { code, state, error } = req.query as { code?: string; state?: string; error?: string };
 
+  const frontendUrl = process.env.FRONTEND_URL || "https://finalsnapshot.vercel.app";
   if (error) {
     logger.error({ error }, `OAuth callback returned error for ${platform}`);
-    res.redirect(`https://finalsnapshot.vercel.app/?oauth_error=${encodeURIComponent(error)}`);
+    res.redirect(`${frontendUrl}/?oauth_error=${encodeURIComponent(error)}`);
     return;
   }
 
@@ -106,10 +108,11 @@ router.get("/oauth/:platform/callback", async (req, res) => {
         clientSecret = clientSecret || process.env.FACEBOOK_APP_SECRET || "";
       }
     }
-    const callbackUrl = `https://api-server-production-4801.up.railway.app/api/oauth/${platform}/callback`;
+    const apiUrl = process.env.API_URL || `${req.protocol}://${req.get("host")}`;
+    const callbackUrl = `${apiUrl}/oauth/${platform}/callback`;
 
-    let accessToken = "act_" + Math.random().toString(36).substring(2);
-    let refreshToken = "rft_" + Math.random().toString(36).substring(2);
+    let accessToken = "";
+    let refreshToken = "";
     let tokenExpiresAt: Date | null = null;
     let username = accConfig?.username || "";
     let displayName = accConfig?.displayName || "";
@@ -206,28 +209,18 @@ router.get("/oauth/:platform/callback", async (req, res) => {
             }
           }
         }
+        
+        if (!accessToken) {
+          throw new Error("Failed to obtain access token from OAuth exchange");
+        }
       } catch (exchangeErr) {
-        logger.error(exchangeErr, `Real token exchange failed for ${platform}, falling back to mock details`);
+        logger.error(exchangeErr, `Real token exchange failed for ${platform}`);
+        res.redirect(`${process.env.FRONTEND_URL || "https://finalsnapshot.vercel.app"}/?oauth_error=${encodeURIComponent("Token exchange failed")}`);
+        return;
       }
     } else {
-      // Setup mock data for verification/demo purposes
-      if (platform === "tiktok") {
-        username = "octopus.ai";
-        displayName = "OCTOPUS TikTok Official";
-        followers = "48300";
-      } else if (platform === "youtube") {
-        username = "OctopusNexus";
-        displayName = "Octopus Nexus Tech";
-        followers = "109000";
-      } else if (platform === "instagram") {
-        username = "octopus.nexus";
-        displayName = "Octopus Instagram Brand";
-        followers = "15600";
-      } else if (platform === "facebook") {
-        username = "OCTOPUS AI LAB";
-        displayName = "OCTOPUS Facebook Page";
-        followers = "24900";
-      }
+      res.redirect(`${frontendUrl}/?oauth_error=${encodeURIComponent("Invalid client credentials or code")}`);
+      return;
     }
 
     // Save tokens and profile metrics back to database
@@ -259,7 +252,7 @@ router.get("/oauth/:platform/callback", async (req, res) => {
       });
     }
 
-    res.redirect(`https://finalsnapshot.vercel.app/`);
+    res.redirect(`${frontendUrl}/`);
   } catch (err) {
     logger.error(err, "OAuth callback processing error");
     res.status(500).send("OAuth integration processing failed");

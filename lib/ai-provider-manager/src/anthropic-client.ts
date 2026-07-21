@@ -17,6 +17,8 @@ interface AnthropicRequestBody {
   messages: { role: "user" | "assistant"; content: string }[];
   system?: string;
   temperature?: number;
+  tools?: any[];
+  tool_choice?: any;
 }
 
 /**
@@ -38,6 +40,15 @@ export function buildAnthropicRequest(
   if (request.systemPrompt !== undefined) body.system = request.systemPrompt;
   if (request.temperature !== undefined) body.temperature = request.temperature;
 
+  if (request.jsonSchema) {
+    body.tools = [{
+      name: "structured_output",
+      description: "Format the output according to the provided schema",
+      input_schema: request.jsonSchema
+    }];
+    body.tool_choice = { type: "tool", name: "structured_output" };
+  }
+
   return {
     url: `${config.baseUrl ?? DEFAULT_BASE_URL}/v1/messages`,
     init: {
@@ -53,7 +64,7 @@ export function buildAnthropicRequest(
 }
 
 interface AnthropicResponseBody {
-  content: { type: string; text?: string }[];
+  content: { type: string; text?: string; input?: any }[];
   model: string;
   stop_reason: string | null;
   usage?: { input_tokens: number; output_tokens: number };
@@ -61,10 +72,11 @@ interface AnthropicResponseBody {
 
 /** Parses an Anthropic Messages API response into the provider-agnostic `CompletionResponse` shape. Pure — no I/O. */
 export function parseAnthropicResponse(body: AnthropicResponseBody): CompletionResponse {
-  const text = body.content
-    .filter((block) => block.type === "text" && typeof block.text === "string")
-    .map((block) => block.text)
-    .join("");
+  // Check if there is a tool use block
+  const toolBlock = body.content.find((block) => block.type === "tool_use" && block.input);
+  const textBlock = body.content.find((block) => block.type === "text" && typeof block.text === "string");
+
+  const text = toolBlock ? JSON.stringify(toolBlock.input) : (textBlock?.text ?? "");
 
   return {
     content: text,
@@ -95,14 +107,28 @@ export class AnthropicProviderClient implements ProviderClient {
     }
 
     const { url, init } = buildAnthropicRequest(this.config, request, apiKey);
-    const response = await this.fetchFn(url, init);
-
-    if (!response.ok) {
-      const bodyText = await response.text();
-      throw new Error(`Anthropic API request failed (${response.status}): ${bodyText}`);
+    
+    const controller = new AbortController();
+    if (request.timeoutMs) {
+      setTimeout(() => controller.abort(), request.timeoutMs);
     }
+    init.signal = controller.signal;
 
-    const json = (await response.json()) as AnthropicResponseBody;
-    return parseAnthropicResponse(json);
+    try {
+      const response = await this.fetchFn(url, init);
+
+      if (!response.ok) {
+        const bodyText = await response.text();
+        throw new Error(`Anthropic API request failed (${response.status}): ${bodyText}`);
+      }
+
+      const json = (await response.json()) as AnthropicResponseBody;
+      return parseAnthropicResponse(json);
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        throw new Error(`Anthropic API request timed out after ${request.timeoutMs}ms`);
+      }
+      throw err;
+    }
   }
 }

@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 const PLATFORMS = [
   { id: "railway", icon: "🚂", name: "Railway", desc: "One-click deploy" },
@@ -12,13 +14,49 @@ const PLATFORMS = [
 ];
 
 export function DeploymentPage() {
+  const { token } = useAuth();
   const [selected, setSelected] = useState("railway");
   const [deploying, setDeploying] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [deployed, setDeployed] = useState(false);
+  const [envVars, setEnvVars] = useState<Record<string, string>>({
+    DATABASE_URL: "postgresql://...",
+    JWT_SECRET: "auto-generated",
+    OPENAI_API_KEY: "sk-...",
+    NODE_ENV: "production"
+  });
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_BASE}/settings/system/deployment_config`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.setting?.value) {
+          const conf = data.setting.value;
+          if (conf.platform) setSelected(conf.platform);
+          if (conf.envVars) setEnvVars(conf.envVars);
+        }
+      })
+      .catch(console.error);
+  }, [token]);
 
   const deploy = async () => {
+    if (!token) return;
     setDeploying(true); setLogs([]); setDeployed(false);
+    
+    // Save config first
+    try {
+      await fetch(`${API_BASE}/settings/system/deployment_config`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+        body: JSON.stringify({ value: { platform: selected, envVars } })
+      });
+    } catch (e) {
+      console.error(e);
+    }
+
     const platform = PLATFORMS.find(p => p.id === selected)?.name || selected;
     const steps = [
       "🔍 Validating configuration...",
@@ -70,10 +108,16 @@ export function DeploymentPage() {
           <div className="card-os p-4 mb-4">
             <h3 className="text-xs font-bold text-purple-300 mb-3">Environment Variables</h3>
             <div className="space-y-2">
-              {[["DATABASE_URL","postgresql://..."],["JWT_SECRET","auto-generated"],["OPENAI_API_KEY","sk-..."],["NODE_ENV","production"]].map(([k,v]) => (
+              {Object.entries(envVars).map(([k,v]) => (
                 <div key={k} className="flex gap-2">
-                  <input defaultValue={k} className="w-36 px-2 py-1.5 rounded-lg text-xs font-mono text-purple-300 outline-none" style={{ background:"#0a0614", border:"1px solid rgba(139,92,246,0.15)" }} />
-                  <input defaultValue={v} type="password" className="flex-1 px-2 py-1.5 rounded-lg text-xs font-mono text-purple-400/60 outline-none" style={{ background:"#0a0614", border:"1px solid rgba(139,92,246,0.15)" }} />
+                  <input readOnly value={k} className="w-36 px-2 py-1.5 rounded-lg text-xs font-mono text-purple-300 outline-none" style={{ background:"#0a0614", border:"1px solid rgba(139,92,246,0.15)" }} />
+                  <input 
+                    value={v} 
+                    onChange={(e) => setEnvVars(prev => ({ ...prev, [k]: e.target.value }))}
+                    type="password" 
+                    className="flex-1 px-2 py-1.5 rounded-lg text-xs font-mono text-purple-400/60 outline-none" 
+                    style={{ background:"#0a0614", border:"1px solid rgba(139,92,246,0.15)" }} 
+                  />
                 </div>
               ))}
             </div>

@@ -1,6 +1,6 @@
 const { Pool } = require('pg');
 const pool = new Pool({
-  connectionString: 'postgresql://postgres:OfvcPdyAJTMGFteYOlwYarWsfdEcoMvD@tokaido.proxy.rlwy.net:24119/railway'
+  connectionString: 'postgresql://postgres:REDACTED@localhost:5432/octopus_test'
 });
 
 async function run() {

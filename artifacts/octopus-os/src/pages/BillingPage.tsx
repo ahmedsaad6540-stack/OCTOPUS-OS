@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 
 const PLANS = [
   { id: "starter", name: "Starter", price: 29, features: ["5 AI Agents", "3 Social Platforms", "5 Affiliate Networks", "1,000 AI Requests/mo", "Basic Analytics"] },
@@ -8,8 +10,42 @@ const PLANS = [
 ];
 
 export function BillingPage() {
+  const { token } = useAuth();
   const [annual, setAnnual] = useState(false);
-  const [current] = useState("pro");
+  const [current, setCurrent] = useState("pro");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_BASE}/settings/me/billing_plan`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.setting?.value) {
+          setCurrent(data.setting.value);
+        }
+      })
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [token]);
+
+  const selectPlan = async (planId: string) => {
+    if (!token) return;
+    setCurrent(planId);
+    try {
+      await fetch(`${API_BASE}/settings/me/billing_plan`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ value: planId })
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   return (
     <div className="p-6 min-h-screen" style={{ background: "#0a0614" }}>
@@ -44,7 +80,9 @@ export function BillingPage() {
                 </li>
               ))}
             </ul>
-            <button className={`w-full py-2 rounded-lg text-xs font-semibold transition-all ${current === p.id ? "bg-emerald-900/30 text-emerald-400 border border-emerald-500/30" : "gradient-purple text-white"}`}>
+            <button 
+              onClick={() => selectPlan(p.id)}
+              className={`w-full py-2 rounded-lg text-xs font-semibold transition-all ${current === p.id ? "bg-emerald-900/30 text-emerald-400 border border-emerald-500/30" : "gradient-purple text-white"}`}>
               {current === p.id ? "Current Plan" : "Upgrade"}
             </button>
           </div>

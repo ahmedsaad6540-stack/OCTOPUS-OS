@@ -187,25 +187,18 @@ async function performAutonomousPublish(
 ): Promise<{ url: string; platformName: string; platformLabel: string; noteText: string }> {
   const isTikTok = (job.platform || "").toLowerCase().includes("tiktok") || (campaign?.platform || "").toLowerCase().includes("tiktok");
   if (isTikTok) {
-    const hasToken = !!process.env["TIKTOK_ACCESS_TOKEN"];
-    const watchId = (job.heygenVideoId || "740" + Math.floor(100000000000 + Math.random() * 900000000000)).slice(0, 19);
-    const targetUrl = hasToken ? `https://www.tiktok.com/@www.tiktokoctopuslab/video/${watchId}` : videoUrl;
-    const noteText = hasToken 
-      ? `🚀 تم الرفع والنشر التلقائي عبر API على حسابك @www.tiktokoctopuslab: ${targetUrl}`
-      : `🎬 الفيديو جاهز 100% (MP4). اضغط زر (📱 نشر في تيك توك) لنسخ الوصف وفتح استوديو الرفع لحسابك @www.tiktokoctopuslab في 3 ثوانٍ!`;
     return {
-      url: targetUrl,
+      url: "",
       platformName: "TikTok",
-      platformLabel: "تيك توك (@www.tiktokoctopuslab)",
-      noteText
+      platformLabel: "تيك توك",
+      noteText: `⏳ بانتظار ربط حساب TikTok الخاص بك (Social OAuth). الفيديو الجاهز: ${videoUrl}`
     };
   } else {
-    const watchId = (job.heygenVideoId || "yt_" + Math.random().toString(36).substring(2, 9)).slice(0, 11);
     return {
-      url: `https://www.youtube.com/watch?v=${watchId}`,
+      url: "",
       platformName: "YouTube",
       platformLabel: "يوتيوب",
-      noteText: `🚀 تم النشر المباشر على قناتك في يوتيوب: https://www.youtube.com/watch?v=${watchId}`
+      noteText: `⏳ بانتظار ربط حساب YouTube الخاص بك (Social OAuth). الفيديو الجاهز: ${videoUrl}`
     };
   }
 }

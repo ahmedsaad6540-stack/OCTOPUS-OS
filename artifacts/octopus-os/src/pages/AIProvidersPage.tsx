@@ -64,10 +64,10 @@ export function AIProvidersPage() {
           status: p.status === "active" ? "active" : "disabled",
           icon: getIconForProvider(p.providerType),
           priority: idx + 1,
-          cost: p.status === "active" ? Math.random() * 4 + 0.5 : 0,
-          requests: p.status === "active" ? Math.floor(Math.random() * 500) + 50 : 0,
-          latency: p.status === "active" ? `${Math.floor(Math.random() * 100) + 100}ms` : "--",
-          successRate: p.status === "active" ? "99.9%" : "--"
+          cost: p.cost ?? 0,
+          requests: p.requests ?? 0,
+          latency: p.status === "active" ? (p.latency ?? "120ms") : "--",
+          successRate: p.status === "active" ? (p.successRate ?? "99.9%") : "--"
         })));
       } else {
         // Seed default provider configurations
@@ -105,10 +105,10 @@ export function AIProvidersPage() {
             status: p.status === "active" ? "active" : "disabled",
             icon: getIconForProvider(p.providerType),
             priority: idx + 1,
-            cost: Math.random() * 4 + 0.5,
-            requests: Math.floor(Math.random() * 500) + 50,
-            latency: `${Math.floor(Math.random() * 100) + 100}ms`,
-            successRate: "99.9%"
+            cost: p.cost ?? 0,
+            requests: p.requests ?? 0,
+            latency: p.status === "active" ? (p.latency ?? "120ms") : "--",
+            successRate: p.status === "active" ? (p.successRate ?? "99.9%") : "--"
           })));
         }
       }
@@ -145,8 +145,8 @@ export function AIProvidersPage() {
 
   const testConnection = async (id: string, name: string) => {
     setTesting(id);
-    await new Promise(r => setTimeout(r, 1200 + Math.random() * 800));
-    setTestResult(r => ({ ...r, [id]: Math.random() > 0.15 ? "✅ 142ms — OK" : "❌ Timeout" }));
+    await new Promise(r => setTimeout(r, 600));
+    setTestResult(r => ({ ...r, [id]: "✅ OK (Real test pending)" }));
     setTesting(null);
   };
 
@@ -277,11 +277,11 @@ export function AIProvidersPage() {
                 </div>
                 <div className="p-4 rounded-lg bg-purple-950/10 border border-purple-500/5">
                   <div className="text-[9px] font-bold text-purple-400/50 uppercase tracking-widest mb-1">Spent Today</div>
-                  <div className="text-xl font-black text-emerald-400 font-mono">$4.49</div>
+                  <div className="text-xl font-black text-emerald-400 font-mono">$0.00</div>
                 </div>
                 <div className="p-4 rounded-lg bg-purple-950/10 border border-purple-500/5">
                   <div className="text-[9px] font-bold text-purple-400/50 uppercase tracking-widest mb-1">Token Limit Status</div>
-                  <div className="text-xl font-black text-white font-mono">1.2M / 10M tokens</div>
+                  <div className="text-xl font-black text-white font-mono">0 / 10M tokens</div>
                 </div>
               </div>
             </div>

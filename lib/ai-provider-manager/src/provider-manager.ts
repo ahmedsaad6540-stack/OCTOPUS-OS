@@ -144,6 +144,22 @@ export class AiProviderManager {
     return client.complete(request);
   }
 
+  async generateImage(configId: string, request: import("./types.js").ImageGenerationRequest): Promise<import("./types.js").ImageGenerationResponse> {
+    const config = await this.store.getById(configId);
+    if (!config) throw new Error(`AI provider config "${configId}" does not exist`);
+    const client = this.getClient(config);
+    if (!client.generateImage) throw new Error(`Provider "${config.providerType}" does not support image generation`);
+    return client.generateImage(request);
+  }
+
+  async generateImageWithDefault(request: import("./types.js").ImageGenerationRequest): Promise<import("./types.js").ImageGenerationResponse> {
+    const config = await this.store.getDefault();
+    if (!config) throw new NoDefaultProviderError();
+    const client = this.getClient(config);
+    if (!client.generateImage) throw new Error(`Provider "${config.providerType}" does not support image generation`);
+    return client.generateImage(request);
+  }
+
   private async clearExistingDefault(exceptId?: string): Promise<void> {
     const current = await this.store.getDefault();
     if (current && current.id !== exceptId) {

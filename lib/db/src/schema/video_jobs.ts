@@ -20,7 +20,7 @@ export const videoJobsTable = pgTable("video_jobs", {
   heygenStatus: text("heygen_status").default("pending"),
   videoUrl: text("video_url").default(""),
   publishedUrl: text("published_url").default(""),
-  status: text("status").default("queued"), // queued, generating_script, generating_voice, rendering_video, publishing, done, failed
+  status: text("status").default("queued"), // queued, generating_script, generating_voice, rendering_video, publishing, user_confirmed, published_unverified, done, failed
   progress: integer("progress").default(0),
   errorMessage: text("error_message").default(""),
   createdAt: timestamp("created_at").notNull().defaultNow(),

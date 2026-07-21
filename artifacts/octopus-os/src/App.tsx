@@ -3,8 +3,11 @@ import { LanguageProvider } from "@/context/LanguageContext";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { LoginPage } from "@/pages/LoginPage";
 import { LandingPage } from "@/pages/LandingPage";
-import { PrivacyPolicyPage } from "@/pages/PrivacyPolicyPage";
-import { TermsOfServicePage } from "@/pages/TermsOfServicePage";
+import { PrivacyPolicyPage } from "@/pages/legal/PrivacyPolicyPage";
+import { TermsOfServicePage } from "@/pages/legal/TermsOfServicePage";
+import { DataDeletionPage } from "@/pages/legal/DataDeletionPage";
+import { TikTokIntegrationPage } from "@/pages/legal/TikTokIntegrationPage";
+import { TikTokReadinessWizard } from "@/pages/TikTokReadinessWizard";
 import { DemoShowcasePage } from "@/pages/DemoShowcasePage";
 import { CommandCenter } from "@/pages/CommandCenter";
 import { MissionControlPage } from "@/pages/MissionControlPage";
@@ -14,6 +17,7 @@ import { AgentsPage } from "@/pages/AgentsPage";
 import { AIProvidersPage } from "@/pages/AIProvidersPage";
 import { SocialPage } from "@/pages/SocialPage";
 import { AffiliatesPage } from "@/pages/AffiliatesPage";
+import { AffiliatesCallbackPage } from "@/pages/AffiliatesCallbackPage";
 import { IdentityCenter } from "@/pages/IdentityCenter";
 import { VideoFactoryPage } from "@/pages/VideoFactoryPage";
 import { PromptStudioPage } from "@/pages/PromptStudioPage";
@@ -30,6 +34,18 @@ import { SaaSPage } from "@/pages/SaaSPage";
 import { CampaignsPage } from "@/pages/CampaignsPage";
 import { useState } from "react";
 import { Switch, Route, useLocation } from "wouter";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+// Initialize React Query Client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 5 * 60 * 1000,
+    },
+  },
+});
 
 export type Page =
   | "command-center" | "mission-control" | "chat" | "agents" | "workforce" | "memory" | "prompt-studio"
@@ -131,19 +147,25 @@ function OS() {
 
 export default function App() {
   return (
-    <LanguageProvider>
-      <AuthProvider>
-        <Switch>
-          {/* Public landing, demo, legal pages — visible WITHOUT login */}
-          <Route path="/" component={LandingPage} />
-          <Route path="/demo" component={DemoShowcasePage} />
-          <Route path="/privacy" component={PrivacyPolicyPage} />
-          <Route path="/terms" component={TermsOfServicePage} />
-          {/* Login + full OS — all /login and everything else */}
-          <Route path="/login" component={() => <OS />} />
-          <Route component={() => <OS />} />
-        </Switch>
-      </AuthProvider>
-    </LanguageProvider>
+    <QueryClientProvider client={queryClient}>
+      <LanguageProvider>
+        <AuthProvider>
+          <Switch>
+            {/* Public landing, demo, legal pages — visible WITHOUT login */}
+            <Route path="/" component={LandingPage} />
+            <Route path="/demo" component={DemoShowcasePage} />
+            <Route path="/privacy" component={PrivacyPolicyPage} />
+            <Route path="/terms" component={TermsOfServicePage} />
+            <Route path="/data-deletion" component={DataDeletionPage} />
+            <Route path="/tiktok-integration" component={TikTokIntegrationPage} />
+            <Route path="/tiktok-wizard" component={TikTokReadinessWizard} />
+            {/* Login + full OS — all /login and everything else */}
+            <Route path="/login" component={() => <OS />} />
+            <Route path="/affiliates/callback" component={AffiliatesCallbackPage} />
+            <Route component={() => <OS />} />
+          </Switch>
+        </AuthProvider>
+      </LanguageProvider>
+    </QueryClientProvider>
   );
 }

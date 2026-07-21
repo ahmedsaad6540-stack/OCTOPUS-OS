@@ -1,6 +1,6 @@
 const { Pool } = require("pg");
 
-const connectionString = process.env.DATABASE_URL || "postgresql://postgres:OfvcPdyAJTMGFteYOlwYarWsfdEcoMvD@tokaido.proxy.rlwy.net:24119/railway";
+const connectionString = process.env.DATABASE_URL || "postgresql://postgres:REDACTED@localhost:5432/octopus_test";
 const pool = new Pool({ connectionString });
 
 async function seed() {

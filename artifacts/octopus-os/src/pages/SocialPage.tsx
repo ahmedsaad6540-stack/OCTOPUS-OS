@@ -151,38 +151,19 @@ export function SocialPage() {
   };
 
   const connect = async () => {
-    if (!token) return;
-    setSaving(true);
-    setSaveMsg("");
-    try {
-      const res = await fetch(`${API_BASE}/social`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          platform: selected,
-          apiKey: values[selected]?.[FIELDS[selected]?.[0] || ""] || "",
-          apiSecret: values[selected]?.[FIELDS[selected]?.[1] || ""] || "",
-          status: "configured",
-          displayName: `${selected.toUpperCase()} Account`,
-          username: "Unknown"
-        }),
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.error || "Failed to save config");
-      }
-      const data = await res.json();
-      const account = data.account || data;
-      setConnectedMap(prev => ({ ...prev, [selected]: account }));
-      setSaveMsg("✅ Configuration saved successfully");
-    } catch (err: any) {
-      setSaveMsg(`❌ ${err.message}`);
-    } finally {
-      setSaving(false);
+    if (!token || !user) {
+      setSaveMsg("❌ Please login first");
+      return;
     }
+    setSaving(true);
+    setSaveMsg("⏳ Redirecting to authorization provider...");
+    
+    // Construct the connect URL pointing to our unified backend OAuth flow
+    const connectUrl = `${API_BASE}/oauth/${selected}/connect?userId=${user.id}`;
+    
+    // Redirect the browser entirely. The OAuth provider will redirect back to our backend callback,
+    // which will then redirect back to the frontend root (/) or a specific route.
+    window.location.href = connectUrl;
   };
 
   const disconnect = async () => {
@@ -223,12 +204,21 @@ export function SocialPage() {
   const testConn = async () => {
     setTesting(true);
     setTestMsg("");
-    await new Promise(r => setTimeout(r, 1400));
-    setTestMsg(
-      platform.status === "connected"
-        ? "✅ Connection successful — API responding"
-        : "❌ Not connected — please add credentials first"
-    );
+    // Fetch latest status from DB
+    try {
+      const res = await fetch(`${API_BASE}/social`, { headers: { Authorization: `Bearer ${token}` } });
+      const data = await res.json();
+      const accounts = data.accounts || [];
+      const dbRecord = accounts.find((a: any) => a.platform.toLowerCase() === selected);
+      
+      if (dbRecord && (dbRecord.status === "connected" || dbRecord.status === "active")) {
+        setTestMsg("✅ Connection successful — Authenticated with DB");
+      } else {
+        setTestMsg("❌ Not connected — Please OAuth or add credentials first");
+      }
+    } catch (err) {
+      setTestMsg("❌ Error connecting to database");
+    }
     setTesting(false);
   };
 

@@ -12,6 +12,7 @@ interface Agent {
   cpu: number;
   requests: number;
   description: string;
+  instructions?: string;
 }
 
 const DEFAULT_AGENTS = [
@@ -40,16 +41,31 @@ export function AgentsPage() {
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [createModal, setCreateModal] = useState(false);
-  const [createForm, setCreateForm] = useState({ name: "", description: "", instructions: "", capabilities: "brain, research" });
+  const [createForm, setCreateForm] = useState({ id: "", name: "", description: "", instructions: "", capabilities: "brain, research" });
   const [creating, setCreating] = useState(false);
+
+  const openEditModal = (agent: any) => {
+    setCreateForm({
+      id: agent.id,
+      name: agent.name,
+      description: agent.description || "",
+      instructions: agent.instructions || agent.description || "",
+      capabilities: "brain, research"
+    });
+    setCreateModal(true);
+  };
 
   const handleCreateAgent = async () => {
     if (!createForm.name.trim() || !createForm.instructions.trim() || !token) return;
     setCreating(true);
     try {
       const caps = createForm.capabilities.split(",").map(c => c.trim()).filter(Boolean);
-      const res = await fetch(`${API_BASE}/agents`, {
-        method: "POST",
+      const isUpdate = !!createForm.id;
+      const url = isUpdate ? `${API_BASE}/agents/${createForm.id}` : `${API_BASE}/agents`;
+      const method = isUpdate ? "PUT" : "POST";
+      
+      const res = await fetch(url, {
+        method,
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${token}`
@@ -64,11 +80,11 @@ export function AgentsPage() {
       });
       if (res.ok) {
         setCreateModal(false);
-        setCreateForm({ name: "", description: "", instructions: "", capabilities: "brain, research" });
+        setCreateForm({ id: "", name: "", description: "", instructions: "", capabilities: "brain, research" });
         await fetchAgents();
-        alert("✅ تم إنشاء الوكيل في قاعدة البيانات بنجاح!");
+        alert(`✅ تم ${isUpdate ? "تحديث" : "إنشاء"} الوكيل في قاعدة البيانات بنجاح!`);
       } else {
-        alert("❌ فشل إنشاء الوكيل");
+        alert("❌ فشل العملية");
       }
     } catch (e) {
       console.error(e);
@@ -93,10 +109,11 @@ export function AgentsPage() {
           name: w.name,
           icon: getIconForAgent(w.name),
           status: w.status === "active" ? "active" : "disabled",
-          task: w.status === "active" ? "Running operations loop" : "Idle",
-          cpu: w.status === "active" ? Math.floor(Math.random() * 50) + 20 : 0,
-          requests: w.status === "active" ? Math.floor(Math.random() * 200) + 10 : 0,
-          description: w.description || "Virtual Agent"
+          task: w.status === "active" ? (w.lastTaskType || "Running operations loop") : "Idle",
+          cpu: w.cpuUsage ?? (w.status === "active" ? 22 : 0),
+          requests: w.requestCount ?? (w.status === "active" ? 18 : 0),
+          description: w.description || "Virtual Agent",
+          instructions: w.instructions || ""
         })));
       } else {
         // Seed default agents in database
@@ -127,10 +144,11 @@ export function AgentsPage() {
             name: w.name,
             icon: getIconForAgent(w.name),
             status: w.status === "active" ? "active" : "disabled",
-            task: "Running operations loop",
-            cpu: Math.floor(Math.random() * 50) + 20,
-            requests: Math.floor(Math.random() * 200) + 10,
-            description: w.description || "Virtual Agent"
+            task: w.status === "active" ? (w.lastTaskType || "Running operations loop") : "Idle",
+            cpu: w.cpuUsage ?? (w.status === "active" ? 22 : 0),
+            requests: w.requestCount ?? (w.status === "active" ? 18 : 0),
+            description: w.description || "Virtual Agent",
+            instructions: w.instructions || ""
           })));
         }
       }
@@ -346,7 +364,7 @@ export function AgentsPage() {
                   <p className="text-xs text-purple-300/70 mb-4 leading-relaxed font-sans">{a.description}</p>
                   <div className="flex gap-2">
                     <button onClick={() => runAgentNow(a.id)} className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-white gradient-purple font-sans">▶ Run Now</button>
-                    <button className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-purple-300 border border-purple-500/20 hover:bg-purple-950/30 transition-all font-sans">✏️ Edit Prompt</button>
+                    <button onClick={() => openEditModal(a)} className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase text-purple-300 border border-purple-500/20 hover:bg-purple-950/30 transition-all font-sans">✏️ Edit Prompt</button>
                   </div>
                 </div>
               )}
@@ -488,7 +506,7 @@ export function AgentsPage() {
               <div className="flex items-center gap-2.5">
                 <span className="text-2xl">🤖</span>
                 <div>
-                  <h3 className="text-sm font-black text-white">إضافة وكيل ذكاء اصطناعي جديد</h3>
+                  <h3 className="text-sm font-black text-white">{createForm.id ? "تعديل وكيل الذكاء الاصطناعي" : "إضافة وكيل ذكاء اصطناعي جديد"}</h3>
                   <p className="text-[10px] text-emerald-400">سيتم حفظ وكيلك المخصص في قاعدة بيانات PostgreSQL</p>
                 </div>
               </div>

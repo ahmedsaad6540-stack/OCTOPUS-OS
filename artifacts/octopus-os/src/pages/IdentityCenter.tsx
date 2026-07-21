@@ -1,5 +1,6 @@
-import { useState } from "react";
-
+import { useState, useEffect } from "react";
+import { API_BASE } from "@/lib/api";
+import { useAuth } from "@/context/AuthContext";
 type Tab = "brand" | "legal" | "oauth" | "export";
 
 const OAUTH_PLATFORMS = [
@@ -8,9 +9,50 @@ const OAUTH_PLATFORMS = [
 ];
 
 export function IdentityCenter() {
+  const { token } = useAuth();
   const [tab, setTab] = useState<Tab>("brand");
   const [brand, setBrand] = useState({ domain: "", appName: "", company: "", supportEmail: "", legalEmail: "", description: "" });
   const [copied, setCopied] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!token) return;
+    fetch(`${API_BASE}/settings/system/brand_identity`, {
+      headers: { "Authorization": `Bearer ${token}` }
+    })
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.setting?.value) {
+          setBrand(data.setting.value);
+        }
+      })
+      .catch(console.error);
+  }, [token]);
+
+  const saveBrand = async () => {
+    if (!token) return;
+    setLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/settings/system/brand_identity`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
+        },
+        body: JSON.stringify({ value: brand })
+      });
+      if (res.ok) {
+        alert("✅ Brand identity saved successfully!");
+      } else {
+        alert("❌ Failed to save. Only admins can edit system settings.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("❌ Error saving");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const copyText = (text: string, key: string) => {
     navigator.clipboard.writeText(text);
@@ -98,8 +140,11 @@ export function IdentityCenter() {
                 className="w-full px-3 py-2.5 rounded-lg text-xs text-white outline-none resize-none"
                 style={{ background: "#0d0920", border: "1px solid rgba(139,92,246,0.2)" }} />
             </div>
-            <button className="px-6 py-2.5 rounded-xl text-xs font-semibold text-white gradient-purple glow-purple">
-              💾 Save Brand Identity
+            <button 
+              onClick={saveBrand}
+              disabled={loading}
+              className="px-6 py-2.5 rounded-xl text-xs font-semibold text-white gradient-purple glow-purple disabled:opacity-50">
+              {loading ? "Saving..." : "💾 Save Brand Identity"}
             </button>
           </div>
         </div>

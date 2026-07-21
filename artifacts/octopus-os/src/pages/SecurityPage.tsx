@@ -38,6 +38,7 @@ interface AuditEntry {
 }
 
 interface ApiKey {
+  id?: string;
   name: string;
   key: string;
   created: string;
@@ -121,6 +122,49 @@ export function SecurityPage() {
   const handleComingSoon = (action: string) =>
     addToast('info', `${action} — coming soon! No backend route exists yet.`);
 
+  const generateApiKey = async () => {
+    if (!token) return;
+    try {
+      const name = prompt("Enter a name for the new API Key:");
+      if (!name) return;
+      
+      const res = await fetch(`${API_BASE}/security/api-keys`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ name })
+      });
+      
+      if (!res.ok) throw new Error("Failed to generate API Key");
+      
+      const data = await res.json();
+      setApiKeys(prev => [...prev, data.apiKey]);
+      addToast('success', 'API Key generated successfully');
+    } catch (e) {
+      addToast('error', e instanceof Error ? e.message : 'Error generating key');
+    }
+  };
+
+  const revokeApiKey = async (id: string) => {
+    if (!token) return;
+    if (!confirm("Are you sure you want to revoke this API Key?")) return;
+    try {
+      const res = await fetch(`${API_BASE}/security/api-keys/${id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+      
+      if (!res.ok) throw new Error("Failed to revoke API Key");
+      
+      setApiKeys(prev => prev.filter(k => k.id !== id));
+      addToast('success', 'API Key revoked successfully');
+    } catch (e) {
+      addToast('error', e instanceof Error ? e.message : 'Error revoking key');
+    }
+  };
+
   return (
     <div className="p-6 min-h-screen" style={{ background: "#0a0614" }}>
       <Toast toasts={toasts} />
@@ -133,15 +177,15 @@ export function SecurityPage() {
         <div className="card-os p-4">
           <div className="flex items-center justify-between mb-2">
             <h3 className="text-sm font-bold text-purple-300">🔑 API Keys</h3>
-            <button onClick={() => handleComingSoon('Generate API Key')} className="px-3 py-1.5 rounded-lg text-xs text-white gradient-purple">+ Generate</button>
+            <button onClick={generateApiKey} className="px-3 py-1.5 rounded-lg text-xs text-white gradient-purple">+ Generate</button>
           </div>
-          <p className="text-[10px] text-purple-400/40 italic mb-3">Real session management coming soon</p>
+          <p className="text-[10px] text-purple-400/40 italic mb-3">Manage your production API keys</p>
           <div className="space-y-3">
             {apiKeys.map(k => (
-              <div key={k.name} className="p-3 rounded-lg" style={{ background: "#0a0614", border: "1px solid rgba(139,92,246,0.1)" }}>
+              <div key={k.id || k.name} className="p-3 rounded-lg" style={{ background: "#0a0614", border: "1px solid rgba(139,92,246,0.1)" }}>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-xs font-semibold text-white">{k.name}</span>
-                  <button onClick={() => handleComingSoon('Revoke API Key')} className="text-red-400/60 hover:text-red-400 text-xs">Revoke</button>
+                  <button onClick={() => k.id ? revokeApiKey(k.id) : handleComingSoon('Revoke API Key')} className="text-red-400/60 hover:text-red-400 text-xs">Revoke</button>
                 </div>
                 <div className="font-mono text-xs text-purple-400/60 mb-2">{k.key}</div>
                 <div className="flex justify-between text-[10px] text-purple-400/40"><span>Created {k.created}</span><span>Last used {k.lastUsed}</span></div>

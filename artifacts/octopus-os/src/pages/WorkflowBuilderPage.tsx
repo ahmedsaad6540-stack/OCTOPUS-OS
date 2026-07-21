@@ -169,17 +169,7 @@ export function WorkflowBuilderPage() {
 
   const simulateRun = async () => {
     const steps = localSteps.length > 0 ? localSteps : activeWorkflow?.steps ?? [];
-    setLocalSteps(steps.map((s, i) => ({ ...s, status: i === 0 ? "running" : "waiting" })));
-    setCurrentStep(0);
-    for (let i = 0; i < steps.length; i++) {
-      setCurrentStep(i);
-      setLocalSteps(prev => prev.map((s, idx) => ({
-        ...s,
-        status: idx < i ? "completed" : idx === i ? "running" : "waiting",
-      })));
-      await new Promise(r => setTimeout(r, 800 + Math.random() * 400));
-    }
-    setLocalSteps(prev => prev.map(s => ({ ...s, status: "completed" })));
+    setLocalSteps(steps.map(s => ({ ...s, status: "completed" })));
     setCurrentStep(steps.length);
   };
 

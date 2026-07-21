@@ -24,6 +24,9 @@ export interface CompletionRequest {
   messages: CompletionMessage[];
   maxTokens?: number;
   temperature?: number;
+  responseFormat?: "text" | "json_object";
+  timeoutMs?: number;
+  jsonSchema?: Record<string, unknown>; // Optional JSON Schema for structured output
 }
 
 export interface CompletionUsage {
@@ -38,9 +41,22 @@ export interface CompletionResponse {
   usage: CompletionUsage | null;
 }
 
+export interface ImageGenerationRequest {
+  prompt: string;
+  size?: "256x256" | "512x512" | "1024x1024" | "1024x1792"; // Basic sizes
+  quality?: "standard" | "hd";
+  n?: number;
+}
+
+export interface ImageGenerationResponse {
+  data: Array<{ url: string; b64_json?: string }>;
+  created: number;
+}
+
 /** Uniform seam every provider client implements, regardless of vendor. */
 export interface ProviderClient {
   complete(request: CompletionRequest): Promise<CompletionResponse>;
+  generateImage?(request: ImageGenerationRequest): Promise<ImageGenerationResponse>;
 }
 
 // ---------------------------------------------------------------------------

@@ -18,7 +18,12 @@ export const logger = pino({
     const span = trace.getActiveSpan();
     if (!span) return {};
     const ctx = span.spanContext();
-    return { traceId: ctx.traceId, spanId: ctx.spanId };
+    return { 
+      traceId: ctx.traceId, 
+      spanId: ctx.spanId,
+      "dd.trace_id": ctx.traceId,
+      "dd.span_id": ctx.spanId 
+    };
   },
   ...(isProduction
     ? {}

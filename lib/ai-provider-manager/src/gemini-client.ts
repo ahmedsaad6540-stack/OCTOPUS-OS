@@ -21,6 +21,8 @@ interface GeminiRequestBody {
   generationConfig?: {
     temperature?: number;
     maxOutputTokens?: number;
+    responseMimeType?: string;
+    responseSchema?: any;
   };
 }
 
@@ -53,6 +55,19 @@ export function buildGeminiRequest(
     body.generationConfig = {
       ...body.generationConfig,
       temperature: request.temperature,
+    };
+  }
+
+  if (request.jsonSchema) {
+    body.generationConfig = {
+      ...body.generationConfig,
+      responseMimeType: "application/json",
+      responseSchema: request.jsonSchema,
+    };
+  } else if (request.responseFormat === "json_object") {
+    body.generationConfig = {
+      ...body.generationConfig,
+      responseMimeType: "application/json",
     };
   }
 
@@ -113,6 +128,13 @@ export class GeminiProviderClient implements ProviderClient {
 
     try {
       const { url, init } = buildGeminiRequest(this.config, request, apiKey);
+      
+      const controller = new AbortController();
+      if (request.timeoutMs) {
+        setTimeout(() => controller.abort(), request.timeoutMs);
+      }
+      init.signal = controller.signal;
+
       const response = await this.fetchFn(url, init);
 
       if (!response.ok) {
@@ -122,7 +144,10 @@ export class GeminiProviderClient implements ProviderClient {
 
       const json = (await response.json()) as GeminiResponseBody;
       return parseGeminiResponse(json, this.config.model);
-    } catch (err) {
+    } catch (err: any) {
+      if (err.name === 'AbortError') {
+        throw new Error(`Gemini API request timed out after ${request.timeoutMs}ms`);
+      }
       console.warn("Gemini call failed, falling back to local simulation:", err);
       return getMockResponse(request, this.config.model);
     }

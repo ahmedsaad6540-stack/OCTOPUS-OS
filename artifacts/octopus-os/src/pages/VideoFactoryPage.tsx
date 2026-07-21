@@ -42,42 +42,49 @@ export function VideoFactoryPage() {
   const [previewJob, setPreviewJob] = useState<VideoJob | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  const [statusMsg, setStatusMsg] = useState("");
+
+  const showMsg = (msg: string, isError = false) => {
+    setStatusMsg(msg);
+    setTimeout(() => setStatusMsg(""), 5000);
+    if (isError) console.error(msg);
+  };
+
   const refreshLiveStatus = async () => {
     setRefreshing(true);
     try {
       const res = await api.get<{ success: boolean; jobs?: VideoJob[]; error?: string }>("/production/jobs?_t=" + Date.now());
       if (res.success && res.jobs) {
         setJobs(res.jobs);
-        alert("✅ [تم تحديث حالة المهام من قاعدة البيانات وخادم HeyGen بنجاح]");
+        showMsg("✅ تم تحديث حالة المهام من قاعدة البيانات بنجاح");
       } else {
         await fetchJobs();
       }
     } catch (e) {
-      console.error("Refresh error:", e);
-      alert("⚠️ تعذر الاتصال بالخادم أثناء التحديث");
+      showMsg("⚠️ تعذر الاتصال بالخادم أثناء التحديث", true);
     } finally {
       setRefreshing(false);
     }
   };
 
   const deleteJob = async (id?: string) => {
-    if (!id || !confirm("هل أنت متأكد من حذف هذا الفيديو من قائمة المهام؟")) return;
+    if (!id) return;
     try {
       await api.delete("/production/jobs/" + id);
       setJobs((prev) => prev.filter((j) => j.id !== id));
-    } catch (e) {
-      alert("حدث خطأ أثناء الحذف");
+      showMsg("🗑️ تم حذف المهمة بنجاح");
+    } catch {
+      showMsg("حدث خطأ أثناء الحذف", true);
     }
   };
 
   const clearAllJobs = async () => {
-    if (!confirm("تحذير: هل تريد تفريغ وحذف جميع المهام والفيديوهات المصنوعة بالكامل من قاعدة البيانات؟")) return;
     try {
       await api.delete("/production/jobs");
       setJobs([]);
-      alert("🗑️ تم تفريغ كافة سجلات وفيديوهات الإنتاج بنجاح.");
-    } catch (e) {
-      alert("حدث خطأ أثناء التفريغ");
+      showMsg("🗑️ تم تفريغ كافة سجلات الإنتاج بنجاح");
+    } catch {
+      showMsg("حدث خطأ أثناء التفريغ", true);
     }
   };
 
@@ -111,18 +118,18 @@ export function VideoFactoryPage() {
         variationMode,
         videoStyle,
         avatarCharacter,
-        videoEngine
+        videoEngine,
       });
 
       if (!res.success || !res.jobs) {
-        alert("فشل طلب التوليد الحقيقي: " + (res.error || "خطأ من الخادم"));
+        showMsg("فشل طلب التوليد: " + (res.error || "خطأ من الخادم"), true);
         return;
       }
 
-      alert(`⚡ [LAUNCH CONFIRMED - تم إطلاق دفعة الإنتاج بنجاح]\n\nتم إطلاق وتوليد عدد (${res.jobs.length}) فيديو بالذكاء الاصطناعي للمنتج "${product}".\n\nيجري الآن الرندر والمعالجة في الخلفية وستظهر المهام الجديدة أعلى القائمة فوراً!`);
+      showMsg(`⚡ تم إطلاق ${res.jobs.length} فيديو للمنتج "${product}" — جاري المعالجة في الخلفية`);
       await fetchJobs();
     } catch (err: any) {
-      alert("حدث خطأ أثناء الاتصال بخادم الإنتاج الحقيقي: " + (err?.message || String(err)));
+      showMsg("حدث خطأ أثناء الاتصال بخادم الإنتاج: " + (err?.message || String(err)), true);
     } finally {
       setRunning(false);
     }
@@ -131,7 +138,7 @@ export function VideoFactoryPage() {
   const downloadAll = () => {
     const completedJobs = jobs.filter((j) => j.status === "done" && j.videoUrl);
     if (completedJobs.length === 0) {
-      alert("لا يوجد فيديوهات حقيقية مكتملة الرندر للتحميل حالياً.");
+      showMsg("لا يوجد فيديوهات مكتملة الرندر للتحميل حالياً");
       return;
     }
 

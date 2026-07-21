@@ -110,7 +110,12 @@ export function ChatPage() {
       });
 
       if (!res.ok) {
-        throw new Error("Failed to invoke agent");
+        let errStr = "Failed to invoke agent";
+        try {
+          const errData = await res.json();
+          if (errData.error) errStr = errData.error;
+        } catch(e) {}
+        throw new Error(errStr);
       }
 
       const data = await res.json();

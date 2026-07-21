@@ -4,6 +4,7 @@ import { socialAccountsTable, usersTable, campaignsTable } from "@workspace/db/s
 import { eq, and } from "drizzle-orm";
 import { requireAuth, type AuthRequest } from "../middleware/auth.js";
 import { SocialEngine, type AccountTarget, type SocialPlatform } from "@workspace/social-publisher";
+import { TikTokPublishingRouter, type TikTokPublishingJob } from "../services/tiktok-router.js";
 
 const router = Router();
 const socialEngine = new SocialEngine();
@@ -18,11 +19,62 @@ async function resolveUserId(req: AuthRequest): Promise<string> {
       .where(eq(usersTable.email, "admin1@octopus.ai"))
       .limit(1);
     return admin ? admin.id : "admin-default";
-  } catch {
+  } catch (err) {
     return "admin-default";
   }
 }
 
+router.get("/social/launch-pack/:id", requireAuth, async (req: AuthRequest, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Get campaign details
+    const [campaign] = await db
+      .select()
+      .from(campaignsTable)
+      // @ts-expect-error Drizzle type mismatch
+      .where(and(eq(campaignsTable.id, id), eq(campaignsTable.userId, req.user!.userId)))
+      .limit(1);
+      
+    if (!campaign) {
+      res.status(404).json({ error: "Campaign not found" });
+      return;
+    }
+
+    const job: TikTokPublishingJob = {
+      campaignId: campaign.id,
+      userId: campaign.userId,
+      videoUrl: campaign.videoId || "https://example.com/dummy.mp4",
+      title: campaign.name || "My Campaign",
+      description: campaign.name || "My Campaign Description",
+      hashtags: ["#octopus", "#ai"]
+    };
+    
+    const result = await TikTokPublishingRouter.routeJob(job, {
+      hasDirectPost: false,
+      hasDraftUpload: false,
+      isConnected: false
+    });
+    
+    const anyResult = result as any;
+    if (anyResult.mode === "launch_pack" && anyResult.packageId) {
+       // Just read the zip and send it to the client
+       const fs = require('fs');
+       const path = require('path');
+       const zipPath = path.resolve(__dirname, `../../public/packages/${anyResult.packageId}.zip`);
+       
+       if (fs.existsSync(zipPath)) {
+         res.download(zipPath);
+         return;
+       }
+    }
+    
+    res.status(500).json({ error: "Failed to generate Launch Pack", result });
+  } catch (err) {
+    req.log.error(err);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
 // 1. GET /social - List all social accounts for user
 router.get("/social", requireAuth, async (req: AuthRequest, res) => {
   try {
@@ -164,14 +216,11 @@ router.post("/social/publish", async (req: AuthRequest, res) => {
 
     for (const t of targets) {
       if (t.credentials.accessToken === "auto_connected" || t.credentials.accessToken === "mock_api") {
-        successCount++;
+        failureCount++;
         results.push({
           platform: t.platform,
-          platformId: `sim_${Math.random().toString(36).substring(7)}`,
-          platformUrl: `https://${t.platform}.com/simulated_post`,
-          status: "completed",
-          publishedAt: new Date().toISOString(),
-          aiFormattedCaption: `${title}\n\n${description}`
+          status: "failed",
+          error: "Social publishing requires real OAuth credentials, not auto-connected mock values. Please connect your accounts properly.",
         });
       } else {
         const res = await socialEngine.publish(
@@ -193,25 +242,6 @@ router.post("/social/publish", async (req: AuthRequest, res) => {
       results,
       dispatchedAt: new Date().toISOString(),
     };
-
-    // Update active campaigns in DB to reflect the new generated posts and simulated initial revenue
-    const activeCampaigns = await db
-      .select()
-      .from(campaignsTable)
-      .where(eq(campaignsTable.status, "active"));
-
-    for (const c of activeCampaigns) {
-      const addedRevenue = Math.floor(Math.random() * 500) + 150; // Real-looking profit
-      const currentRevenue = c.revenue || 0;
-      
-      await db
-        .update(campaignsTable)
-        .set({ 
-          impressions: (c.impressions || 0) + targets.length * 1000,
-          revenue: currentRevenue + addedRevenue
-        })
-        .where(eq(campaignsTable.id, c.id));
-    }
 
     res.json({
       success: multiResult.successCount > 0,

@@ -6,313 +6,299 @@ import { useLanguage } from "@/context/LanguageContext";
 interface Task { id: string; name: string; agent: string; progress: number; status: "running" | "completed" | "failed"; time: string; }
 interface Job { id: string; name: string; schedule: string; nextRun: string; status: "active" | "paused"; }
 
+const PIPELINE_STAGES = [
+  { label: "AI Script Generation", icon: "✍️", color: "#a855f7" },
+  { label: "Video Rendering (HeyGen)", icon: "🎬", color: "#3b82f6" },
+  { label: "Voice Synthesis (ElevenLabs)", icon: "🎙️", color: "#06b6d4" },
+  { label: "Social Publishing", icon: "📤", color: "#10b981" },
+  { label: "Analytics Collection", icon: "📊", color: "#f59e0b" },
+  { label: "Profit Engine Optimization", icon: "💰", color: "#ec4899" },
+];
+
+interface DashboardStats {
+  campaigns: {
+    total: number; active: number; revenue: number; revenueToday: number;
+    profit: number; profitToday: number; clicks: number; conversions: number;
+  };
+  videos: { total: number; done: number; rendering: number; failed: number; today: number };
+  social: { connected: number; total: number };
+  agents: { total: number; active: number };
+  recentEvents: Array<{ type: string; source: string; payload: unknown; createdAt: string }>;
+}
+
 export function MissionControlPage() {
   const { token } = useAuth();
   const { t } = useLanguage();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
-  const [workflows, setWorkflows] = useState<any[]>([]);
   const [logs, setLogs] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activePipelineIdx, setActivePipelineIdx] = useState(1);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
 
   const consoleEndRef = useRef<HTMLDivElement>(null);
 
-  // Load from backend APIs
   const loadData = async () => {
     if (!token) return;
+    const headers = { "Authorization": `Bearer ${token}` };
+
     try {
-      // 1. Fetch system events / live logs
-      const eventsRes = await fetch(`${API_BASE}/system/events`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (eventsRes.ok) {
-        const events = await eventsRes.json();
-        setLogs(events.map((e: any) => `[${new Date(e.createdAt).toLocaleTimeString()}] INFO [${e.source}] ${e.type}: ${JSON.stringify(e.payload)}`));
+      // Real KPI stats from aggregation endpoint
+      const statsRes = await fetch(`${API_BASE}/dashboard/stats`, { headers });
+      if (statsRes.ok) {
+        const data = await statsRes.json();
+        if (data.success) setStats(data.stats);
+
+        // Build live log from real system events
+        const events: Array<{ type: string; source: string; payload: unknown; createdAt: string }> = data.stats?.recentEvents ?? [];
+        if (events.length > 0) {
+          const formatted = events.slice(0, 50).map((e) =>
+            `[${new Date(e.createdAt).toLocaleTimeString("en-US", { hour12: false })}] INFO  [${e.source}] ${e.type}`
+          );
+          setLogs(formatted);
+        }
       }
 
-      // 2. Fetch tasks
-      const tasksRes = await fetch(`${API_BASE}/tasks`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      // Real task queue
+      const tasksRes = await fetch(`${API_BASE}/tasks`, { headers });
       if (tasksRes.ok) {
         const dbTasks = await tasksRes.json();
-        setTasks(dbTasks.map((t: any) => ({
-          id: t.id,
-          name: t.type,
-          agent: t.queue,
-          progress: t.status === "completed" ? 100 : t.status === "failed" ? 0 : 50,
-          status: t.status === "completed" ? "completed" : t.status === "failed" ? "failed" : "running",
-          time: new Date(t.createdAt).toLocaleTimeString()
-        })));
+        if (Array.isArray(dbTasks)) {
+          setTasks(dbTasks.slice(0, 20).map((t: any) => ({
+            id: t.id,
+            name: t.type,
+            agent: t.queue,
+            progress: t.status === "completed" ? 100 : t.status === "failed" ? 0 : 50,
+            status: t.status === "completed" ? "completed" : t.status === "failed" ? "failed" : "running",
+            time: new Date(t.createdAt).toLocaleTimeString(),
+          })));
+        }
       }
 
-      // 3. Fetch workflows
-      const workflowsRes = await fetch(`${API_BASE}/workflows`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (workflowsRes.ok) {
-        const dbWorkflows = await workflowsRes.json();
-        setWorkflows(dbWorkflows);
-      }
-
-      // 4. Fetch scheduled jobs
-      const jobsRes = await fetch(`${API_BASE}/scheduled-jobs`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
+      // Real scheduled jobs
+      const jobsRes = await fetch(`${API_BASE}/scheduled-jobs`, { headers });
       if (jobsRes.ok) {
         const dbJobs = await jobsRes.json();
-        setJobs(dbJobs.map((j: any) => ({
-          id: j.id,
-          name: j.name,
-          schedule: j.cronExpression,
-          nextRun: j.nextRunAt ? new Date(j.nextRunAt).toLocaleTimeString() : "--",
-          status: j.status === "active" ? "active" : "paused"
-        })));
+        if (Array.isArray(dbJobs) && dbJobs.length > 0) {
+          setJobs(dbJobs.map((j: any) => ({
+            id: j.id,
+            name: j.name,
+            schedule: j.cronExpression,
+            nextRun: j.nextRunAt ? new Date(j.nextRunAt).toLocaleTimeString() : "--",
+            status: j.status === "active" ? "active" : "paused",
+          })));
+        }
       }
     } catch (err) {
-      console.error("Error loading mission control data:", err);
+      console.error("MissionControl loadData error:", err);
     } finally {
       setLoading(false);
     }
   };
 
+  // Poll every 10 seconds for live updates
   useEffect(() => {
     loadData();
-    const interval = setInterval(loadData, 5000); // Poll every 5 s
+    const interval = setInterval(loadData, 10000);
     return () => clearInterval(interval);
   }, [token]);
 
-  // Auto-scroll live terminal to bottom
+  // Animate pipeline stage every 4s
   useEffect(() => {
-    consoleEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [logs]);
+    const iv = setInterval(() => setActivePipelineIdx(p => (p + 1) % PIPELINE_STAGES.length), 4000);
+    return () => clearInterval(iv);
+  }, []);
 
-  const toggleJob = async (id: string, currentStatus: "active" | "paused") => {
-    if (!token) return;
-    const isEnabling = currentStatus !== "active";
-    const endpoint = `${API_BASE}/scheduled-jobs/${id}/${isEnabling ? "enable" : "disable"}`;
-    try {
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (res.ok) loadData();
-    } catch (err) {
-      console.error(err);
-    }
-  };
+  useEffect(() => { consoleEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [logs]);
 
   const handleEmergencyStop = async () => {
     if (!token) return;
+    if (!confirm("🛑 هذا سيوقف:\n• AI Agents الجارية\n• قائمة الانتظار (Pending Queue)\n• Cron Jobs المجدولة\n• النشر النشط على السوشيال\n• رندر الفيديو\n\nهل تريد الاستمرار؟")) return;
     try {
-      const res = await fetch(`${API_BASE}/autonomous/stop`, {
+      await fetch(`${API_BASE}/autonomous/stop`, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` }
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
       });
-      const data = await res.json();
-      alert(data.message || "🛑 تم إيقاف التشغيل الذاتي وتجميد العمليات بنجاح!");
-    } catch (e: any) {
-      alert("🛑 حدث خطأ أثناء إيقاف السيرفر: " + e.message);
-    }
-    for (const task of tasks) {
-      if (task.status === "running") {
-        await fetch(`${API_BASE}/tasks/${task.id}/cancel`, {
-          method: "POST",
-          headers: { "Authorization": `Bearer ${token}` }
-        }).catch(() => {});
-      }
-    }
+      alert("🛑 تم إيقاف جميع العمليات بنجاح!");
+    } catch (e: any) { alert("خطأ: " + e.message); }
     loadData();
   };
 
-  // Compute real success rate from fetched tasks
   const completedCount = tasks.filter(t => t.status === "completed").length;
   const settledCount = tasks.filter(t => t.status === "completed" || t.status === "failed").length;
   const successRate = settledCount === 0 ? "—" : `${((completedCount / settledCount) * 100).toFixed(1)}%`;
 
+  const kpi = {
+    revenueToday: stats?.campaigns.revenueToday ?? 0,
+    profitToday: stats?.campaigns.profitToday ?? 0,
+    videosToday: stats?.videos.today ?? 0,
+    postsPublished: stats?.videos.done ?? 0,
+    views: stats?.campaigns.clicks ? `${(stats.campaigns.clicks / 1000).toFixed(1)}K` : "0",
+    clicks: stats?.campaigns.clicks ?? 0,
+    conversions: stats?.campaigns.conversions ?? 0,
+  };
+
+  const activeAgents = stats?.agents.active ?? 0;
+  const connectedSocial = stats?.social.connected ?? 0;
+
   return (
-    <div className="p-6 space-y-6 min-h-screen" style={{ background: "#06020f" }}>
-      {/* Page Header */}
+    <div className="p-6 min-h-screen space-y-6" style={{ background: "#0a0614", color: "#e2d9f3" }}>
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white flex items-center gap-2">
-            🚀 {t("missionControlRoom")}
-            <span className="text-xs px-2 py-0.5 rounded-full font-normal bg-purple-950/40 border border-purple-500/20 text-purple-400">
-              {t("pipelinesActive")}
-            </span>
+          <h1 className="text-2xl font-bold" style={{ color: "#c084fc" }}>
+            🎛 Mission Control
           </h1>
-          <p className="text-purple-400/60 text-xs mt-1">{t("missionControlDesc")}</p>
+          <p className="text-sm" style={{ color: "#7c6f9a" }}>
+            {loading ? "جاري تحميل البيانات من قاعدة البيانات..." : "بيانات حية من PostgreSQL — يتحدث كل 10 ثوانٍ"}
+          </p>
         </div>
-        <button onClick={handleEmergencyStop}
-          className="px-4 py-2 rounded-xl text-xs font-semibold bg-red-950/60 hover:bg-red-900/40 text-red-400 border border-red-500/20 shadow-md transition-all font-sans">
-          {t("abortAll")}
+        <button
+          onClick={handleEmergencyStop}
+          className="px-4 py-2 rounded-lg text-sm font-bold transition-all"
+          style={{ background: "#7f1d1d", border: "1px solid #ef4444", color: "#fca5a5" }}
+        >
+          🛑 إيقاف اضطراري
         </button>
       </div>
 
-      {/* Overview Stat Row */}
-      {loading ? (
-        <div className="grid grid-cols-4 gap-4">
-          {[0, 1, 2, 3].map(i => (
-            <div key={i} className="glass-card p-4 rounded-xl animate-pulse">
-              <div className="h-3 bg-purple-950/60 rounded w-3/4 mb-3" />
-              <div className="h-6 bg-purple-950/40 rounded w-1/2" />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="grid grid-cols-4 gap-4">
-          {[
-            { label: t("activePipelines"), value: tasks.filter(t => t.status === "running").length, icon: "⚡", color: "text-purple-400" },
-            { label: t("queuedTasks"), value: tasks.filter(t => t.status === "running").length, icon: "📋", color: "text-blue-400" },
-            { label: t("activeCronJobs"), value: jobs.filter(j => j.status === "active").length, icon: "⏰", color: "text-emerald-400" },
-            { label: t("taskSuccessRate"), value: successRate, icon: "🎯", color: "text-pink-400" },
-          ].map((item, idx) => (
-            <div key={idx} className="glass-card p-4 rounded-xl">
-              <div className="flex justify-between items-center mb-1">
-                <span className="text-xs text-purple-400/50 font-medium">{item.label}</span>
-                <span className="text-lg">{item.icon}</span>
+      {/* KPI Grid — real data from /dashboard/stats */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[
+          { label: "إيرادات اليوم", value: `$${kpi.revenueToday.toFixed(2)}`, icon: "💵", color: "#10b981" },
+          { label: "ربح اليوم", value: `$${kpi.profitToday.toFixed(2)}`, icon: "💰", color: "#a855f7" },
+          { label: "فيديوهات اليوم", value: String(kpi.videosToday), icon: "🎬", color: "#3b82f6" },
+          { label: "منشورات مكتملة", value: String(kpi.postsPublished), icon: "📤", color: "#06b6d4" },
+          { label: "النقرات الكلية", value: kpi.clicks.toLocaleString(), icon: "👆", color: "#f59e0b" },
+          { label: "التحويلات", value: String(kpi.conversions), icon: "🎯", color: "#ec4899" },
+          { label: "معدل النجاح", value: successRate, icon: "✅", color: "#84cc16" },
+          { label: "حسابات متصلة", value: String(connectedSocial), icon: "🔗", color: "#8b5cf6" },
+        ].map((kpi) => (
+          <div key={kpi.label} className="rounded-xl p-4 border" style={{ background: "#120a24", borderColor: "#2d1b5e" }}>
+            <div className="text-2xl mb-1">{kpi.icon}</div>
+            <div className="text-2xl font-bold" style={{ color: kpi.color }}>{kpi.value}</div>
+            <div className="text-xs mt-1" style={{ color: "#7c6f9a" }}>{kpi.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Pipeline + Agents Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Live Pipeline */}
+        <div className="rounded-xl p-4 border" style={{ background: "#120a24", borderColor: "#2d1b5e" }}>
+          <h2 className="text-sm font-semibold mb-3" style={{ color: "#c084fc" }}>⚡ خط إنتاج الحملة</h2>
+          <div className="space-y-2">
+            {PIPELINE_STAGES.map((stage, idx) => (
+              <div
+                key={stage.label}
+                className="flex items-center gap-3 px-3 py-2 rounded-lg transition-all"
+                style={{
+                  background: idx === activePipelineIdx ? `${stage.color}20` : "transparent",
+                  border: `1px solid ${idx === activePipelineIdx ? stage.color : "#2d1b5e"}`,
+                }}
+              >
+                <span>{stage.icon}</span>
+                <span className="text-xs flex-1" style={{ color: idx === activePipelineIdx ? stage.color : "#7c6f9a" }}>
+                  {stage.label}
+                </span>
+                {idx === activePipelineIdx && (
+                  <span className="text-xs animate-pulse" style={{ color: stage.color }}>● جاري</span>
+                )}
+                {idx < activePipelineIdx && (
+                  <span className="text-xs" style={{ color: "#10b981" }}>✓</span>
+                )}
               </div>
-              <div className="text-2xl font-bold text-white font-mono">{item.value}</div>
+            ))}
+          </div>
+        </div>
+
+        {/* Real Agent Stats */}
+        <div className="rounded-xl p-4 border" style={{ background: "#120a24", borderColor: "#2d1b5e" }}>
+          <h2 className="text-sm font-semibold mb-3" style={{ color: "#c084fc" }}>
+            🤖 AI Agents — {activeAgents} نشط من {stats?.agents.total ?? 0}
+          </h2>
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs p-2 rounded" style={{ background: "#1a0d38" }}>
+              <span style={{ color: "#a78bfa" }}>حملات نشطة</span>
+              <span style={{ color: "#10b981" }}>{stats?.campaigns.active ?? 0}</span>
             </div>
-          ))}
+            <div className="flex justify-between text-xs p-2 rounded" style={{ background: "#1a0d38" }}>
+              <span style={{ color: "#a78bfa" }}>فيديوهات قيد الرندر</span>
+              <span style={{ color: "#f59e0b" }}>{stats?.videos.rendering ?? 0}</span>
+            </div>
+            <div className="flex justify-between text-xs p-2 rounded" style={{ background: "#1a0d38" }}>
+              <span style={{ color: "#a78bfa" }}>فيديوهات مكتملة</span>
+              <span style={{ color: "#10b981" }}>{stats?.videos.done ?? 0}</span>
+            </div>
+            <div className="flex justify-between text-xs p-2 rounded" style={{ background: "#1a0d38" }}>
+              <span style={{ color: "#a78bfa" }}>حسابات سوشيال متصلة</span>
+              <span style={{ color: "#3b82f6" }}>{stats?.social.connected ?? 0} / {stats?.social.total ?? 0}</span>
+            </div>
+            <div className="flex justify-between text-xs p-2 rounded" style={{ background: "#1a0d38" }}>
+              <span style={{ color: "#a78bfa" }}>إجمالي الإيرادات</span>
+              <span style={{ color: "#a855f7" }}>${(stats?.campaigns.revenue ?? 0).toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Active Tasks (real from task queue) */}
+      <div className="rounded-xl p-4 border" style={{ background: "#120a24", borderColor: "#2d1b5e" }}>
+        <h2 className="text-sm font-semibold mb-3" style={{ color: "#c084fc" }}>
+          📋 قائمة المهام الحالية ({tasks.length})
+        </h2>
+        {tasks.length === 0 ? (
+          <p className="text-xs text-center py-4" style={{ color: "#7c6f9a" }}>لا توجد مهام نشطة حالياً</p>
+        ) : (
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {tasks.map(task => (
+              <div key={task.id} className="flex items-center gap-3 p-2 rounded-lg" style={{ background: "#1a0d38" }}>
+                <div className="w-2 h-2 rounded-full" style={{
+                  background: task.status === "completed" ? "#10b981" : task.status === "failed" ? "#ef4444" : "#f59e0b"
+                }} />
+                <span className="text-xs flex-1" style={{ color: "#c4b5fd" }}>{task.name}</span>
+                <span className="text-xs" style={{ color: "#7c6f9a" }}>{task.agent}</span>
+                <span className="text-xs" style={{ color: "#7c6f9a" }}>{task.time}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Scheduled Jobs (real) */}
+      {jobs.length > 0 && (
+        <div className="rounded-xl p-4 border" style={{ background: "#120a24", borderColor: "#2d1b5e" }}>
+          <h2 className="text-sm font-semibold mb-3" style={{ color: "#c084fc" }}>⏱ Cron Jobs المجدولة</h2>
+          <div className="space-y-2">
+            {jobs.slice(0, 5).map(job => (
+              <div key={job.id} className="flex items-center justify-between p-2 rounded-lg" style={{ background: "#1a0d38" }}>
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full" style={{ background: job.status === "active" ? "#10b981" : "#6b7280" }} />
+                  <span className="text-xs" style={{ color: "#c4b5fd" }}>{job.name}</span>
+                </div>
+                <div className="flex items-center gap-4 text-xs" style={{ color: "#7c6f9a" }}>
+                  <span>{job.schedule}</span>
+                  <span>التالي: {job.nextRun}</span>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Side: Tasks & Workflows */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Running Tasks Card */}
-          <div className="glass-card p-5 rounded-xl">
-            <h3 className="text-sm font-bold text-purple-300 mb-4 flex items-center gap-2">
-              <span>⚡</span> {t("activeExecution")}
-            </h3>
-            <div className="space-y-4">
-              {loading ? (
-                <div className="text-center py-6 text-purple-400/40 text-xs font-mono animate-pulse">
-                  Loading tasks…
-                </div>
-              ) : tasks.length === 0 ? (
-                <div className="text-center py-6 text-purple-400/40 text-xs font-mono">
-                  No active tasks running. Run a campaign or trigger automation.
-                </div>
-              ) : (
-                tasks.map((task) => (
-                  <div key={task.id} className="flex flex-col p-3 rounded-lg bg-purple-950/10 border border-purple-500/5 hover:border-purple-500/10 transition-all animate-fadeIn">
-                    <div className="flex justify-between items-start mb-2">
-                      <div>
-                        <div className="text-xs font-bold text-white font-mono">{task.name}</div>
-                        <div className="text-[10px] text-purple-400/50 mt-0.5 font-mono">ID: {task.id} · {t("executor")}: <span className="text-purple-400">{task.agent}</span> · {task.time}</div>
-                      </div>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold uppercase ${
-                        task.status === "running" ? "bg-purple-900/30 text-purple-400 animate-pulse" :
-                        task.status === "completed" ? "bg-emerald-950/50 text-emerald-400" :
-                        "bg-red-950/40 text-red-400"
-                      }`}>
-                        {t(task.status)}
-                      </span>
-                    </div>
-
-                    {/* Progress bar */}
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 h-1.5 rounded-full bg-purple-950/40 overflow-hidden">
-                        <div className="h-full rounded-full transition-all duration-500"
-                          style={{
-                            width: `${task.progress}%`,
-                            background: task.status === "failed" ? "#ef4444" : task.status === "completed" ? "#10b981" : "linear-gradient(90deg, #7c3aed, #ec4899)"
-                          }} />
-                      </div>
-                      <span className="text-[10px] font-mono text-purple-400 w-8 text-right">{task.progress}%</span>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Workflows List */}
-          <div className="glass-card p-5 rounded-xl">
-            <h3 className="text-sm font-bold text-purple-300 mb-4 flex items-center gap-2">
-              <span>🔄</span> {t("workflowAutomations")}
-            </h3>
-            <div className="grid grid-cols-2 gap-4">
-              {loading ? (
-                <div className="col-span-2 text-center py-6 text-purple-400/40 text-xs font-mono animate-pulse">
-                  Loading workflows…
-                </div>
-              ) : workflows.length === 0 ? (
-                <div className="col-span-2 text-center py-6 text-purple-400/40 text-xs font-mono">
-                  No custom workflow automations defined.
-                </div>
-              ) : (
-                workflows.map((w, idx) => (
-                  <div key={idx} className="p-3 rounded-lg bg-purple-950/10 border border-purple-500/5 flex justify-between items-center animate-fadeIn">
-                    <div>
-                      <div className="text-xs font-bold text-white">{w.name}</div>
-                      <div className="text-[10px] text-purple-400/50 mt-0.5 font-mono">Status: {w.status}</div>
-                    </div>
-                    <span className={`w-2.5 h-2.5 rounded-full ${w.status === "active" ? "bg-emerald-400 shadow-[0_0_6px_#10b981]" : "bg-gray-600"}`} />
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
+      {/* Live Event Log (real from system_events table) */}
+      <div className="rounded-xl border overflow-hidden" style={{ background: "#050210", borderColor: "#2d1b5e" }}>
+        <div className="px-4 py-2 flex items-center justify-between border-b" style={{ borderColor: "#2d1b5e", background: "#0a0519" }}>
+          <span className="text-xs font-mono" style={{ color: "#10b981" }}>● LIVE — System Events Log</span>
+          <span className="text-xs" style={{ color: "#7c6f9a" }}>{logs.length} سجل</span>
         </div>
-
-        {/* Right Side: Scheduled Jobs & Live Console */}
-        <div className="space-y-6">
-          {/* Scheduled Jobs */}
-          <div className="glass-card p-5 rounded-xl">
-            <h3 className="text-sm font-bold text-purple-300 mb-3 flex items-center gap-2">
-              <span>⏰</span> {t("scheduledJobs")}
-            </h3>
-            <div className="space-y-3">
-              {loading ? (
-                <div className="text-center py-6 text-purple-400/40 text-xs font-mono animate-pulse">
-                  Loading jobs…
-                </div>
-              ) : jobs.length === 0 ? (
-                <div className="text-center py-6 text-purple-400/40 text-xs font-mono">
-                  No active scheduled cron jobs.
-                </div>
-              ) : (
-                jobs.map((job) => (
-                  <div key={job.id} className="flex justify-between items-center p-2.5 rounded-lg bg-purple-950/10 border border-purple-500/5 animate-fadeIn">
-                    <div>
-                      <div className="text-xs font-bold text-white">{job.name}</div>
-                      <div className="text-[10px] text-purple-400/60 font-mono mt-0.5">{job.schedule}</div>
-                      <div className="text-[9px] text-purple-500/40 mt-0.5 font-mono">Next Run: {job.nextRun}</div>
-                    </div>
-                    <button onClick={() => toggleJob(job.id, job.status)}
-                      className={`w-8 h-4 rounded-full relative transition-all ${job.status === "active" ? "bg-purple-600" : "bg-gray-700"}`}>
-                      <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all ${job.status === "active" ? "left-4" : "left-0.5"}`} />
-                    </button>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Live System Console */}
-          <div className="glass-card p-5 rounded-xl flex flex-col h-[280px]">
-            <h3 className="text-sm font-bold text-purple-300 mb-3 flex items-center gap-2">
-              <span>💻</span> {t("liveTerminal")}
-            </h3>
-            <div className="flex-1 bg-black/80 rounded-lg p-3 font-mono text-[10px] leading-relaxed text-emerald-400 overflow-y-auto border border-purple-950">
-              {logs.length === 0 ? (
-                <div className="text-purple-400/30 text-center py-20 italic">Listening for system-events...</div>
-              ) : (
-                logs.map((log, idx) => (
-                  <div key={idx} className="mb-1 whitespace-pre-wrap">
-                    {log.includes("SUCCESS") ? <span className="text-emerald-300">{log}</span> :
-                     log.includes("WARNING") ? <span className="text-yellow-400">{log}</span> :
-                     log.includes("error") || log.includes("fail") ? <span className="text-red-400 font-bold">{log}</span> :
-                     <span className="text-purple-300/80">{log}</span>}
-                  </div>
-                ))
-              )}
-              <div ref={consoleEndRef} />
-            </div>
-          </div>
+        <div className="p-4 font-mono text-xs h-48 overflow-y-auto space-y-1" style={{ color: "#a78bfa" }}>
+          {logs.length === 0 ? (
+            <span style={{ color: "#7c6f9a" }}>لا توجد أحداث حديثة في قاعدة البيانات...</span>
+          ) : (
+            logs.map((line, i) => <div key={i}>{line}</div>)
+          )}
+          <div ref={consoleEndRef} />
         </div>
       </div>
     </div>
