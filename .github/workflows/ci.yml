@@ -131,10 +131,13 @@ jobs:
         pnpm --filter "@workspace/octopus-os" dev > frontend.log 2>&1 &
         sleep 10
         if ! pnpm exec playwright test e2e/dogfooding.spec.ts; then
-          echo "==== BACKEND LOG ===="
-          cat backend.log
-          echo "==== FRONTEND LOG ===="
-          cat frontend.log
+          echo "==== E2E FAILED. PUSHING LOGS TO BRANCH ===="
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git checkout -b ci-logs-branch
+          git add backend.log frontend.log
+          git commit -m "ci failure logs"
+          git push origin ci-logs-branch -f
           exit 1
         fi
       env:
