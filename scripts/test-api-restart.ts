@@ -48,7 +48,7 @@ async function run() {
 
   const startServer = () => {
     console.log("Starting API server...");
-    const child = spawn(process.platform === "win32" ? "pnpm.cmd" : "pnpm", ["run", "dev:api"], { 
+    const child = spawn(process.platform === "win32" ? "pnpm.cmd" : "pnpm", ["--filter", "@workspace/api-server", "start"], { 
       cwd: process.cwd(),
       env,
       stdio: "pipe",
