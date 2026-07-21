@@ -120,19 +120,19 @@ jobs:
     - name: Build Frontend & Backend
       run: pnpm run build
 
-    - name: Start Services for E2E
-      run: |
-        pnpm --filter "@workspace/api-server" start &
-        pnpm --filter "@workspace/octopus-os" dev &
-        sleep 10
-      env:
-        DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
-        
     - name: Install Playwright Browsers
       run: pnpm exec playwright install --with-deps chromium
 
-    - name: Playwright E2E
-      run: pnpm exec playwright test e2e/dogfooding.spec.ts
+    - name: Run E2E Dogfooding Test
+      run: |
+        sudo fuser -k 5002/tcp || true
+        sudo fuser -k 8081/tcp || true
+        pnpm --filter "@workspace/api-server" start &
+        pnpm --filter "@workspace/octopus-os" dev &
+        sleep 10
+        pnpm exec playwright test e2e/dogfooding.spec.ts
+      env:
+        DATABASE_URL: ${{ env.TEST_DATABASE_URL }}
 
     - name: API Restart Persistence Test
       run: pnpm exec tsx scripts/test-api-restart.ts
