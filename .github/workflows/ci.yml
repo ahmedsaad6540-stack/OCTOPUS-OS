@@ -131,7 +131,7 @@ jobs:
       run: pnpm exec playwright install --with-deps chromium
 
     - name: Playwright E2E
-      run: pnpm exec playwright test e2e/affiliate.spec.ts
+      run: pnpm exec playwright test e2e/dogfooding.spec.ts
 
     - name: API Restart Persistence Test
       run: pnpm exec tsx scripts/test-api-restart.ts
