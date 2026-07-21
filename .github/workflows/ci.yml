@@ -13,6 +13,7 @@ env:
   JWT_SECRET: "test-secret-long-enough-for-hs256"
   NODE_ENV: test
   PORT: 5002
+  BASE_PATH: /
 
 jobs:
   validate:
