@@ -188,7 +188,7 @@ router.post("/autonomous/generate-scripts", requireAuth, async (req: AuthRequest
   try {
     // Find Creator agent
     const agents = await db.select().from(agentsTable).where(eq(agentsTable.status, "active"));
-    const creator = agents.find(a => a.name.toLowerCase().includes("creator"));
+    const creator = agents.find((a: any) => a.name.toLowerCase().includes("creator"));
 
     if (!creator) {
       res.status(404).json({ success: false, error: "لم يتم العثور على وكيل Creator. تحقق من صفحة AI Agents." });
@@ -238,7 +238,7 @@ router.post("/autonomous/scan-trends", requireAuth, async (req: AuthRequest, res
 
   try {
     const agents = await db.select().from(agentsTable).where(eq(agentsTable.status, "active"));
-    const trendhunter = agents.find(a =>
+    const trendhunter = agents.find((a: any) =>
       a.name.toLowerCase().includes("trend") || a.name.toLowerCase().includes("hunter")
     );
 

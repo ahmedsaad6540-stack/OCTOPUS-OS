@@ -110,9 +110,9 @@ async function pollAndPublishActiveJobs() {
             .from(campaignsTable)
             .where(eq(campaignsTable.userId, job.userId));
 
-          const targetCampaign = campaigns.find(c => c.id === job.campaignId)
-            || campaigns.find(c => c.name.toLowerCase() === (job.productName || "").toLowerCase())
-            || campaigns.find(c => (job.productName || "").toLowerCase().includes(c.name.toLowerCase()));
+          const targetCampaign = campaigns.find((c: any) => c.id === job.campaignId)
+            || campaigns.find((c: any) => c.name.toLowerCase() === (job.productName || "").toLowerCase())
+            || campaigns.find((c: any) => (job.productName || "").toLowerCase().includes(c.name.toLowerCase()));
 
           const pub = await performAutonomousPublish(job, targetCampaign, videoUrl);
 

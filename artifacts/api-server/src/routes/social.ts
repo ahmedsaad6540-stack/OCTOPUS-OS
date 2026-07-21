@@ -201,7 +201,7 @@ router.post("/social/publish", async (req: AuthRequest, res) => {
     if (targets.length === 0) {
       res.status(400).json({
         error: `None of the requested platforms (${platforms.join(", ")}) are connected.`,
-        availableConnected: userAccounts.map((a) => a.platform),
+        availableConnected: userAccounts.map((a: any) => a.platform),
       });
       return;
     }

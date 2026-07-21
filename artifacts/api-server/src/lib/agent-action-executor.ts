@@ -44,8 +44,8 @@ export async function executeRealAgentAction(agentName: string, agentId: string,
 
       // Filter out any products already added as campaigns in the database
       const existingCampaigns = await db.select().from(campaignsTable);
-      const existingUrls = new Set(existingCampaigns.map(c => (c.productUrl || "").trim().toLowerCase()));
-      const existingNames = new Set(existingCampaigns.map(c => (c.productName || c.name || "").trim().toLowerCase()));
+      const existingUrls = new Set(existingCampaigns.map((c: any) => (c.productUrl || "").trim().toLowerCase()));
+      const existingNames = new Set(existingCampaigns.map((c: any) => (c.productName || c.name || "").trim().toLowerCase()));
 
       const unlaunched = allDiscovered.filter(p => 
         !existingUrls.has((p.productUrl || "").trim().toLowerCase()) &&

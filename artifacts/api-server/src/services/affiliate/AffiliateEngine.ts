@@ -34,14 +34,14 @@ export class AffiliateEngine {
       .from(affiliateConnectionsTable)
       .where(eq(affiliateConnectionsTable.userId, userId));
 
-    const activeNetworks = connectedNetworks.filter(n => n.status === "active" || n.status === "connected");
+    const activeNetworks = connectedNetworks.filter((n: any) => n.status === "active" || n.status === "connected");
 
     if (activeNetworks.length === 0) {
       return []; // No connected networks
     }
 
     // 2. Fetch products from each connected network in parallel
-    const promises = activeNetworks.map(async (networkRow) => {
+    const promises = activeNetworks.map(async (networkRow: any) => {
       // The DB schema currently uses provider
       const providerId = (networkRow as any).provider ?? "";
       const provider = this.providers.get(providerId);
