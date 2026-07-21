@@ -23,7 +23,7 @@ export function useCampaignStats(id: string | number) {
   return useQuery({
     queryKey: ["campaignStats", id],
     queryFn: () => campaignService.getCampaignStats(token!, id),
-    enabled: !!token && !!id,
+    enabled: !!token && !!id && !String(id).startsWith("temp-"),
     staleTime: 30 * 1000,
     refetchInterval: 15000,
   });

@@ -4,7 +4,7 @@ const archiver = require('archiver');
 
 
 const output = fs.createWriteStream(path.join(process.cwd(), 'octopus-os-final-release.zip'));
-const archive = archiver('zip', { zlib: { level: 9 } });
+const archive = archiver.create('zip', { zlib: { level: 9 } });
 
 output.on('close', function() {
   console.log(archive.pointer() + ' total bytes');

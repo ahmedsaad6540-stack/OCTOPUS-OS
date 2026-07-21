@@ -1,5 +1,7 @@
 // API base — uses the real backend in production, falls back to /api for local dev
-const envUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") || "https://api-server-production-4801.up.railway.app";
+const isDev = import.meta.env.DEV;
+const fallbackUrl = isDev ? "http://localhost:5002" : "https://api-server-production-4801.up.railway.app";
+const envUrl = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") || fallbackUrl;
 export const API_BASE = envUrl.endsWith("/api") ? envUrl : `${envUrl}/api`;
 
 function getToken(): string | null {

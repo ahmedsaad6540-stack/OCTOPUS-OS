@@ -32,7 +32,7 @@ import { BillingPage } from "@/pages/BillingPage";
 import { DeploymentPage } from "@/pages/DeploymentPage";
 import { SaaSPage } from "@/pages/SaaSPage";
 import { CampaignsPage } from "@/pages/CampaignsPage";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -59,7 +59,14 @@ function OS() {
   const { user, isLoading } = useAuth();
   const [page, setPage] = useState<Page>("command-center");
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [, navigate] = useLocation();
+  const [location, navigate] = useLocation();
+
+  useEffect(() => {
+    const path = location.replace(/^\//, "").split("?")[0];
+    if (path && path !== "login" && path !== "") {
+      setPage(path as Page);
+    }
+  }, [location]);
 
   if (isLoading) return (
     <div className="min-h-screen flex items-center justify-center bg-[#06020f]">
@@ -115,6 +122,7 @@ function OS() {
             currentPage={page}
             onNavigate={p => {
               setPage(p);
+              navigate("/" + p);
               setMobileOpen(false);
             }}
           />
@@ -129,6 +137,7 @@ function OS() {
                 currentPage={page}
                 onNavigate={p => {
                   setPage(p);
+                  navigate("/" + p);
                   setMobileOpen(false);
                 }}
               />
@@ -145,25 +154,29 @@ function OS() {
   );
 }
 
+import { ServiceProvider } from "@/context/ServiceContext";
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <LanguageProvider>
         <AuthProvider>
-          <Switch>
-            {/* Public landing, demo, legal pages — visible WITHOUT login */}
-            <Route path="/" component={LandingPage} />
-            <Route path="/demo" component={DemoShowcasePage} />
-            <Route path="/privacy" component={PrivacyPolicyPage} />
-            <Route path="/terms" component={TermsOfServicePage} />
-            <Route path="/data-deletion" component={DataDeletionPage} />
-            <Route path="/tiktok-integration" component={TikTokIntegrationPage} />
-            <Route path="/tiktok-wizard" component={TikTokReadinessWizard} />
-            {/* Login + full OS — all /login and everything else */}
-            <Route path="/login" component={() => <OS />} />
-            <Route path="/affiliates/callback" component={AffiliatesCallbackPage} />
-            <Route component={() => <OS />} />
-          </Switch>
+          <ServiceProvider>
+            <Switch>
+              {/* Public landing, demo, legal pages — visible WITHOUT login */}
+              <Route path="/" component={LandingPage} />
+              <Route path="/demo" component={DemoShowcasePage} />
+              <Route path="/privacy" component={PrivacyPolicyPage} />
+              <Route path="/terms" component={TermsOfServicePage} />
+              <Route path="/data-deletion" component={DataDeletionPage} />
+              <Route path="/tiktok-integration" component={TikTokIntegrationPage} />
+              <Route path="/tiktok-wizard" component={TikTokReadinessWizard} />
+              {/* Login + full OS — all /login and everything else */}
+              <Route path="/login" component={() => <OS />} />
+              <Route path="/affiliates/callback" component={AffiliatesCallbackPage} />
+              <Route component={() => <OS />} />
+            </Switch>
+          </ServiceProvider>
         </AuthProvider>
       </LanguageProvider>
     </QueryClientProvider>

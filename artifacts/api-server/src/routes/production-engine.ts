@@ -102,6 +102,28 @@ router.post("/generate-video-batch", requireAuth, async (req: AuthRequest, res) 
       if (job) batchJobs.push(job);
     }
 
+    // Process jobs asynchronously
+    setTimeout(async () => {
+      console.log(`[VideoBatch] Starting async video generation for ${batchJobs.length} jobs`);
+      const { videoEngine } = await import("../services/video/VideoEngine.js");
+      for (const job of batchJobs as any[]) {
+        try {
+          console.log(`[VideoBatch] Rendering job ${job.id}`);
+          await db.update(videoJobsTable).set({ status: "rendering_video", progress: 50 }).where(eq(videoJobsTable.id, job.id));
+          const videoUrl = await videoEngine.renderVideo(
+            { title: job.productName, hook: job.hook, body: [job.script], callToAction: "Link in bio" },
+            []
+          );
+          console.log(`[VideoBatch] Finished rendering job ${job.id}. Video URL: ${videoUrl}`);
+          await db.update(videoJobsTable).set({ status: "done", progress: 100, videoUrl, updatedAt: new Date() }).where(eq(videoJobsTable.id, job.id));
+        } catch (e) {
+          console.error(`[VideoBatch] Async video generation failed for job ${job.id}`, e);
+          await db.update(videoJobsTable).set({ status: "failed", progress: 0 }).where(eq(videoJobsTable.id, job.id));
+        }
+      }
+    }, 1000);
+
+
     await logOp(userId, "video_batch", "", "batch_queued", "OCTOPUS", "success",
       `Queued ${actualCount} production jobs for ${productName}`);
 
