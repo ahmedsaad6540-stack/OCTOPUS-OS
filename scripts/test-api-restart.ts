@@ -48,8 +48,8 @@ async function run() {
 
   const startServer = () => {
     console.log("Starting API server...");
-    const child = spawn(process.platform === "win32" ? "pnpm.cmd" : "pnpm", ["--filter", "@workspace/api-server", "start"], { 
-      cwd: process.cwd(),
+    const child = spawn("node", ["-r", "dotenv/config", "--enable-source-maps", "./dist/index.mjs"], { 
+      cwd: path.join(process.cwd(), "artifacts", "api-server"),
       env,
       stdio: "pipe",
       shell: true
