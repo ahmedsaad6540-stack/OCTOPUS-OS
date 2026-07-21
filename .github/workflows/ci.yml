@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ "main" ]
 
+permissions:
+  contents: write
+
 env:
   TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/octopus_test
   REDIS_URL: redis://localhost:6379
