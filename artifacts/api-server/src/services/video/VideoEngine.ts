@@ -78,12 +78,13 @@ export class VideoEngine {
     const fs = await import("node:fs/promises");
     const path = await import("node:path");
     const { fileURLToPath } = await import("node:url");
+    const { exec } = await import("node:child_process");
+    const { promisify } = await import("node:util");
+    const execAsync = promisify(exec);
 
-    // In a real system we'd use FFmpeg here. For guaranteed path, we generate a playable mp4 copy.
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const publicRendersDir = path.resolve(__dirname, "../../../../public/renders");
-    const sourceMp4 = path.resolve(__dirname, "../../../../public/renders/dummy.mp4");
     
     await fs.mkdir(publicRendersDir, { recursive: true });
 
@@ -91,10 +92,12 @@ export class VideoEngine {
     const destMp4 = path.join(publicRendersDir, fileName);
 
     try {
-      await fs.copyFile(sourceMp4, destMp4);
-    } catch (e) {
-      // Fallback if dummy.mp4 doesn't exist
-      await fs.writeFile(destMp4, "MOCK_VIDEO_DATA");
+      // Run real FFmpeg to generate a 1-second 1080x1920 MP4
+      const cmd = `ffmpeg -f lavfi -i color=c=blue:s=1080x1920:r=30 -t 1 -c:v libx264 -pix_fmt yuv420p "${destMp4}"`;
+      await execAsync(cmd);
+    } catch (e: any) {
+      console.error("FFmpeg rendering failed:", e);
+      throw new Error(`Video rendering failed: ${e.message}`);
     }
 
     const host = process.env.PUBLIC_URL || "http://localhost:5002";
