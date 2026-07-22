@@ -49,7 +49,9 @@ export function ChatPage() {
         });
         if (res.ok) {
           const data = await res.json();
-          const active = data.filter((a: any) => a.status === "active");
+          // Backend might return { agents: [...] } or just [...]
+          const agentList = Array.isArray(data) ? data : (data.agents || []);
+          const active = agentList.filter((a: any) => a.status === "active");
           setAgents(
             active.map((a: any) => ({
               id: a.id,
