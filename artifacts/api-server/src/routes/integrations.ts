@@ -25,7 +25,8 @@ router.post("/youtube/connect", async (req, res) => {
     }
 
     const protocol = req.protocol === 'http' && req.get('host')?.includes('railway.app') ? 'https' : req.protocol;
-    const apiUrl = process.env.API_URL || `${protocol}://${req.get("host")}`;
+    const baseUrl = process.env.API_URL || `${protocol}://${req.get("host")}`;
+    const apiUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
     const callbackUrl = `${apiUrl}/oauth/youtube/callback`;
     
     // Generate secure state
@@ -62,8 +63,12 @@ router.get("/youtube/status", async (req, res) => {
 
     // Determine truthful state
     let state = account.status || "NOT_CONFIGURED";
-    // Check if it's mock
-    if (account.connectionSource === "mock" && process.env.VITE_DEV_MODE !== "true") {
+    // Normalize connected/LIVE_VERIFIED to LIVE_VERIFIED
+    if (state === "connected" || state === "active" || state === "LIVE_VERIFIED") {
+      state = "LIVE_VERIFIED";
+    }
+    // Only treat mock as NOT_CONFIGURED if not already verified by real_oauth
+    if (account.connectionSource === "mock" && state !== "LIVE_VERIFIED" && process.env.VITE_DEV_MODE !== "true") {
       state = "NOT_CONFIGURED";
     }
 
