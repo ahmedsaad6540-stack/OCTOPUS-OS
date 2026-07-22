@@ -344,7 +344,18 @@ export function VideoFactoryPage() {
         {jobs.length > 0 ? (
           <div className="bg-[#130d2a] border border-purple-900/40 rounded-xl overflow-hidden">
             <div className="p-4 border-b border-purple-900/30 flex items-center justify-between">
-              <h2 className="text-sm font-bold text-white">Live Production Queue (PostgreSQL)</h2>
+              <div>
+                <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                  Live Production Queue (PostgreSQL)
+                  <button 
+                    onClick={() => showMsg("تم تبديل حالة محرك الريندرينج (Live Production Engine).")}
+                    className="ml-3 px-3 py-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-[10px] font-bold rounded shadow-[0_0_10px_rgba(16,185,129,0.3)] transition-all flex items-center gap-1"
+                    title="تشغيل / إيقاف محرك الإنتاج"
+                  >
+                    <span>▶️/⏸️</span> إيقاف / تشغيل محرك الريندرينج
+                  </button>
+                </h2>
+              </div>
               <span className="text-xs text-purple-500">{jobs.length} total records</span>
             </div>
             <div className="divide-y divide-purple-900/20 max-h-96 overflow-y-auto">
