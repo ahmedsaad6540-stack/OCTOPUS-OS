@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { API_BASE } from "@/lib/api";
+import { YouTubeConnectionCard } from "@/components/social/YouTubeConnectionCard";
 
 const PLATFORMS = [
   { id: "tiktok",    icon: "🎵", name: "TikTok",      color: "#ff0050" },
@@ -44,6 +45,7 @@ interface ProviderRecord {
   displayName: string;
   status: string;
   followers?: string;
+  connectionSource?: string;
 }
 
 export function SocialPage() {
@@ -477,26 +479,32 @@ export function SocialPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          {fields.filter(Boolean).map(field => (
-            <div key={field}>
-              <label className="text-xs text-purple-400 mb-1 block">{field}</label>
-              <input
-                type={field.toLowerCase().includes("secret") || field.toLowerCase().includes("token") || field.toLowerCase().includes("password") ? "password" : "text"}
-                value={values[selected]?.[field] || ""}
-                onChange={e => setVal(field, e.target.value)}
-                placeholder={`Enter ${field.toLowerCase()}...`}
-                className="w-full px-3 py-2.5 rounded-lg text-xs text-white outline-none transition-all"
-                style={{ background: "#0d0920", border: "1px solid rgba(139,92,246,0.2)" }}
-              />
+        {selected === "youtube" ? (
+          <YouTubeConnectionCard />
+        ) : (
+          <>
+            <div className="grid grid-cols-2 gap-4 mb-6">
+              {fields.filter(Boolean).map(field => (
+                <div key={field}>
+                  <label className="text-xs text-purple-400 mb-1 block">{field}</label>
+                  <input
+                    type={field.toLowerCase().includes("secret") || field.toLowerCase().includes("token") || field.toLowerCase().includes("password") ? "password" : "text"}
+                    value={values[selected]?.[field] || ""}
+                    onChange={e => setVal(field, e.target.value)}
+                    placeholder={`Enter ${field.toLowerCase()}...`}
+                    className="w-full px-3 py-2.5 rounded-lg text-xs text-white outline-none transition-all"
+                    style={{ background: "#0d0920", border: "1px solid rgba(139,92,246,0.2)" }}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
 
-        <button onClick={saveConfig} disabled={saving}
-          className="px-6 py-2.5 rounded-xl text-xs font-semibold text-white gradient-purple glow-purple">
-          {saving ? "⟳ Saving..." : "💾 Save Configuration"}
-        </button>
+            <button onClick={saveConfig} disabled={saving}
+              className="px-6 py-2.5 rounded-xl text-xs font-semibold text-white gradient-purple glow-purple">
+              {saving ? "⟳ Saving..." : "💾 Save Configuration"}
+            </button>
+          </>
+        )}
 
         {/* OAuth URI */}
         <div className="mt-6 card-os p-4">

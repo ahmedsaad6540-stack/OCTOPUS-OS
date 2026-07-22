@@ -32,6 +32,7 @@ import dashboardRouter from "./dashboard.js";
 import analyticsRouter from "./analytics.js";
 import securityRouter from "./security.js";
 import campaignDraftsRouter from "./campaign-drafts.js";
+import integrationsRouter from "./integrations.js";
 
 const router: IRouter = Router();
 
@@ -68,5 +69,6 @@ router.use(geminiChatRouter);
 router.use(dashboardRouter);
 router.use(analyticsRouter);
 router.use(securityRouter);
+router.use("/integrations", integrationsRouter);
 
 export default router;

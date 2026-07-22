@@ -253,7 +253,7 @@ export function AffiliatesPage() {
           </div>
         )}
 
-        {isDemoMode && (
+        {isDevMode && (
           <div className="mt-auto px-3">
             <div className="bg-yellow-900/30 border border-yellow-700/50 p-2 rounded text-[10px] text-yellow-500 font-bold text-center">
               AFFILIATE_DEMO_MODE=true

@@ -8,22 +8,7 @@ import { randomBytes } from "node:crypto";
 
 const router = Router();
 
-// In-memory OAuth state store (expires in 10 minutes)
-interface OAuthState {
-  userId: string;
-  expiresAt: number;
-}
-const oauthStates = new Map<string, OAuthState>();
-
-// Clean up expired states every 5 minutes
-setInterval(() => {
-  const now = Date.now();
-  for (const [key, state] of oauthStates.entries()) {
-    if (now > state.expiresAt) {
-      oauthStates.delete(key);
-    }
-  }
-}, 5 * 60 * 1000);
+import { createOAuthState, consumeOAuthState } from "../lib/oauth-state.js";
 
 // ── CONNECT / REDIRECT ENDPOINT ──────────────────────────────────────────────
 router.get("/oauth/:platform/connect", async (req, res) => {
@@ -61,11 +46,7 @@ router.get("/oauth/:platform/connect", async (req, res) => {
     const callbackUrl = `${apiUrl}/oauth/${platform}/callback`;
     
     // Generate secure random state and store it
-    const state = randomBytes(32).toString("hex");
-    oauthStates.set(state, {
-      userId,
-      expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
-    });
+    const state = createOAuthState(userId);
 
     let authUrl = "";
     if (platform === "tiktok") {
@@ -109,17 +90,9 @@ router.get("/oauth/:platform/callback", async (req, res) => {
   }
 
   // Validate the secure one-time state
-  const storedState = oauthStates.get(state);
+  const storedState = consumeOAuthState(state);
   if (!storedState) {
     res.status(400).send("Invalid or expired OAuth state. Please try again.");
-    return;
-  }
-  
-  // Consume the state (One-time enforcement)
-  oauthStates.delete(state);
-
-  if (Date.now() > storedState.expiresAt) {
-    res.status(400).send("OAuth state expired. Please try again.");
     return;
   }
 
@@ -299,7 +272,7 @@ router.get("/oauth/:platform/callback", async (req, res) => {
       });
     }
 
-    res.redirect(`${frontendUrl}/`);
+    res.redirect(`${frontendUrl}/social?provider=${platform}&status=success`);
   } catch (err) {
     logger.error(err, "OAuth callback processing error");
     res.status(500).send("OAuth integration processing failed");
