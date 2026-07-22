@@ -87,19 +87,64 @@ router.post("/chat", requireAuth, async (req: AuthRequest, res) => {
         body: JSON.stringify(payload),
       });
 
-      if (!geminiRes.ok) {
-        // If we hit a rate limit (429) but we ALREADY successfully executed an intent, just gracefully fallback.
-        if (geminiRes.status === 429 && thoughtLog && thoughtLog.length > 0) {
-          reply = "لقد وصلت للحد الأقصى المجاني من محادثات Gemini، ولكنني قمت بتنفيذ طلبك بنجاح في الخلفية (انظر لسجل الأفكار).";
+        if (geminiRes.status === 429 || !geminiRes.ok) {
+          console.warn(`[AI Router] Gemini failed with status ${geminiRes.status}. Attempting OpenAI fallback...`);
+          const OPENAI_API_KEY = process.env["OPENAI_API_KEY"];
+          
+          if (OPENAI_API_KEY) {
+            // Transform history for OpenAI
+            const openAiMessages = [{ role: "system", content: systemContext }];
+            if (history && history.length > 0) {
+              for (const h of history.slice(-10)) {
+                openAiMessages.push({
+                  role: h.role === "agent" ? "assistant" : "user",
+                  content: h.text
+                });
+              }
+            }
+            openAiMessages.push({ role: "user", content: message });
+
+            const openAiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${OPENAI_API_KEY}`
+              },
+              body: JSON.stringify({
+                model: "gpt-4o-mini", // Fast and cheap fallback
+                messages: openAiMessages,
+                temperature: 0.8,
+                max_tokens: 1024
+              })
+            });
+
+            if (openAiRes.ok) {
+              const openAiData = await openAiRes.json() as any;
+              reply = openAiData.choices?.[0]?.message?.content || "عذراً، لم أتلق ردًا من OpenAI.";
+              
+              res.json({
+                reply,
+                thoughtLog: thoughtLog ? [...thoughtLog, "🔄 Switched to OpenAI (GPT-4o) automatically due to Gemini limits."] : ["🔄 Switched to OpenAI (GPT-4o) automatically due to Gemini limits."],
+                model: "gpt-4o-mini (Fallback)",
+                agentName: agentName || "OCTOPUS Brain",
+                timestamp: new Date().toISOString(),
+              });
+              return;
+            }
+          }
+
+          // If no fallback succeeded
+          if (geminiRes.status === 429 && thoughtLog && thoughtLog.length > 0) {
+            reply = "لقد وصلت للحد الأقصى المجاني من محادثات Gemini، ولكنني قمت بتنفيذ طلبك بنجاح في الخلفية.";
+          } else {
+            const errText = await geminiRes.text();
+            res.status(502).json({ error: `Gemini API error (${geminiRes.status}): ${errText}` });
+            return;
+          }
         } else {
-          const errText = await geminiRes.text();
-          res.status(502).json({ error: `Gemini API error (${geminiRes.status}): ${errText}` });
-          return;
+          const geminiData = await geminiRes.json() as any;
+          reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "عذراً، لم أتلق ردًا من Gemini.";
         }
-      } else {
-        const geminiData = await geminiRes.json() as any;
-        reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "عذراً، لم أتلق ردًا من Gemini.";
-      }
     } catch (networkErr) {
       if (thoughtLog && thoughtLog.length > 0) {
         reply = "حدث خطأ في الاتصال بنموذج Gemini، ولكن تم تنفيذ أمرك بنجاح في النظام.";
@@ -156,16 +201,47 @@ router.post("/chat/generate-content", requireAuth, async (req: AuthRequest, res)
       generationConfig: { temperature: 0.9, maxOutputTokens: 2048, topP: 0.95 }
     };
 
+    let content = "";
     const geminiRes = await fetch(GEMINI_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
-    const geminiData = await geminiRes.json() as any;
-    const content = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+    if (geminiRes.status === 429 || !geminiRes.ok) {
+      console.warn(`[Content Gen Router] Gemini failed with status ${geminiRes.status}. Attempting OpenAI fallback...`);
+      const OPENAI_API_KEY = process.env["OPENAI_API_KEY"];
+      
+      if (OPENAI_API_KEY) {
+        const openAiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: "gpt-4o-mini", // Fast and cheap fallback
+            messages: [{ role: "user", content: prompt }],
+            temperature: 0.9,
+            max_tokens: 2048
+          })
+        });
 
-    res.json({ content, type, product, platform, generatedAt: new Date().toISOString() });
+        if (openAiRes.ok) {
+          const openAiData = await openAiRes.json() as any;
+          content = openAiData.choices?.[0]?.message?.content || "";
+          res.json({ content, type, product, platform, generatedAt: new Date().toISOString(), model: "gpt-4o-mini (Fallback)" });
+          return;
+        }
+      }
+      res.status(502).json({ error: "Gemini AI limit reached and OpenAI fallback failed or not configured." });
+      return;
+    }
+
+    const geminiData = await geminiRes.json() as any;
+    content = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "";
+
+    res.json({ content, type, product, platform, generatedAt: new Date().toISOString(), model: GEMINI_MODEL });
   } catch (err) {
     res.status(500).json({ error: String(err) });
   }
