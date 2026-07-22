@@ -79,8 +79,36 @@ router.post("/chat", requireAuth, async (req: AuthRequest, res) => {
     const geminiData = await geminiRes.json() as any;
     const reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "عذراً، لم أتلق ردًا من Gemini.";
 
+    // Simple Intent Recognition: Trigger internal system agents if the user asks for operations
+    let thoughtLog: string[] | undefined = undefined;
+    try {
+      const msgLower = message.toLowerCase();
+      // Import dynamically to avoid circular dependencies
+      const { executeRealAgentAction } = await import("../lib/agent-action-executor.js");
+      
+      if (msgLower.includes("فيديو") || msgLower.includes("video") || msgLower.includes("صنع") || msgLower.includes("render")) {
+        const actionResult = await executeRealAgentAction("Creator Agent", "chat", "chat-run", message, req.user?.userId) as any;
+        thoughtLog = [
+          "🎬 " + (actionResult?.taskExecuted || "Started Video Generation"),
+          `Product: ${actionResult?.product || "Unknown"}`,
+          `Job Status: ${actionResult?.status || "Queued"}`
+        ];
+      } else if (msgLower.includes("منتج") || msgLower.includes("product") || msgLower.includes("تريند") || msgLower.includes("trend")) {
+        const actionResult = await executeRealAgentAction("TrendHunter", "chat", "chat-run", message, req.user?.userId) as any;
+        thoughtLog = [
+          "🔥 " + (actionResult?.taskExecuted || "Scanned Amazon & Digistore24"),
+          `Discovered: ${actionResult?.discoveredCount || 0} products`,
+          `Unlaunched: ${actionResult?.unlaunchedCount || 0} products`
+        ];
+      }
+    } catch (err) {
+      console.error("Agent execution error:", err);
+      thoughtLog = ["⚠️ Failed to execute system agent command."];
+    }
+
     res.json({
       reply,
+      thoughtLog,
       model: GEMINI_MODEL,
       agentName: agentName || "OCTOPUS Brain",
       timestamp: new Date().toISOString(),

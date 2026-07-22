@@ -22,7 +22,7 @@ export function ChatPage() {
   const { token } = useAuth();
   const { t } = useLanguage();
   const [agents, setAgents] = useState<AgentOption[]>([]);
-  const [selectedAgentId, setSelectedAgentId] = useState<string>("");
+  const [selectedAgentId, setSelectedAgentId] = useState<string>("system");
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(false);
@@ -59,9 +59,6 @@ export function ChatPage() {
               description: a.description || "Virtual Worker",
             }))
           );
-          if (active.length > 0) {
-            setSelectedAgentId(active[0].id);
-          }
         }
       } catch (err) {
         console.error(err);
@@ -175,16 +172,14 @@ export function ChatPage() {
             onChange={e => setSelectedAgentId(e.target.value)}
             className="bg-purple-950/50 text-white border border-purple-500/20 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-purple-500/40 font-heading"
           >
+            <option value="system" className="bg-[#0c051a]">
+              OCTOPUS System Brain (Orchestrator)
+            </option>
             {agents.map(a => (
               <option key={a.id} value={a.id} className="bg-[#0c051a]">
                 {a.name} ({a.description})
               </option>
             ))}
-            {agents.length === 0 && (
-              <option value="" className="bg-[#0c051a]">
-                {t("noActiveAgents")}
-              </option>
-            )}
           </select>
         </div>
       </div>
