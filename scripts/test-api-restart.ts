@@ -178,7 +178,9 @@ async function run() {
     console.log("Restart persistence validation successful.");
 
   } finally {
-    apiProcess.kill("SIGKILL");
+    try { apiProcess.kill("SIGKILL"); } catch(e) {}
+    console.log("Exiting test-api-restart.ts");
+    process.exit(0);
   }
 }
 
