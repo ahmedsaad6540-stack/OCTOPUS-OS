@@ -387,6 +387,7 @@ export function AffiliatesPage() {
               </button>
             </div>
           </div>
+        )}
       </div>
 
       {/* Smart Navigation Bar */}
