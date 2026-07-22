@@ -4,7 +4,26 @@ import { socialAccountsTable } from "@workspace/db/schema";
 import { eq, and } from "drizzle-orm";
 import { logger } from "../lib/logger.js";
 
+import { randomBytes } from "node:crypto";
+
 const router = Router();
+
+// In-memory OAuth state store (expires in 10 minutes)
+interface OAuthState {
+  userId: string;
+  expiresAt: number;
+}
+const oauthStates = new Map<string, OAuthState>();
+
+// Clean up expired states every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, state] of oauthStates.entries()) {
+    if (now > state.expiresAt) {
+      oauthStates.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
 
 // ── CONNECT / REDIRECT ENDPOINT ──────────────────────────────────────────────
 router.get("/oauth/:platform/connect", async (req, res) => {
@@ -40,7 +59,13 @@ router.get("/oauth/:platform/connect", async (req, res) => {
 
     const apiUrl = process.env.API_URL || `${req.protocol}://${req.get("host")}`;
     const callbackUrl = `${apiUrl}/oauth/${platform}/callback`;
-    const state = JSON.stringify({ userId });
+    
+    // Generate secure random state and store it
+    const state = randomBytes(32).toString("hex");
+    oauthStates.set(state, {
+      userId,
+      expiresAt: Date.now() + 10 * 60 * 1000, // 10 minutes
+    });
 
     let authUrl = "";
     if (platform === "tiktok") {
@@ -83,8 +108,23 @@ router.get("/oauth/:platform/callback", async (req, res) => {
     return;
   }
 
+  // Validate the secure one-time state
+  const storedState = oauthStates.get(state);
+  if (!storedState) {
+    res.status(400).send("Invalid or expired OAuth state. Please try again.");
+    return;
+  }
+  
+  // Consume the state (One-time enforcement)
+  oauthStates.delete(state);
+
+  if (Date.now() > storedState.expiresAt) {
+    res.status(400).send("OAuth state expired. Please try again.");
+    return;
+  }
+
   try {
-    const { userId } = JSON.parse(state) as { userId: string };
+    const userId = storedState.userId;
 
     // Fetch the client credentials saved by the user
     const [accConfig] = await db
