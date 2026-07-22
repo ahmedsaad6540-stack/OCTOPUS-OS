@@ -55,8 +55,15 @@ import { errorHandler } from "./middleware/error.js";
 
 app.use("/api", apiRateLimiter, router);
 
+import oauthRouter from "./routes/oauth.js";
+app.use(oauthRouter); // Mount at root so /oauth/... works
+
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 app.get("/readiness", (req, res) => res.json({ status: "ready" }));
+
+app.get("/", (req, res) => {
+  res.redirect(process.env.FRONTEND_URL || "https://finalsnapshot.vercel.app");
+});
 
 app.use(errorHandler);
 
