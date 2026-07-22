@@ -26,6 +26,11 @@ export function requireAuth(
   res: Response,
   next: NextFunction,
 ): void {
+  if (req.method === "OPTIONS") {
+    next();
+    return;
+  }
+
   const authHeader = req.headers.authorization;
   const token =
     authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
