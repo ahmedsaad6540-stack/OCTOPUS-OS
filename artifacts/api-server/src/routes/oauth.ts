@@ -43,7 +43,8 @@ router.get("/oauth/:platform/connect", async (req, res) => {
     }
 
     const protocol = req.protocol === 'http' && req.get('host')?.includes('railway.app') ? 'https' : req.protocol;
-    const apiUrl = process.env.API_URL || `${protocol}://${req.get("host")}`;
+    const baseUrl = process.env.API_URL || `${protocol}://${req.get("host")}`;
+    const apiUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
     const callbackUrl = `${apiUrl}/oauth/${platform}/callback`;
     
     // Generate secure random state and store it
@@ -123,7 +124,8 @@ router.get("/oauth/:platform/callback", async (req, res) => {
       }
     }
     const protocol = req.protocol === 'http' && req.get('host')?.includes('railway.app') ? 'https' : req.protocol;
-    const apiUrl = process.env.API_URL || `${protocol}://${req.get("host")}`;
+    const baseUrl = process.env.API_URL || `${protocol}://${req.get("host")}`;
+    const apiUrl = baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
     const callbackUrl = `${apiUrl}/oauth/${platform}/callback`;
 
     let accessToken = "";
