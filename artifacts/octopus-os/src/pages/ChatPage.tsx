@@ -23,7 +23,19 @@ export function ChatPage() {
   const { t } = useLanguage();
   const [agents, setAgents] = useState<AgentOption[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState<string>("system");
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>(() => {
+    try {
+      const saved = localStorage.getItem("octopus_chat_messages");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Persist messages whenever they change
+  useEffect(() => {
+    localStorage.setItem("octopus_chat_messages", JSON.stringify(messages));
+  }, [messages]);
   const [inputValue, setInputValue] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeThoughts, setActiveThoughts] = useState<string[]>([]);
@@ -71,6 +83,57 @@ export function ChatPage() {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, activeThoughts]);
+
+  // --- Speech to Text (Microphone) ---
+  const [isListening, setIsListening] = useState(false);
+  const handleListen = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("عذراً، متصفحك لا يدعم الإدخال الصوتي.");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "ar-SA";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = (e: any) => {
+      console.error("Speech recognition error", e);
+      setIsListening(false);
+    };
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setInputValue((prev) => prev + (prev ? " " : "") + transcript);
+    };
+    recognition.start();
+  };
+
+  // --- Text to Speech (Speaker) ---
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const handleSpeak = (text: string, id: string) => {
+    if (!("speechSynthesis" in window)) {
+      alert("عذراً، متصفحك لا يدعم القراءة الصوتية.");
+      return;
+    }
+    if (speakingId === id) {
+      window.speechSynthesis.cancel();
+      setSpeakingId(null);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    const arVoice = voices.find(v => v.lang.startsWith('ar'));
+    if (arVoice) utterance.voice = arVoice;
+    else utterance.lang = "ar-SA";
+    
+    utterance.onend = () => setSpeakingId(null);
+    utterance.onerror = () => setSpeakingId(null);
+    setSpeakingId(id);
+    window.speechSynthesis.speak(utterance);
+  };
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,7 +215,6 @@ export function ChatPage() {
 
   return (
     <div className="p-6 space-y-6 min-h-screen flex flex-col justify-between" style={{ background: "#06020f" }}>
-      {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white flex items-center gap-2">
@@ -164,16 +226,27 @@ export function ChatPage() {
           <p className="text-purple-400/60 text-xs mt-1">{t("agentTerminalDesc")}</p>
         </div>
 
-        {/* Selected Agent Dropdown */}
-        <div className="flex items-center gap-2">
-          <label className="text-xs text-purple-400">{t("selectWorker")}:</label>
+        <div className="flex items-center gap-4">
+          {messages.length > 0 && (
+            <button
+              onClick={() => {
+                setMessages([]);
+                localStorage.removeItem("octopus_chat_messages");
+              }}
+              className="text-xs px-3 py-1.5 rounded-xl bg-red-950/20 text-red-400 border border-red-500/20 hover:bg-red-950/40 transition-colors"
+            >
+              🗑️ مسح المحادثة
+            </button>
+          )}
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-purple-400">{t("selectWorker")}:</label>
           <select
             value={selectedAgentId}
             onChange={e => setSelectedAgentId(e.target.value)}
             className="bg-purple-950/50 text-white border border-purple-500/20 rounded-xl px-3 py-1.5 text-xs outline-none focus:border-purple-500/40 font-heading"
           >
             <option value="system" className="bg-[#0c051a]">
-              OCTOPUS System Brain (Orchestrator)
+              عقل النظام المدبر (OCTOPUS Brain)
             </option>
             {agents.map(a => (
               <option key={a.id} value={a.id} className="bg-[#0c051a]">
@@ -183,18 +256,16 @@ export function ChatPage() {
           </select>
         </div>
       </div>
+      </div>
 
-      {/* AI Provider notice */}
       {hasProviderConfig === false && (
         <div className="px-4 py-3 rounded-xl text-xs bg-amber-900/20 border border-amber-500/30 text-amber-400 flex items-center gap-2">
           ⚠️ Configure an AI provider in <strong>AI Providers</strong> page first before sending messages.
         </div>
       )}
 
-      {/* Main chat layout */}
       <div className="flex-1 glass-card rounded-2xl flex flex-col overflow-hidden h-[450px] border border-purple-950">
 
-        {/* Messages viewport */}
         <div className="flex-1 p-5 overflow-y-auto space-y-4 scrollbar-thin">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center space-y-3">
@@ -208,12 +279,21 @@ export function ChatPage() {
 
           {messages.map(m => (
             <div key={m.id} className={`flex flex-col ${m.sender === "user" ? "items-end" : "items-start"} animate-fadeIn`}>
-              {/* Sender Tag */}
-              <span className="text-[10px] text-purple-400/50 mb-1 font-mono">
-                {m.sender === "user" ? t("you") : m.agentName} · {m.timestamp}
-              </span>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-[10px] text-purple-400/50 font-mono">
+                  {m.sender === "user" ? t("you") : m.agentName} · {m.timestamp}
+                </span>
+                {m.sender === "agent" && (
+                  <button
+                    onClick={() => handleSpeak(m.text, m.id)}
+                    className={`text-[10px] px-1.5 py-0.5 rounded hover:bg-purple-900/50 transition-colors ${speakingId === m.id ? "text-green-400 animate-pulse" : "text-purple-400/60"}`}
+                    title="استمع للرسالة"
+                  >
+                    {speakingId === m.id ? "🔊" : "🔈"}
+                  </button>
+                )}
+              </div>
 
-              {/* Message bubble */}
               <div className={`max-w-[75%] rounded-2xl p-4 text-xs leading-relaxed font-heading ${
                 m.sender === "user"
                   ? "bg-purple-600 text-white rounded-br-none font-medium glow-purple-sm"
@@ -221,7 +301,6 @@ export function ChatPage() {
               }`}>
                 {m.text}
 
-                {/* Show Thought Log (collapsible) if agent ran sub-tasks */}
                 {m.thoughtLog && m.thoughtLog.length > 0 && (
                   <details className="mt-3 border-t border-purple-900/60 pt-2 cursor-pointer outline-none">
                     <summary className="text-[10px] text-purple-400/60 font-mono hover:text-purple-300 font-bold">
@@ -238,7 +317,6 @@ export function ChatPage() {
             </div>
           ))}
 
-          {/* Active Loading / Thought sequence */}
           {loading && (
             <div className="flex flex-col items-start animate-pulse">
               <span className="text-[10px] text-purple-400/50 mb-1 font-mono">
@@ -259,20 +337,27 @@ export function ChatPage() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Panel */}
-        <form onSubmit={handleSendMessage} className="p-4 bg-purple-950/10 border-t border-purple-950/60 flex gap-3">
+        <form onSubmit={handleSendMessage} className="p-4 bg-purple-950/10 border-t border-purple-950/60 flex gap-3 items-center">
+          <button
+            type="button"
+            onClick={handleListen}
+            className={`p-3 rounded-xl border transition-all ${isListening ? "bg-red-500/20 border-red-500/50 text-red-400 animate-pulse glow-red-sm" : "bg-purple-950/30 border-purple-900/40 text-purple-400 hover:bg-purple-900/50"}`}
+            title="تحدث الآن"
+          >
+            🎙️
+          </button>
           <input
             type="text"
             value={inputValue}
             onChange={e => setInputValue(e.target.value)}
             disabled={loading}
-            placeholder={loading ? "Waiting for agent process..." : t("typeMessagePlaceholder")}
+            placeholder={isListening ? "جاري الاستماع... تحدث الآن" : (loading ? "Waiting for agent process..." : t("typeMessagePlaceholder"))}
             className="flex-1 bg-black/60 border border-purple-950 rounded-xl px-4 py-3 text-xs text-white outline-none focus:border-purple-500/30 transition-all font-sans"
           />
           <button
             type="submit"
             disabled={loading}
-            className="px-5 py-3 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition-all glow-purple-sm font-sans"
+            className="px-5 py-3 rounded-xl text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white transition-all glow-purple-sm font-sans disabled:opacity-50"
           >
             {t("send")}
           </button>
