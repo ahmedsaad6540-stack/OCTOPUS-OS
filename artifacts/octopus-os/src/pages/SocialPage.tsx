@@ -48,6 +48,8 @@ interface ProviderRecord {
   connectionSource?: string;
 }
 
+const isDevMode = import.meta.env.VITE_DEV_MODE === "true" || import.meta.env.DEV;
+
 export function SocialPage() {
   const { token, user } = useAuth();
   const [selected, setSelected] = useState("tiktok");
