@@ -100,6 +100,12 @@ router.post("/autonomous/run", requireAuth, async (req: AuthRequest, res) => {
  */
 router.post("/autonomous/start", requireAuth, async (req: AuthRequest, res) => {
   try {
+    // Resume paused campaigns and jobs
+    try {
+      await db.update(videoJobsTable).set({ status: "queued", updatedAt: new Date() }).where(eq(videoJobsTable.status, "paused"));
+      await db.update(campaignsTable).set({ status: "active", updatedAt: new Date() }).where(eq(campaignsTable.status, "paused"));
+    } catch (e) {}
+
     startAutonomousDaemon(30_000);
     res.json({
       success: true,
