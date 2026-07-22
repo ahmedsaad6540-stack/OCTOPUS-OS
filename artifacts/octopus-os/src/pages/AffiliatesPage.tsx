@@ -387,8 +387,21 @@ export function AffiliatesPage() {
               </button>
             </div>
           </div>
-        )}
       </div>
+
+      {/* Smart Navigation Bar */}
+      <div className="mt-10 border-t border-purple-900/30 pt-6 flex justify-between items-center bg-black/20 p-4 rounded-xl">
+        <div>
+          <h3 className="text-sm font-bold text-white mb-1">الخطوة التالية (Next Step)</h3>
+          <p className="text-xs text-purple-400">بعد ربط شبكات التسويق، انتقل لربط حساباتك الاجتماعية لنشر المحتوى.</p>
+        </div>
+        <button 
+          onClick={() => window.location.href = "/?page=social"}
+          className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white text-sm font-bold rounded-lg shadow-[0_0_20px_rgba(147,51,234,0.4)] transition-all transform hover:scale-105">
+          الذهاب إلى Social Hub ➡️
+        </button>
+      </div>
+
     </div>
   );
 }

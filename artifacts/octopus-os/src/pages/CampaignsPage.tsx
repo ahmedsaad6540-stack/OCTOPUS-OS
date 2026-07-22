@@ -92,6 +92,19 @@ export function CampaignsPage() {
         campaigns={campaigns} 
         isLoading={isLoading} 
       />
+
+      {/* Smart Navigation Bar */}
+      <div className="mt-10 border-t border-purple-900/30 pt-6 flex justify-between items-center bg-black/20 p-4 rounded-xl">
+        <div>
+          <h3 className="text-sm font-bold text-white mb-1">الخطوة الأخيرة: محرك الأرباح (Profit Engine)</h3>
+          <p className="text-xs text-purple-400">بمجرد إنشاء الحملة، انقر على زر Start Profit Engine في الأعلى ليبدأ النظام بالعمل، ثم يمكنك متابعة حالة الفيديوهات من Video Factory.</p>
+        </div>
+        <button 
+          onClick={() => window.location.href = "/?page=video-factory"}
+          className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-bold rounded-lg shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all transform hover:scale-105">
+          متابعة مصنع الفيديوهات 🎬
+        </button>
+      </div>
     </div>
   );
 }
