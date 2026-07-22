@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
 import { API_BASE } from "@/lib/api";
@@ -93,6 +93,8 @@ export function AgentsPage() {
     }
   };
 
+  const isFirstLoad = useRef(true);
+
   const fetchAgents = async () => {
     if (!token) return;
     try {
@@ -166,7 +168,10 @@ export function AgentsPage() {
         description: a.desc
       })));
     } finally {
-      setLoading(false);
+      if (isFirstLoad.current) {
+        isFirstLoad.current = false;
+        setLoading(false);
+      }
     }
   };
 

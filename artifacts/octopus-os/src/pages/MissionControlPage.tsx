@@ -37,6 +37,7 @@ export function MissionControlPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
 
   const consoleEndRef = useRef<HTMLDivElement>(null);
+  const isFirstLoad = useRef(true);
 
   const loadData = async () => {
     if (!token) return;
@@ -92,7 +93,10 @@ export function MissionControlPage() {
     } catch (err) {
       console.error("MissionControl loadData error:", err);
     } finally {
-      setLoading(false);
+      if (isFirstLoad.current) {
+        isFirstLoad.current = false;
+        setLoading(false);
+      }
     }
   };
 

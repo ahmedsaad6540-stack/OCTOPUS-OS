@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { API_BASE } from "@/lib/api";
 import { useLanguage } from "@/context/LanguageContext";
 import { useAuth } from "@/context/AuthContext";
@@ -35,10 +35,11 @@ export function AnalyticsPage() {
   const [taskCount, setTaskCount] = useState(0);
   const [activeTasks, setActiveTasks] = useState(0);
   const [completedTasks, setCompletedTasks] = useState(0);
+  const isFirstLoad = useRef(true);
 
   const fetchAnalytics = useCallback(async () => {
     if (!token) return;
-    setLoading(true);
+    if (isFirstLoad.current) setLoading(true);
     const headers = { Authorization: `Bearer ${token}` };
 
     try {
@@ -74,7 +75,10 @@ export function AnalyticsPage() {
     } catch (err) {
       console.error("Analytics fetch error:", err);
     } finally {
-      setLoading(false);
+      if (isFirstLoad.current) {
+        isFirstLoad.current = false;
+        setLoading(false);
+      }
     }
   }, [token, period]);
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
@@ -58,6 +58,8 @@ export function WorkforcePage() {
   const [tempInstructions, setTempInstructions] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const isFirstLoad = useRef(true);
+
   const fetchWorkers = async () => {
     if (!token) return;
     try {
@@ -96,7 +98,10 @@ export function WorkforcePage() {
     } catch (err) {
       console.error("WorkforcePage: error fetching agents:", err);
     } finally {
-      setLoading(false);
+      if (isFirstLoad.current) {
+        isFirstLoad.current = false;
+        setLoading(false);
+      }
     }
   };
 
