@@ -41,8 +41,33 @@ export function VideoFactoryPage() {
   const [running, setRunning] = useState(false);
   const [previewJob, setPreviewJob] = useState<VideoJob | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [isListening, setIsListening] = useState(false);
 
   const [statusMsg, setStatusMsg] = useState("");
+
+  const handleListen = () => {
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("عذراً، متصفحك لا يدعم الإدخال الصوتي.");
+      return;
+    }
+    const recognition = new SpeechRecognition();
+    recognition.lang = "ar-SA";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => setIsListening(true);
+    recognition.onend = () => setIsListening(false);
+    recognition.onerror = (e: any) => {
+      console.error("Speech recognition error", e);
+      setIsListening(false);
+    };
+    recognition.onresult = (event: any) => {
+      const transcript = event.results[0][0].transcript;
+      setProduct((prev) => prev + (prev ? " " : "") + transcript);
+    };
+    recognition.start();
+  };
 
   const showMsg = (msg: string, isError = false) => {
     setStatusMsg(msg);
@@ -189,12 +214,22 @@ export function VideoFactoryPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-purple-300 mb-1.5">Product Name / Offer</label>
-                <input
-                  value={product}
-                  onChange={(e) => setProduct(e.target.value)}
-                  placeholder="e.g. Genius Wave & Wealth Manifestation"
-                  className="w-full bg-[#0d0920] border border-purple-800/50 rounded-xl px-3 py-2.5 text-white text-sm placeholder-purple-700 focus:outline-none focus:border-purple-500"
-                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={handleListen}
+                    title="تحدث لإدخال اسم المنتج"
+                    className={`px-3 rounded-xl border transition-all flex items-center justify-center ${isListening ? "bg-red-500/20 border-red-500/50 text-red-400 animate-pulse glow-red-sm" : "bg-[#0d0920] border-purple-800/50 text-purple-400 hover:bg-purple-900/50"}`}
+                  >
+                    🎙️
+                  </button>
+                  <input
+                    value={product}
+                    onChange={(e) => setProduct(e.target.value)}
+                    placeholder={isListening ? "جاري الاستماع..." : "e.g. Genius Wave & Wealth Manifestation"}
+                    className="flex-1 bg-[#0d0920] border border-purple-800/50 rounded-xl px-3 py-2.5 text-white text-sm placeholder-purple-700 focus:outline-none focus:border-purple-500"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-purple-300 mb-1.5">Target Platform</label>

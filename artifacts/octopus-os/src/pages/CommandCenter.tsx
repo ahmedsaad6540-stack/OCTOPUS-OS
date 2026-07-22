@@ -14,6 +14,31 @@ export function CommandCenter() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null);
   const [metrics, setMetrics] = useState<Metrics | null>(null);
+  
+  // --- Text to Speech (Speaker) ---
+  const [speakingId, setSpeakingId] = useState<string | null>(null);
+  const handleSpeak = (text: string, id: string) => {
+    if (!("speechSynthesis" in window)) {
+      alert("عذراً، متصفحك لا يدعم القراءة الصوتية.");
+      return;
+    }
+    if (speakingId === id) {
+      window.speechSynthesis.cancel();
+      setSpeakingId(null);
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    const voices = window.speechSynthesis.getVoices();
+    const arVoice = voices.find(v => v.lang.startsWith('ar'));
+    if (arVoice) utterance.voice = arVoice;
+    else utterance.lang = "ar-SA";
+    
+    utterance.onend = () => setSpeakingId(null);
+    utterance.onerror = () => setSpeakingId(null);
+    setSpeakingId(id);
+    window.speechSynthesis.speak(utterance);
+  };
 
   // Live clock
   useEffect(() => {
@@ -230,10 +255,19 @@ export function CommandCenter() {
             <div className="glass-card p-4 border-l-2 border-purple-500 rounded-r-xl">
               <div className="flex items-start gap-3">
                 <div className="w-8 h-8 rounded-lg gradient-purple flex items-center justify-center text-sm shrink-0">🤖</div>
-                <div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-bold text-purple-400">{t("ceoBriefing")}</span>
-                    <span className="text-[9px] text-emerald-400 font-mono">{t("live")}</span>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-purple-400">{t("ceoBriefing")}</span>
+                      <span className="text-[9px] text-emerald-400 font-mono">{t("live")}</span>
+                    </div>
+                    <button
+                      onClick={() => handleSpeak(t("ceoBriefingText"), "ceoBrief")}
+                      className={`text-[12px] px-2 py-1 rounded-lg transition-colors ${speakingId === "ceoBrief" ? "bg-green-500/20 text-green-400 animate-pulse" : "bg-purple-900/40 text-purple-400 hover:bg-purple-800/60"}`}
+                      title="استمع للموجز"
+                    >
+                      {speakingId === "ceoBrief" ? "🔊 استماع للموجز" : "🔈 استماع للموجز"}
+                    </button>
                   </div>
                   <p className="text-xs text-purple-200/90 leading-relaxed">{t("ceoBriefingText")}</p>
                 </div>
