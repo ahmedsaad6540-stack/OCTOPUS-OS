@@ -16,7 +16,7 @@ async function resolveUserId(req: AuthRequest): Promise<string> {
     const [admin] = await db
       .select()
       .from(usersTable)
-      .where(eq(usersTable.email, "admin1@octopus.ai"))
+      .where(eq(usersTable.email, "admin@octopus.ai"))
       .limit(1);
     return admin ? admin.id : "admin-default";
   } catch (err) {
