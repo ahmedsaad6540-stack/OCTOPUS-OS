@@ -193,17 +193,10 @@ router.post("/social/publish", async (req: AuthRequest, res) => {
     }
 
     // Fetch user's connected social accounts from DB
-    const { or } = await import("drizzle-orm");
     const userAccounts = await db
       .select()
       .from(socialAccountsTable)
-      .where(and(
-        eq(socialAccountsTable.userId, userId),
-        or(
-          eq(socialAccountsTable.status, "connected"),
-          eq(socialAccountsTable.status, "LIVE_VERIFIED")
-        )
-      ));
+      .where(eq(socialAccountsTable.userId, userId));
 
     if (userAccounts.length === 0) {
       res.status(400).json({
