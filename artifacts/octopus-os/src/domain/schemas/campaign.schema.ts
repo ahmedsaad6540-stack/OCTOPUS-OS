@@ -3,15 +3,15 @@ import { z } from "zod";
 export const CampaignSchema = z.object({
   id: z.union([z.string(), z.number()]),
   name: z.string().min(1, "Campaign name is required"),
-  status: z.enum(["active", "paused", "draft", "completed", "error"]).catch("draft" as any),
-  platform: z.string(),
-  affiliateNetwork: z.string(),
-  revenue: z.number().optional().default(0),
-  roi: z.number().optional().default(0),
-  posts: z.number().optional().default(0),
-  productUrl: z.string().url().optional().or(z.literal("")),
-  createdAt: z.string().optional(),
-  updatedAt: z.string().optional(),
+  status: z.enum(["active", "paused", "draft", "completed", "error", "running", "failed"]).catch("draft" as any),
+  platform: z.string().nullable().catch("tiktok"),
+  affiliateNetwork: z.string().nullable().catch(""),
+  revenue: z.number().nullable().catch(0),
+  roi: z.number().nullable().catch(0),
+  posts: z.number().nullable().catch(0),
+  productUrl: z.string().url().nullable().or(z.literal("")).catch(""),
+  createdAt: z.string().nullable().catch(""),
+  updatedAt: z.string().nullable().catch(""),
 });
 
 export const CampaignStatsSchema = z.object({

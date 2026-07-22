@@ -21,7 +21,7 @@ export const securityHeaders: RequestHandler = helmet({
  */
 export const apiRateLimiter: RequestHandler = rateLimit({
   windowMs: 15 * 60 * 1000,
-  limit: 300,
+  limit: 5000,
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: "Too Many Requests", message: "Rate limit exceeded, try again later" },
