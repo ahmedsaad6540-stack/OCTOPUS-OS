@@ -23,6 +23,12 @@ async function request<T>(
     },
   });
 
+  if (res.status === 401) {
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("octopus:unauthorized"));
+    }
+  }
+
   const contentType = res.headers.get("content-type") ?? "";
   if (!contentType.includes("application/json")) {
     if (!res.ok) {
