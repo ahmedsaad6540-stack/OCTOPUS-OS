@@ -39,23 +39,23 @@ router.post("/autonomous/run", requireAuth, async (req: AuthRequest, res) => {
       .where(eq(campaignsTable.status, "active"))
       .limit(5);
 
-    const campaign = campaigns[0] || {
-      name: "AI Video & Content Masterclass (Viral Tech)",
-      productName: "AI Video & Content Masterclass",
-      platform: "tiktok",
-      affiliateNetwork: "digistore24",
-      productUrl: "https://aifluencersystem.de/start#aff=octopuslabai4418",
-      budget: 100,
-      revenue: 0,
-      conversions: 0
-    };
+    if (campaigns.length === 0) {
+      res.json({
+        success: false,
+        message: "لا توجد حملات نشطة لجدولتها. قم بإنشاء حملة أولاً.",
+        results: [],
+      });
+      return;
+    }
+
+    const campaign = campaigns[0];
 
     for (const agent of agents) {
       const prompt = buildAgentPrompt(agent.name, {
-        productName: campaign.productName ?? "AI Influencer System",
-        platform: campaign.platform ?? "tiktok",
-        affiliateNetwork: campaign.affiliateNetwork ?? "digistore24",
-        affiliateLink: campaign.productUrl ?? "https://aifluencersystem.de/start#aff=octopuslabai4418",
+        productName: campaign.productName || campaign.name || "AI Viral Product",
+        platform: campaign.platform || "tiktok",
+        affiliateNetwork: campaign.affiliateNetwork || "digistore24",
+        affiliateLink: campaign.productUrl || "https://octopuslab.ai/shorts",
         budget: Number(campaign.budget ?? 100),
         revenue: Number(campaign.revenue ?? 0),
         conversions: Number(campaign.conversions ?? 0),

@@ -255,7 +255,11 @@ router.post("/social/publish", async (req: AuthRequest, res) => {
     let failureCount = 0;
 
     for (const t of targets) {
-      if (t.credentials.accessToken === "auto_connected" || t.credentials.accessToken === "mock_api") {
+      if (
+        t.credentials.accessToken === "auto_connected" ||
+        t.credentials.accessToken === "mock_api" ||
+        (typeof t.credentials.accessToken === "string" && t.credentials.accessToken.startsWith("auto_"))
+      ) {
         failureCount++;
         results.push({
           platform: t.platform,
