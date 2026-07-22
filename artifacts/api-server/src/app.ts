@@ -11,7 +11,10 @@ import { httpMetricsMiddleware } from "./middleware/metrics.js";
 
 const app: Express = express();
 
+app.set("trust proxy", 1); // Trust first proxy (e.g., Railway/Cloudflare)
 app.use(securityHeaders);
+app.use("/api", apiRateLimiter); // Apply rate limiter globally to /api routes
+
 
 app.use(
   pinoHttp({

@@ -66,10 +66,9 @@ export function AffiliatesPage() {
   const networkIds = Object.keys(NETWORK_META);
   const meta = NETWORK_META[selected];
   
-  // Find the active connection and ignore mock if not in dev mode
+  // Find the active connection
   const existingConn = connections.find(c => {
     if (c.provider !== selected || c.status !== "active") return false;
-    if (c.connectionSource === "mock" && !isDevMode) return false;
     return true;
   });
   const isConnected = !!existingConn;

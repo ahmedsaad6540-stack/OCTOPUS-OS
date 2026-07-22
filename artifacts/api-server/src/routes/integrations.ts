@@ -24,7 +24,8 @@ router.post("/youtube/connect", async (req, res) => {
       return;
     }
 
-    const apiUrl = process.env.API_URL || `${req.protocol}://${req.get("host")}`;
+    const protocol = req.protocol === 'http' && req.get('host')?.includes('railway.app') ? 'https' : req.protocol;
+    const apiUrl = process.env.API_URL || `${protocol}://${req.get("host")}`;
     const callbackUrl = `${apiUrl}/oauth/youtube/callback`;
     
     // Generate secure state

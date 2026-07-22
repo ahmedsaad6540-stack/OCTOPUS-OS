@@ -148,13 +148,8 @@ export function SocialPage() {
     const record = connectedMap[p.id];
     let status = record?.status || "NOT_CONFIGURED";
     
-    // Fallback to legacy mapping if it exists
     if (status === "active" || status === "configured" || status === "connected") {
       status = "CONNECTED";
-    }
-
-    if (record?.connectionSource === "mock" && !isDevMode) {
-      status = "NOT_CONFIGURED"; // Hide mock connection in prod by showing as not configured
     }
 
     return {
@@ -397,12 +392,11 @@ export function SocialPage() {
         </div>
         {platforms.map(p => {
           const isConnected = ["CONNECTED", "LIVE_VERIFIED"].includes(p.status);
-          const isMock = p.connectionSource === "mock" && isDevMode;
           return (
             <button key={p.id} onClick={() => { setSelected(p.id); setTestMsg(""); setSaveMsg(""); }}
               className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs font-medium mb-0.5 transition-all ${selected === p.id ? "gradient-purple text-white" : "text-purple-300/70 hover:bg-purple-900/30"}`}>
               <span className="text-sm">{p.icon}</span>
-              <span className="flex-1 text-left">{p.name} {isMock && <span className="text-[8px] opacity-50 bg-yellow-900 px-1 rounded ml-1">MOCK</span>}</span>
+              <span className="flex-1 text-left">{p.name}</span>
               <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isConnected ? "bg-emerald-400" : "bg-gray-600"}`}></div>
             </button>
           );
@@ -422,11 +416,6 @@ export function SocialPage() {
                   <span className={`text-xs ${["CONNECTED", "LIVE_VERIFIED"].includes(platform.status) ? "text-emerald-400" : "text-gray-500"}`}>
                     {platform.status}
                   </span>
-                  {platform.connectionSource === "mock" && isDevMode && (
-                    <span className="text-[10px] font-mono text-yellow-500 border border-yellow-500/30 px-1.5 py-0.5 rounded ml-2">
-                      MOCK_DEVELOPMENT_ONLY
-                    </span>
-                  )}
                 </div>
               </div>
             </div>

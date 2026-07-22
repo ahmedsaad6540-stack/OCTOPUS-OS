@@ -42,7 +42,8 @@ router.get("/oauth/:platform/connect", async (req, res) => {
       else if (platform === "instagram" || platform === "facebook") clientId = process.env.FACEBOOK_APP_ID || "";
     }
 
-    const apiUrl = process.env.API_URL || `${req.protocol}://${req.get("host")}`;
+    const protocol = req.protocol === 'http' && req.get('host')?.includes('railway.app') ? 'https' : req.protocol;
+    const apiUrl = process.env.API_URL || `${protocol}://${req.get("host")}`;
     const callbackUrl = `${apiUrl}/oauth/${platform}/callback`;
     
     // Generate secure random state and store it
@@ -121,7 +122,8 @@ router.get("/oauth/:platform/callback", async (req, res) => {
         clientSecret = clientSecret || process.env.FACEBOOK_APP_SECRET || "";
       }
     }
-    const apiUrl = process.env.API_URL || `${req.protocol}://${req.get("host")}`;
+    const protocol = req.protocol === 'http' && req.get('host')?.includes('railway.app') ? 'https' : req.protocol;
+    const apiUrl = process.env.API_URL || `${protocol}://${req.get("host")}`;
     const callbackUrl = `${apiUrl}/oauth/${platform}/callback`;
 
     let accessToken = "";
