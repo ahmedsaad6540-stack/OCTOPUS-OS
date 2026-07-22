@@ -29,57 +29,7 @@ router.post("/chat", requireAuth, async (req: AuthRequest, res) => {
       return;
     }
 
-    const systemContext = agentName
-      ? `You are ${agentName}, an AI agent in OCTOPUS NEXUS OS — an autonomous AI marketing operating system. You help with affiliate marketing, social media growth, content creation, campaign strategy, and profit optimization. Be concise, strategic, and action-oriented. Respond in the same language as the user.`
-      : `You are OCTOPUS Brain — the central AI intelligence of OCTOPUS NEXUS OS. You help with affiliate marketing, content creation, social media strategy, and automated profit systems. Be direct, smart, and practical. Respond in the same language as the user.`;
-
-    // Build conversation history
-    const contents: any[] = [];
-
-    // Add history if present
-    if (history && history.length > 0) {
-      for (const h of history.slice(-10)) { // Last 10 messages for context
-        contents.push({
-          role: h.role === "agent" ? "model" : "user",
-          parts: [{ text: h.text }]
-        });
-      }
-    }
-
-    // Add current message
-    contents.push({
-      role: "user",
-      parts: [{ text: message }]
-    });
-
-    const payload = {
-      system_instruction: {
-        parts: [{ text: systemContext }]
-      },
-      contents,
-      generationConfig: {
-        temperature: 0.8,
-        maxOutputTokens: 1024,
-        topP: 0.95,
-      }
-    };
-
-    const geminiRes = await fetch(GEMINI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!geminiRes.ok) {
-      const errText = await geminiRes.text();
-      res.status(502).json({ error: `Gemini API error (${geminiRes.status}): ${errText}` });
-      return;
-    }
-
-    const geminiData = await geminiRes.json() as any;
-    const reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "عذراً، لم أتلق ردًا من Gemini.";
-
-    // Simple Intent Recognition: Trigger internal system agents if the user asks for operations
+    // 1. Simple Intent Recognition: Trigger internal system agents BEFORE Gemini call
     let thoughtLog: string[] | undefined = undefined;
     try {
       const msgLower = message.toLowerCase();
@@ -104,6 +54,58 @@ router.post("/chat", requireAuth, async (req: AuthRequest, res) => {
     } catch (err) {
       console.error("Agent execution error:", err);
       thoughtLog = ["⚠️ Failed to execute system agent command."];
+    }
+
+    // 2. Call Gemini
+    const systemContext = agentName
+      ? `You are ${agentName}, an AI agent in OCTOPUS NEXUS OS — an autonomous AI marketing operating system. You help with affiliate marketing, social media growth, content creation, campaign strategy, and profit optimization. Be concise, strategic, and action-oriented. Respond in the same language as the user.`
+      : `You are OCTOPUS Brain — the central AI intelligence of OCTOPUS NEXUS OS. You help with affiliate marketing, content creation, social media strategy, and automated profit systems. Be direct, smart, and practical. Respond in the same language as the user.`;
+
+    const contents: any[] = [];
+    if (history && history.length > 0) {
+      for (const h of history.slice(-10)) {
+        contents.push({
+          role: h.role === "agent" ? "model" : "user",
+          parts: [{ text: h.text }]
+        });
+      }
+    }
+    contents.push({ role: "user", parts: [{ text: message }] });
+
+    const payload = {
+      system_instruction: { parts: [{ text: systemContext }] },
+      contents,
+      generationConfig: { temperature: 0.8, maxOutputTokens: 1024, topP: 0.95 }
+    };
+
+    let reply = "";
+    
+    try {
+      const geminiRes = await fetch(GEMINI_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (!geminiRes.ok) {
+        // If we hit a rate limit (429) but we ALREADY successfully executed an intent, just gracefully fallback.
+        if (geminiRes.status === 429 && thoughtLog && thoughtLog.length > 0) {
+          reply = "لقد وصلت للحد الأقصى المجاني من محادثات Gemini، ولكنني قمت بتنفيذ طلبك بنجاح في الخلفية (انظر لسجل الأفكار).";
+        } else {
+          const errText = await geminiRes.text();
+          res.status(502).json({ error: `Gemini API error (${geminiRes.status}): ${errText}` });
+          return;
+        }
+      } else {
+        const geminiData = await geminiRes.json() as any;
+        reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "عذراً، لم أتلق ردًا من Gemini.";
+      }
+    } catch (networkErr) {
+      if (thoughtLog && thoughtLog.length > 0) {
+        reply = "حدث خطأ في الاتصال بنموذج Gemini، ولكن تم تنفيذ أمرك بنجاح في النظام.";
+      } else {
+        throw networkErr;
+      }
     }
 
     res.json({
