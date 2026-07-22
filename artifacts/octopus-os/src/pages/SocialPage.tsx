@@ -216,7 +216,49 @@ export function SocialPage() {
   };
 
   const saveConfig = async () => {
-    await connect();
+    const platformValues = values[selected];
+    if (platformValues && Object.values(platformValues).some(v => v)) {
+      if (!token) return;
+      setSaving(true);
+      setSaveMsg("");
+      try {
+        const payload = {
+          platform: selected,
+          apiKey: platformValues["API Key"] || platformValues["App ID"] || platformValues["Client ID"] || platformValues["Client Key"] || "",
+          apiSecret: platformValues["API Secret"] || platformValues["App Secret"] || platformValues["Client Secret"] || "",
+          accessToken: platformValues["Access Token"] || platformValues["Bot Token"] || platformValues["OAuth Token"] || platformValues["Integration Token"] || platformValues["Page Access Token"] || "",
+          status: "connected",
+          connectionSource: "manual"
+        };
+        const res = await fetch(`${API_BASE}/social`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.message || "Failed to save credentials");
+        }
+        setSaveMsg("✅ تم الحفظ بنجاح");
+        // refresh
+        const res2 = await fetch(`${API_BASE}/social`, { headers: { Authorization: `Bearer ${token}` } });
+        if (res2.ok) {
+          const data2 = await res2.json();
+          const map: Record<string, ProviderRecord> = {};
+          for (const p of (data2.accounts || data2 || [])) {
+            const platformId = PLATFORMS.find(pl => pl.id === p.platform?.toLowerCase() || pl.name.toLowerCase() === p.platform?.toLowerCase())?.id;
+            if (platformId) map[platformId] = { ...p, providerName: p.platform, status: p.status || "disconnected" };
+          }
+          setConnectedMap(map);
+        }
+      } catch (err: any) {
+        setSaveMsg(`❌ ${err.message}`);
+      } finally {
+        setSaving(false);
+      }
+    } else {
+      await connect();
+    }
   };
 
   const testConn = async () => {
