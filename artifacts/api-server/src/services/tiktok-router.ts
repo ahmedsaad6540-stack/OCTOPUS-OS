@@ -173,14 +173,51 @@ export class TikTokPublishingRouter {
   private static async executeDirectPost(job: TikTokPublishingJob, capabilities: TikTokAccountCapabilities) {
     logger.info({ campaignId: job.campaignId }, "Executing Tier 3: Direct Post Mode");
     
-    // In a real implementation, this would hit https://open.tiktokapis.com/v2/post/publish/video/init/
-    // using capabilities.accessToken
-    
+    if (!capabilities.accessToken) {
+      throw new Error("Missing TikTok access token for direct post.");
+    }
+
+    // Hit https://open.tiktokapis.com/v2/post/publish/video/init/
+    const response = await fetch("https://open.tiktokapis.com/v2/post/publish/video/init/", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${capabilities.accessToken}`,
+        "Content-Type": "application/json; charset=UTF-8"
+      },
+      body: JSON.stringify({
+        post_info: {
+          title: job.title,
+          description: `${job.description} ${job.hashtags.join(" ")}`,
+          privacy_level: "PUBLIC_TO_EVERYONE",
+          disable_comment: false,
+          disable_duet: false,
+          disable_stitch: false
+        },
+        source_info: {
+          source: "PULL_FROM_URL",
+          video_url: job.videoUrl
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      logger.error({ error: errorData }, "TikTok Direct Post API failed");
+      throw new Error(`TikTok API Error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json() as { data?: { publish_id?: string } };
+    const publishId = data.data?.publish_id;
+
+    if (!publishId) {
+      throw new Error("TikTok API did not return a publish_id.");
+    }
+
     return {
       status: "published",
       mode: "direct_post",
-      externalPostId: `tt_${randomUUID().slice(0, 10)}`,
-      message: "Successfully auto-published to TikTok."
+      externalPostId: publishId,
+      message: "Successfully initiated auto-publishing to TikTok (PULL_FROM_URL)."
     };
   }
 }
