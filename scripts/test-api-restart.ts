@@ -21,20 +21,7 @@ async function waitForServer(url: string, timeout = 10000) {
 }
 
 async function run() {
-  const envPath = path.join(process.cwd(), ".env.test.local");
-  if (!fs.existsSync(envPath)) {
-    console.error("No .env.test.local found. Aborting.");
-    process.exit(1);
-  }
-
-  const envContent = fs.readFileSync(envPath, "utf-8");
-  const testDbUrlMatch = envContent.match(/^TEST_DATABASE_URL=(.+)$/m);
-  if (!testDbUrlMatch || !testDbUrlMatch[1]) {
-    console.error("TEST_DATABASE_URL missing in .env.test.local");
-    process.exit(1);
-  }
-
-  const testDbUrl = testDbUrlMatch[1].trim();
+  const testDbUrl = process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/octopus_test";
   
   // Set up env for child API
   const env = { 
