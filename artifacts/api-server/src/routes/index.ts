@@ -20,6 +20,7 @@ import auditLogRouter from "./audit-log.js";
 import settingsRouter from "./settings.js";
 import metricsRouter from "./metrics.js";
 import { authRateLimiter } from "../middleware/security.js";
+import { requireAuth } from "../middleware/auth.js";
 import profitEngineRouter from "./profit-engine.js";
 import oauthRouter from "./oauth.js";
 import webhooksRouter from "./webhooks.js";
@@ -69,6 +70,6 @@ router.use(geminiChatRouter);
 router.use(dashboardRouter);
 router.use(analyticsRouter);
 router.use(securityRouter);
-router.use("/integrations", integrationsRouter);
+router.use("/integrations", requireAuth, integrationsRouter);
 
 export default router;

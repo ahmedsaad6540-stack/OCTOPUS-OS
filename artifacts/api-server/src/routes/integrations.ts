@@ -9,7 +9,7 @@ const router = Router();
 
 // Secure POST endpoint to initiate connection
 router.post("/youtube/connect", async (req, res) => {
-  const userId = (req as any).user?.id;
+  const userId = (req as any).user?.userId;
   if (!userId) {
     res.status(401).json({ error: "Unauthorized" });
     return;
@@ -41,7 +41,7 @@ router.post("/youtube/connect", async (req, res) => {
 
 // GET status without exposing tokens
 router.get("/youtube/status", async (req, res) => {
-  const userId = (req as any).user?.id;
+  const userId = (req as any).user?.userId;
   if (!userId) {
     res.status(401).json({ error: "Unauthorized" });
     return;
@@ -98,7 +98,7 @@ router.get("/youtube/status", async (req, res) => {
 });
 
 router.post("/youtube/disconnect", async (req, res) => {
-  const userId = (req as any).user?.id;
+  const userId = (req as any).user?.userId;
   if (!userId) {
     res.status(401).json({ error: "Unauthorized" });
     return;
