@@ -55,6 +55,9 @@ import { errorHandler } from "./middleware/error.js";
 
 app.use("/api", apiRateLimiter, router);
 
+app.get("/health", (req, res) => res.json({ status: "ok" }));
+app.get("/readiness", (req, res) => res.json({ status: "ready" }));
+
 app.use(errorHandler);
 
 export default app;
