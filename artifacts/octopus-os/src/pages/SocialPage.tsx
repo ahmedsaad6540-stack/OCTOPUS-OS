@@ -146,7 +146,7 @@ export function SocialPage() {
 
   const platforms = PLATFORMS.map(p => {
     const record = connectedMap[p.id];
-    let status = record?.status || "NOT_CONFIGURED";
+    let status = record?.status || "AUTHORIZATION_REQUIRED";
     
     if (status === "active" || status === "configured" || status === "connected") {
       status = "CONNECTED";
