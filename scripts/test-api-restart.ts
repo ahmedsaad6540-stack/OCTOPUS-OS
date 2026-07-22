@@ -54,8 +54,8 @@ async function run() {
       stdio: "pipe",
       shell: true
     });
-    // child.stdout.on("data", d => process.stdout.write(d));
-    // child.stderr.on("data", d => process.stderr.write(d));
+    child.stdout.on("data", d => process.stdout.write(d));
+    child.stderr.on("data", d => process.stderr.write(d));
     return child;
   };
 
