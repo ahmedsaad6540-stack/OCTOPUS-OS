@@ -182,7 +182,7 @@ export function ChatPage() {
             ))}
             {agents.length === 0 && (
               <option value="" className="bg-[#0c051a]">
-                No active agents
+                {t("noActiveAgents")}
               </option>
             )}
           </select>
