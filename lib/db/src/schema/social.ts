@@ -13,6 +13,7 @@ export const socialAccountsTable = pgTable("social_accounts", {
   apiKey: text("api_key").default(""),
   apiSecret: text("api_secret").default(""),
   status: text("status").default("disconnected"),
+  connectionSource: text("connection_source").default("mock"), // real_oauth, real_api_key, manual, mock
   avatarUrl: text("avatar_url").default(""),
   followers: text("followers").default("0"),
   createdAt: timestamp("created_at").notNull().defaultNow(),

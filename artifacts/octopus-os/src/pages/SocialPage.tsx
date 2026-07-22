@@ -136,12 +136,29 @@ export function SocialPage() {
     }
   };
 
-  const platforms = PLATFORMS.map(p => ({
-    ...p,
-    status: (connectedMap[p.id]?.status === "active" || connectedMap[p.id]?.status === "connected" || connectedMap[p.id]?.status === "configured") ? "connected" : "disconnected",
-    followers: connectedMap[p.id]?.followers || "0",
-    dbId: connectedMap[p.id]?.id,
-  }));
+  const isDevMode = import.meta.env.VITE_DEV_MODE === "true";
+
+  const platforms = PLATFORMS.map(p => {
+    const record = connectedMap[p.id];
+    let status = record?.status || "NOT_CONFIGURED";
+    
+    // Fallback to legacy mapping if it exists
+    if (status === "active" || status === "configured" || status === "connected") {
+      status = "CONNECTED";
+    }
+
+    if (record?.connectionSource === "mock" && !isDevMode) {
+      status = "NOT_CONFIGURED"; // Hide mock connection in prod by showing as not configured
+    }
+
+    return {
+      ...p,
+      status,
+      followers: record?.followers || "0",
+      dbId: record?.id,
+      connectionSource: record?.connectionSource,
+    };
+  });
 
   const platform = platforms.find(p => p.id === selected)!;
   const fields = FIELDS[selected] || [];
@@ -360,7 +377,7 @@ export function SocialPage() {
         </div>
       )}
 
-      {/* Platform List */}
+        {/* Platform List */}
       <div className="w-52 shrink-0 py-4 px-2 overflow-y-auto" style={{ background: "#0d0920", borderRight: "1px solid rgba(139,92,246,0.15)" }}>
         <div className="flex items-center justify-between px-2 py-2 mb-1">
           <span className="text-[9px] font-bold uppercase tracking-widest text-purple-500/50">
@@ -373,14 +390,18 @@ export function SocialPage() {
             🚀 نشر ذكي
           </button>
         </div>
-        {platforms.map(p => (
-          <button key={p.id} onClick={() => { setSelected(p.id); setTestMsg(""); setSaveMsg(""); }}
-            className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs font-medium mb-0.5 transition-all ${selected === p.id ? "gradient-purple text-white" : "text-purple-300/70 hover:bg-purple-900/30"}`}>
-            <span className="text-sm">{p.icon}</span>
-            <span className="flex-1 text-left">{p.name}</span>
-            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${p.status === "connected" ? "bg-emerald-400" : "bg-gray-600"}`}></div>
-          </button>
-        ))}
+        {platforms.map(p => {
+          const isConnected = ["CONNECTED", "LIVE_VERIFIED"].includes(p.status);
+          const isMock = p.connectionSource === "mock";
+          return (
+            <button key={p.id} onClick={() => { setSelected(p.id); setTestMsg(""); setSaveMsg(""); }}
+              className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs font-medium mb-0.5 transition-all ${selected === p.id ? "gradient-purple text-white" : "text-purple-300/70 hover:bg-purple-900/30"}`}>
+              <span className="text-sm">{p.icon}</span>
+              <span className="flex-1 text-left">{p.name} {isMock && <span className="text-[8px] opacity-50 bg-yellow-900 px-1 rounded ml-1">MOCK</span>}</span>
+              <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${isConnected ? "bg-emerald-400" : "bg-gray-600"}`}></div>
+            </button>
+          );
+        })}
       </div>
 
       {/* Platform Config */}
@@ -391,10 +412,15 @@ export function SocialPage() {
             <div>
               <h1 className="text-xl font-bold text-white">{platform.name}</h1>
               <div className="flex items-center gap-2 mt-0.5">
-                <span className={`w-2 h-2 rounded-full ${platform.status === "connected" ? "bg-emerald-400" : "bg-gray-600"}`}></span>
-                <span className={`text-xs ${platform.status === "connected" ? "text-emerald-400" : "text-gray-500"}`}>
-                  {platform.status === "connected" ? "Connected" : "Disconnected"}
+                <span className={`w-2 h-2 rounded-full ${["CONNECTED", "LIVE_VERIFIED"].includes(platform.status) ? "bg-emerald-400" : "bg-gray-600"}`}></span>
+                <span className={`text-xs ${["CONNECTED", "LIVE_VERIFIED"].includes(platform.status) ? "text-emerald-400" : "text-gray-500"}`}>
+                  {platform.status}
                 </span>
+                {platform.connectionSource === "mock" && (
+                  <span className="text-[10px] font-mono text-yellow-500 border border-yellow-500/30 px-1.5 py-0.5 rounded ml-2">
+                    MOCK_DEVELOPMENT_ONLY
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -403,7 +429,7 @@ export function SocialPage() {
               className="px-3 py-2 rounded-lg text-xs text-purple-300 border border-purple-500/30 hover:border-purple-400/50 transition-all">
               {testing ? "⟳ Testing..." : "🧪 Test Connection"}
             </button>
-            {platform.status === "connected" ? (
+            {platform.status !== "NOT_CONFIGURED" ? (
               <button onClick={disconnect} disabled={saving}
                 className="px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-red-900/50 text-red-400 border border-red-500/30">
                 {saving ? "⟳ Disconnecting..." : "🔌 Disconnect"}
@@ -426,7 +452,7 @@ export function SocialPage() {
           >
             {autoConnecting ? "⟳ جاري الربط التلقائي..." : "⚡ ربط جميع المنصات تلقائياً (ضغطة واحدة)"}
           </button>
-          {platform.status === "connected" && (
+          {["CONNECTED", "LIVE_VERIFIED"].includes(platform.status) && (
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-900/30 border border-emerald-500/30">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
               <span className="text-emerald-400 text-xs font-bold">✅ {platform.name} متصل ومفعّل</span>

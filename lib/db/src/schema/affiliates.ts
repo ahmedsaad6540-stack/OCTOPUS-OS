@@ -17,6 +17,7 @@ export const affiliateConnectionsTable = pgTable(
     lastVerifiedAt: timestamp("last_verified_at"),
     lastErrorCode: text("last_error_code"),
     status: text("status").notNull().default("active"), // active, revoked
+    connectionSource: text("connection_source").default("mock"), // real_oauth, real_api_key, manual, mock
     createdAt: timestamp("created_at").notNull().defaultNow(),
     updatedAt: timestamp("updated_at").notNull().defaultNow(),
     revokedAt: timestamp("revoked_at"),

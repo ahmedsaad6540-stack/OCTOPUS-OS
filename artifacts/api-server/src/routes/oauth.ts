@@ -223,15 +223,21 @@ router.get("/oauth/:platform/callback", async (req, res) => {
       return;
     }
 
+    const { SecretsManager } = await import("../lib/secrets-manager.js");
+    const sm = SecretsManager.instance();
+    const encryptedAccess = sm.encryptOptional(accessToken) || "";
+    const encryptedRefresh = sm.encryptOptional(refreshToken) || "";
+
     // Save tokens and profile metrics back to database
     if (accConfig) {
       await db
         .update(socialAccountsTable)
         .set({
-          accessToken,
-          refreshToken,
+          accessToken: encryptedAccess,
+          refreshToken: encryptedRefresh,
           tokenExpiresAt,
-          status: "connected",
+          status: "LIVE_VERIFIED",
+          connectionSource: "real_oauth",
           username,
           displayName,
           followers,
@@ -244,10 +250,11 @@ router.get("/oauth/:platform/callback", async (req, res) => {
         platform,
         displayName,
         username,
-        accessToken,
-        refreshToken,
+        accessToken: encryptedAccess,
+        refreshToken: encryptedRefresh,
         tokenExpiresAt,
-        status: "connected",
+        status: "LIVE_VERIFIED",
+        connectionSource: "real_oauth",
         followers,
       });
     }

@@ -126,6 +126,31 @@ router.put("/social/:id", requireAuth, async (req: AuthRequest, res) => {
 router.delete("/social/:id", requireAuth, async (req: AuthRequest, res) => {
   try {
     const { id } = req.params as { id: string };
+    
+    // Fetch the token before deleting so we can revoke it at the provider
+    const [account] = await db
+      .select()
+      .from(socialAccountsTable)
+      .where(and(eq(socialAccountsTable.id, id), eq(socialAccountsTable.userId, req.user!.userId)))
+      .limit(1);
+
+    if (account && account.platform === "youtube" && account.accessToken) {
+      const { SecretsManager } = await import("../lib/secrets-manager.js");
+      const sm = SecretsManager.instance();
+      let decryptedAccess = account.accessToken;
+      if (decryptedAccess.startsWith("{")) {
+        decryptedAccess = sm.decryptOptional(decryptedAccess) || decryptedAccess;
+      }
+      if (decryptedAccess && decryptedAccess !== "auto_connected" && decryptedAccess !== "mock_api") {
+        try {
+          // Revoke Google token
+          await fetch(`https://oauth2.googleapis.com/revoke?token=${decryptedAccess}`, { method: "POST" });
+        } catch (e) {
+          req.log.error(e, "Failed to revoke Google token");
+        }
+      }
+    }
+
     await db
       .delete(socialAccountsTable)
       .where(and(eq(socialAccountsTable.id, id), eq(socialAccountsTable.userId, req.user!.userId)));
@@ -168,10 +193,17 @@ router.post("/social/publish", async (req: AuthRequest, res) => {
     }
 
     // Fetch user's connected social accounts from DB
+    const { or } = await import("drizzle-orm");
     const userAccounts = await db
       .select()
       .from(socialAccountsTable)
-      .where(and(eq(socialAccountsTable.userId, userId), eq(socialAccountsTable.status, "connected")));
+      .where(and(
+        eq(socialAccountsTable.userId, userId),
+        or(
+          eq(socialAccountsTable.status, "connected"),
+          eq(socialAccountsTable.status, "LIVE_VERIFIED")
+        )
+      ));
 
     if (userAccounts.length === 0) {
       res.status(400).json({
@@ -181,16 +213,31 @@ router.post("/social/publish", async (req: AuthRequest, res) => {
       return;
     }
 
+    const { SecretsManager } = await import("../lib/secrets-manager.js");
+    const sm = SecretsManager.instance();
+
     // Determine target platforms
     const targets: AccountTarget[] = [];
     for (const acc of userAccounts) {
       const platformName = acc.platform.toLowerCase() as SocialPlatform;
       if (platforms.includes("all") || platforms.length === 0 || platforms.includes(platformName)) {
+        
+        // Decrypt tokens if they are encrypted
+        let decryptedAccess = acc.accessToken || undefined;
+        let decryptedRefresh = acc.refreshToken || undefined;
+        
+        if (decryptedAccess && decryptedAccess.startsWith("{")) {
+          decryptedAccess = sm.decryptOptional(decryptedAccess) || decryptedAccess;
+        }
+        if (decryptedRefresh && decryptedRefresh.startsWith("{")) {
+          decryptedRefresh = sm.decryptOptional(decryptedRefresh) || decryptedRefresh;
+        }
+
         targets.push({
           platform: platformName,
           credentials: {
-            accessToken: acc.accessToken || undefined,
-            refreshToken: acc.refreshToken || undefined,
+            accessToken: decryptedAccess,
+            refreshToken: decryptedRefresh,
             accountId: acc.username || undefined,
           },
           useGateway: useGateway || acc.platform === "universal_gateway",

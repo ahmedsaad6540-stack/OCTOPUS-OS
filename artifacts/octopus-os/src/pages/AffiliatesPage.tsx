@@ -28,7 +28,7 @@ export function AffiliatesPage() {
   
   const [importForm, setImportForm] = useState({ productName: "", productId: "", promolink: "" });
 
-  const isDemoMode = import.meta.env.VITE_AFFILIATE_DEMO_MODE === "true";
+  const isDevMode = import.meta.env.VITE_DEV_MODE === "true";
 
   const fetchConnections = async () => {
     if (!token) return;
@@ -65,7 +65,13 @@ export function AffiliatesPage() {
 
   const networkIds = Object.keys(NETWORK_META);
   const meta = NETWORK_META[selected];
-  const existingConn = connections.find(c => c.provider === selected && c.status === "active");
+  
+  // Find the active connection and ignore mock if not in dev mode
+  const existingConn = connections.find(c => {
+    if (c.provider !== selected || c.status !== "active") return false;
+    if (c.connectionSource === "mock" && !isDevMode) return false;
+    return true;
+  });
   const isConnected = !!existingConn;
 
   const connect = async () => {
