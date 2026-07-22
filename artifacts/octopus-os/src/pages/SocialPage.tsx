@@ -138,7 +138,9 @@ export function SocialPage() {
     }
   };
 
-  const isDevMode = import.meta.env.VITE_DEV_MODE === "true";
+  const defaultDomain = "finalsnapshot.vercel.app";
+  const apiUrl = API_BASE.replace(/\/api$/, "");
+  const domain = apiUrl.replace("https://", "").replace("http://", "") || defaultDomain;
 
   const platforms = PLATFORMS.map(p => {
     const record = connectedMap[p.id];
@@ -282,7 +284,6 @@ export function SocialPage() {
     }
   };
 
-  const domain = window.location.hostname || "yourdomain.com";
   const redirectUri = `https://${domain}/oauth/${selected}/callback`;
 
   return (
@@ -394,7 +395,7 @@ export function SocialPage() {
         </div>
         {platforms.map(p => {
           const isConnected = ["CONNECTED", "LIVE_VERIFIED"].includes(p.status);
-          const isMock = p.connectionSource === "mock";
+          const isMock = p.connectionSource === "mock" && isDevMode;
           return (
             <button key={p.id} onClick={() => { setSelected(p.id); setTestMsg(""); setSaveMsg(""); }}
               className={`w-full flex items-center gap-2 px-2 py-2 rounded-lg text-xs font-medium mb-0.5 transition-all ${selected === p.id ? "gradient-purple text-white" : "text-purple-300/70 hover:bg-purple-900/30"}`}>
@@ -408,64 +409,67 @@ export function SocialPage() {
 
       {/* Platform Config */}
       <div className="flex-1 p-6 overflow-y-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <span className="text-4xl">{platform.icon}</span>
-            <div>
-              <h1 className="text-xl font-bold text-white">{platform.name}</h1>
-              <div className="flex items-center gap-2 mt-0.5">
-                <span className={`w-2 h-2 rounded-full ${["CONNECTED", "LIVE_VERIFIED"].includes(platform.status) ? "bg-emerald-400" : "bg-gray-600"}`}></span>
-                <span className={`text-xs ${["CONNECTED", "LIVE_VERIFIED"].includes(platform.status) ? "text-emerald-400" : "text-gray-500"}`}>
-                  {platform.status}
-                </span>
-                {platform.connectionSource === "mock" && (
-                  <span className="text-[10px] font-mono text-yellow-500 border border-yellow-500/30 px-1.5 py-0.5 rounded ml-2">
-                    MOCK_DEVELOPMENT_ONLY
+        {selected !== "youtube" && (
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <span className="text-4xl">{platform.icon}</span>
+              <div>
+                <h1 className="text-xl font-bold text-white">{platform.name}</h1>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className={`w-2 h-2 rounded-full ${["CONNECTED", "LIVE_VERIFIED"].includes(platform.status) ? "bg-emerald-400" : "bg-gray-600"}`}></span>
+                  <span className={`text-xs ${["CONNECTED", "LIVE_VERIFIED"].includes(platform.status) ? "text-emerald-400" : "text-gray-500"}`}>
+                    {platform.status}
                   </span>
-                )}
+                  {platform.connectionSource === "mock" && isDevMode && (
+                    <span className="text-[10px] font-mono text-yellow-500 border border-yellow-500/30 px-1.5 py-0.5 rounded ml-2">
+                      MOCK_DEVELOPMENT_ONLY
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <button onClick={testConn} disabled={testing}
-              className="px-3 py-2 rounded-lg text-xs text-purple-300 border border-purple-500/30 hover:border-purple-400/50 transition-all">
-              {testing ? "⟳ Testing..." : "🧪 Test Connection"}
-            </button>
-            {platform.status !== "NOT_CONFIGURED" ? (
-              <button onClick={disconnect} disabled={saving}
-                className="px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-red-900/50 text-red-400 border border-red-500/30">
-                {saving ? "⟳ Disconnecting..." : "🔌 Disconnect"}
+            <div className="flex gap-2">
+              <button onClick={testConn} disabled={testing}
+                className="px-3 py-2 rounded-lg text-xs text-purple-300 border border-purple-500/30 hover:border-purple-400/50 transition-all">
+                {testing ? "⟳ Testing..." : "🧪 Test Connection"}
               </button>
-            ) : (
-              <button onClick={connect} disabled={saving}
-                className="px-4 py-2 rounded-lg text-xs font-semibold transition-all gradient-purple text-white glow-purple">
-                {saving ? "⟳ Connecting..." : "🔗 Connect"}
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Auto-Connect All Platforms Button */}
-        <div className="mb-6 flex flex-col gap-3">
-          <button
-            onClick={autoConnect}
-            disabled={autoConnecting}
-            className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-700/90 to-cyan-700/90 hover:from-emerald-600 hover:to-cyan-600 text-white font-bold py-3.5 px-6 rounded-xl text-xs border border-emerald-500/60 transition-all text-center shadow-[0_0_20px_rgba(16,185,129,0.3)] w-full"
-          >
-            {autoConnecting ? "⟳ جاري الربط التلقائي..." : "⚡ ربط جميع المنصات تلقائياً (ضغطة واحدة)"}
-          </button>
-          {["CONNECTED", "LIVE_VERIFIED"].includes(platform.status) && (
-            <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-900/30 border border-emerald-500/30">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
-              <span className="text-emerald-400 text-xs font-bold">✅ {platform.name} متصل ومفعّل</span>
+              {platform.status !== "NOT_CONFIGURED" ? (
+                <button onClick={disconnect} disabled={saving}
+                  className="px-4 py-2 rounded-lg text-xs font-semibold transition-all bg-red-900/50 text-red-400 border border-red-500/30">
+                  {saving ? "⟳ Disconnecting..." : "🔌 Disconnect"}
+                </button>
+              ) : (
+                <button onClick={connect} disabled={saving}
+                  className="px-4 py-2 rounded-lg text-xs font-semibold transition-all gradient-purple text-white glow-purple">
+                  {saving ? "⟳ Connecting..." : "🔗 Connect"}
+                </button>
+              )}
             </div>
-          )}
-          <div className="flex items-center my-1">
-            <div className="flex-1 border-t border-purple-950/50" />
-            <span className="px-2 text-[9px] text-purple-600 uppercase font-bold tracking-wider">أو الإعداد اليدوي أدناه</span>
-            <div className="flex-1 border-t border-purple-950/50" />
           </div>
-        </div>
+        )}
+
+        {selected !== "youtube" && (
+          <div className="mb-6 flex flex-col gap-3">
+            <button
+              onClick={autoConnect}
+              disabled={autoConnecting}
+              className="flex items-center justify-center gap-2 bg-gradient-to-r from-emerald-700/90 to-cyan-700/90 hover:from-emerald-600 hover:to-cyan-600 text-white font-bold py-3.5 px-6 rounded-xl text-xs border border-emerald-500/60 transition-all text-center shadow-[0_0_20px_rgba(16,185,129,0.3)] w-full"
+            >
+              {autoConnecting ? "⟳ جاري الربط التلقائي..." : "⚡ ربط جميع المنصات تلقائياً (ضغطة واحدة)"}
+            </button>
+            {["CONNECTED", "LIVE_VERIFIED"].includes(platform.status) && (
+              <div className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-900/30 border border-emerald-500/30">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-emerald-400 text-xs font-bold">✅ {platform.name} متصل ومفعّل</span>
+              </div>
+            )}
+            <div className="flex items-center my-1">
+              <div className="flex-1 border-t border-purple-950/50" />
+              <span className="px-2 text-[9px] text-purple-600 uppercase font-bold tracking-wider">أو الإعداد اليدوي أدناه</span>
+              <div className="flex-1 border-t border-purple-950/50" />
+            </div>
+          </div>
+        )}
 
         {testMsg && (
           <div className={`mb-4 px-4 py-3 rounded-lg text-xs ${testMsg.includes("✅") ? "bg-emerald-900/20 text-emerald-400 border border-emerald-500/20" : "bg-red-900/20 text-red-400 border border-red-500/20"}`}>
