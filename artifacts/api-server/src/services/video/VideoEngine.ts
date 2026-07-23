@@ -75,35 +75,61 @@ export class VideoEngine {
   }
 
   async renderVideo(script: VideoScriptResponse, images: string[]): Promise<string> {
-    const fs = await import("node:fs/promises");
-    const path = await import("node:path");
-    const { fileURLToPath } = await import("node:url");
-    const { exec } = await import("node:child_process");
-    const { promisify } = await import("node:util");
-    const execAsync = promisify(exec);
-
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-    const publicRendersDir = path.resolve(__dirname, "../../../../public/renders");
-    
-    await fs.mkdir(publicRendersDir, { recursive: true });
-
-    const fileName = `video_${randomUUID()}.mp4`;
-    const destMp4 = path.join(publicRendersDir, fileName);
-
-    try {
-      // Return a real sample AI-generated vertical video from a fast CDN
-      // This ensures the frontend video player works perfectly and looks like a real product video.
-      const sampleVideos = [
-        "https://cdn.pixabay.com/video/2023/10/22/186105-877112002_tiny.mp4",
-        "https://cdn.pixabay.com/video/2023/07/04/170138-842491176_tiny.mp4",
-        "https://cdn.pixabay.com/video/2024/02/16/200676-913619525_tiny.mp4"
-      ];
-      return sampleVideos[Math.floor(Math.random() * sampleVideos.length)];
-    } catch (e: any) {
-      console.error("Failed to assign video URL:", e);
-      return "https://cdn.pixabay.com/video/2023/10/22/186105-877112002_tiny.mp4";
+    const heygenKey = process.env["HEYGEN_API_KEY"];
+    if (!heygenKey) {
+      throw new Error("HEYGEN_API_KEY is missing. Cannot render real AI video.");
     }
+
+    const fullScript = `${script.hook} ${script.body.join(" ")} ${script.callToAction}`;
+
+    // Real HeyGen render
+    const initRes = await fetch("https://api.heygen.com/v2/video/generate", {
+      method: "POST",
+      headers: { "X-Api-Key": heygenKey, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        video_inputs: [{
+          character: { type: "avatar", avatar_id: "Aditya_public_4", avatar_style: "normal" },
+          voice: { type: "text", input_text: fullScript, voice_id: "f38a635bee7a4d1f9b0a654a31d050d2" },
+          background: { type: "color", value: "#0a0614" },
+        }],
+        dimension: { width: 1080, height: 1920 },
+        title: script.title || "OCTOPUS Generated Video",
+      }),
+    });
+
+    if (!initRes.ok) {
+      throw new Error(`HeyGen init failed (${initRes.status}): ${await initRes.text()}`);
+    }
+
+    const initData = await initRes.json() as { data?: { video_id?: string } };
+    const heygenVideoId = initData.data?.video_id;
+    if (!heygenVideoId) throw new Error("HeyGen did not return video_id");
+
+    // Poll HeyGen until ready
+    const HEYGEN_MAX_POLLS = 50;
+    const HEYGEN_POLL_INTERVAL_MS = 9000;
+    
+    let videoUrl: string | null = null;
+    for (let i = 0; i < HEYGEN_MAX_POLLS; i++) {
+      await new Promise((r) => setTimeout(r, HEYGEN_POLL_INTERVAL_MS));
+
+      const stRes = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${heygenVideoId}`, {
+        headers: { "X-Api-Key": heygenKey },
+      });
+      if (!stRes.ok) continue;
+
+      const stData = await stRes.json() as { data?: { status?: string; video_url?: string } };
+      const st = stData.data?.status?.toLowerCase();
+
+      if (st === "completed" && stData.data?.video_url) {
+        videoUrl = stData.data.video_url;
+        break;
+      }
+      if (st === "failed") throw new Error(`HeyGen render failed for video_id=${heygenVideoId}`);
+    }
+
+    if (!videoUrl) throw new Error("Timed out waiting for HeyGen render");
+    return videoUrl;
   }
 
   async queueVideoGeneration(req: VideoScriptRequest): Promise<VideoGenerationJob> {

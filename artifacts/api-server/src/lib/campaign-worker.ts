@@ -186,49 +186,65 @@ async function handleRenderVideo(payload: Record<string, string>) {
 
 // ─── Handler: publish-social ──────────────────────────────────────────────────
 async function handlePublishSocial(payload: Record<string, string>) {
-  const { campaignId, userId, videoJobId, videoUrl, title, script, platform, productUrl } = payload;
+  const { campaignId, userId, videoJobId, videoUrl, title, script, productUrl } = payload;
 
   const engine = new SocialEngine();
-  const normalizedPlatform = (platform || "youtube").toLowerCase().includes("tiktok") ? "tiktok" : "youtube";
+  const platformsToPublish: SocialPlatform[] = ["tiktok", "youtube", "instagram"];
+  
+  const results = [];
+  const publishedUrls = [];
+  const noteLines = [];
 
-  // Load credentials from vault (falls back to env vars inside each publisher)
-  const creds = await socialCredentialsService.get(userId, normalizedPlatform) ?? {};
+  for (const plat of platformsToPublish) {
+    try {
+      const creds = await socialCredentialsService.get(userId, plat) ?? {};
+      
+      const result = await engine.publish(
+        {
+          title: title || "Campaign Video",
+          description: `${script}\n\n👉 Get it now: ${productUrl || "link in bio"}\n\n#ai #affiliate #viral`,
+          videoUrl,
+          tags: ["ai", "affiliate", "viral", "shorts"],
+          privacyStatus: "public",
+          aiOptimize: true,
+        },
+        plat,
+        creds,
+      );
 
-  const result = await engine.publish(
-    {
-      title: title || "Campaign Video",
-      description: `${script}\n\n👉 Get it now: ${productUrl || "link in bio"}\n\n#ai #affiliate #viral`,
-      videoUrl,
-      tags: ["ai", "affiliate", "viral", "shorts"],
-      privacyStatus: "public",
-      aiOptimize: true,
-    },
-    normalizedPlatform as SocialPlatform,
-    creds,
-  );
+      results.push({ platform: plat, ...result });
+      
+      const pUrl = result.platformUrl || result.platformVideoUrl;
+      if (result.status === "completed" && pUrl) {
+        publishedUrls.push(pUrl);
+        noteLines.push(`✅ ${plat}: ${pUrl}`);
+      } else {
+        noteLines.push(`⚠ ${plat} failed: ${result.error || "unknown"}`);
+      }
+    } catch (e: any) {
+      noteLines.push(`⚠ ${plat} error: ${e.message}`);
+    }
+  }
 
-  const publishedUrl = result.platformUrl || result.platformVideoUrl || "";
+  const mainUrl = publishedUrls[0] || "";
+  const finalStatus = publishedUrls.length > 0 ? "active" : "paused";
+  const notes = noteLines.join("\n");
 
   // Update DB records
   if (videoJobId) {
     await db.update(videoJobsTable)
-      .set({ publishedUrl, updatedAt: new Date() })
+      .set({ publishedUrl: mainUrl, updatedAt: new Date() })
       .where(eq(videoJobsTable.id, videoJobId));
   }
 
   if (campaignId && userId) {
-    const status = result.status === "completed" ? "active" : "paused";
-    const notes = result.status === "completed"
-      ? `✅ Published to ${normalizedPlatform}: ${publishedUrl}`
-      : `⚠ Publish attempted but failed: ${result.error || "unknown"}`;
-
     await db.update(campaignsTable)
-      .set({ status, publishedUrl, notes, updatedAt: new Date() })
+      .set({ status: finalStatus, publishedUrl: mainUrl, notes, updatedAt: new Date() })
       .where(and(eq(campaignsTable.id, campaignId), eq(campaignsTable.userId, userId)));
   }
 
-  logger.info({ campaignId, platform: normalizedPlatform, publishedUrl, status: result.status }, "worker.publish_social.done");
-  return { publishedUrl, status: result.status };
+  logger.info({ campaignId, platforms: platformsToPublish, publishedUrls }, "worker.publish_social.done");
+  return { publishedUrl: mainUrl, status: finalStatus };
 }
 
 // ─── Dispatch table ───────────────────────────────────────────────────────────

@@ -41,6 +41,11 @@ export class CampaignService extends BaseService<CampaignRepository, Campaign> {
     await this.repository.generateScripts(token, id);
   }
 
+  public async launchEngine(token: string, id: string | number): Promise<{ success: boolean; message: string }> {
+    await this.repository.launchEngine(token, id);
+    return { success: true, message: "Pipeline launched successfully" };
+  }
+
   public async publish(token: string): Promise<{ success: boolean; message: string }> {
     return this.repository.publish(token);
   }

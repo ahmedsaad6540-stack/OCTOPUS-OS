@@ -89,7 +89,7 @@ export function useCampaignMutations() {
   });
 
   const startProfitEngine = useMutation({
-    mutationFn: () => campaignService.publish(token!),
+    mutationFn: (id: string | number) => campaignService.launchEngine(token!, id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["campaigns"] });
     },

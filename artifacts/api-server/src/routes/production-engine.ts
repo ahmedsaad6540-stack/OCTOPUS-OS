@@ -25,6 +25,7 @@ import { requireAuth, type AuthRequest } from "../middleware/auth.js";
 import { campaignWorkflowService } from "../lib/campaign-workflow-service.js";
 import { workflowEngine } from "../lib/workflow-engine.js";
 import { logger } from "../lib/logger.js";
+import { videoEngine } from "../services/video/VideoEngine.js";
 
 const router = Router();
 
@@ -105,7 +106,7 @@ router.post("/generate-video-batch", requireAuth, async (req: AuthRequest, res) 
     // Process jobs asynchronously
     setTimeout(async () => {
       console.log(`[VideoBatch] Starting async video generation for ${batchJobs.length} jobs`);
-      const { videoEngine } = await import("../services/video/VideoEngine.js");
+      
       for (const job of batchJobs as any[]) {
         try {
           console.log(`[VideoBatch] Rendering job ${job.id}`);
@@ -116,9 +117,9 @@ router.post("/generate-video-batch", requireAuth, async (req: AuthRequest, res) 
           );
           console.log(`[VideoBatch] Finished rendering job ${job.id}. Video URL: ${videoUrl}`);
           await db.update(videoJobsTable).set({ status: "done", progress: 100, videoUrl, updatedAt: new Date() }).where(eq(videoJobsTable.id, job.id));
-        } catch (e) {
+        } catch (e: any) {
           console.error(`[VideoBatch] Async video generation failed for job ${job.id}`, e);
-          await db.update(videoJobsTable).set({ status: "failed", progress: 0 }).where(eq(videoJobsTable.id, job.id));
+          await db.update(videoJobsTable).set({ status: "failed", errorMessage: e?.message || String(e), progress: 0 }).where(eq(videoJobsTable.id, job.id));
         }
       }
     }, 1000);

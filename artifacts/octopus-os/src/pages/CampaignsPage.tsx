@@ -65,16 +65,8 @@ export function CampaignsPage() {
     <div className="p-6 min-h-screen" style={{ background: "#0a0614" }}>
       <CampaignToolbar 
         onNew={() => setShowForm(!showForm)} 
-        onStartEngine={handleStartEngine} 
-        isEngineStarting={startProfitEngine.isPending} 
         isFormOpen={showForm} 
       />
-
-      {engineResult && (
-        <div className={`mb-4 p-4 rounded-xl border ${engineResult.success ? "bg-emerald-900/30 border-emerald-500/50 text-emerald-300" : "bg-red-900/30 border-red-500/50 text-red-300"}`}>
-          {engineResult.message}
-        </div>
-      )}
       
       {error && (
         <div className="mb-4 p-4 rounded-xl bg-red-950/40 border border-red-500/20 text-red-400 text-xs">
@@ -99,7 +91,7 @@ export function CampaignsPage() {
       <div className="mt-10 border-t border-purple-900/30 pt-6 flex justify-between items-center bg-black/20 p-4 rounded-xl">
         <div>
           <h3 className="text-sm font-bold text-white mb-1">الخطوة الأخيرة: محرك الأرباح (Profit Engine)</h3>
-          <p className="text-xs text-purple-400">بمجرد إنشاء الحملة، انقر على زر Start Profit Engine في الأعلى ليبدأ النظام بالعمل، ثم يمكنك متابعة حالة الفيديوهات من Video Factory.</p>
+          <p className="text-xs text-purple-400">بمجرد إنشاء الحملة، انقر على زر 🚀 Launch Real Pipeline الموجود على كارت الحملة ليبدأ النظام بالعمل الفعلي والتوليد الذكي، ثم يمكنك متابعة حالة الفيديوهات من Video Factory.</p>
         </div>
         <button 
           onClick={() => setLocation("/video-factory")}

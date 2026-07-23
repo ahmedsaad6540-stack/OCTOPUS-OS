@@ -7,10 +7,11 @@ const SOCIAL_ICONS: Record<string, string> = { TikTok: "🎵", Instagram: "📸"
 export function CampaignCard({ campaign: c }: { campaign: Campaign }) {
   const [expanded, setExpanded] = useState(false);
   const { data: stats, isLoading } = useCampaignStats(c.id);
-  const { toggleCampaignStatus, deleteCampaign } = useCampaignMutations();
+  const { toggleCampaignStatus, deleteCampaign, startProfitEngine } = useCampaignMutations();
   
   const isToggling = toggleCampaignStatus.isPending && toggleCampaignStatus.variables?.id === c.id;
   const isDeleting = deleteCampaign.isPending && deleteCampaign.variables === c.id;
+  const isStarting = startProfitEngine.isPending && startProfitEngine.variables === c.id;
   const isActive = ["active", "running", "queued"].includes(c.status);
 
   return (
@@ -96,7 +97,7 @@ export function CampaignCard({ campaign: c }: { campaign: Campaign }) {
           </>
         )}
 
-        <div className="flex items-center gap-2 pt-3 border-t border-purple-500/10">
+        <div className="flex items-center gap-2 pt-3 border-t border-purple-500/10 mb-2">
           <button onClick={() => toggleCampaignStatus.mutate({ id: c.id, currentStatus: isActive ? "active" : "paused" })} disabled={isToggling}
             className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
               isActive ? "bg-yellow-950/30 text-yellow-400 border border-yellow-500/20" : "bg-emerald-950/30 text-emerald-400 border border-emerald-500/20"
@@ -110,6 +111,14 @@ export function CampaignCard({ campaign: c }: { campaign: Campaign }) {
             {isDeleting ? "⏳" : "🗑"}
           </button>
         </div>
+        
+        <button 
+          onClick={() => startProfitEngine.mutate(c.id)}
+          disabled={isStarting}
+          className="w-full px-3 py-2.5 rounded-lg text-xs font-black text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-[0_0_15px_rgba(16,185,129,0.3)] transition-all flex justify-center items-center gap-2 disabled:opacity-50"
+        >
+          {isStarting ? "⏳ Launching..." : "🚀 Launch Real Pipeline"}
+        </button>
       </div>
     </div>
   );
