@@ -1,0 +1,19 @@
+# ---- Builder -------------------------------------------------
+FROM node:20-alpine AS builder
+WORKDIR /app
+# copy only the API server files
+COPY artifacts/api-server/package*.json ./
+COPY artifacts/api-server/ .
+# install pnpm, dependencies and build
+RUN npm i -g pnpm && pnpm install && pnpm run build
+
+# ---- Runtime -------------------------------------------------
+FROM node:20-alpine
+WORKDIR /app
+# copy built output and needed modules
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package*.json ./
+ENV NODE_ENV=production
+EXPOSE 3000
+CMD ["node", "--enable-source-maps", "./dist/index.mjs"]

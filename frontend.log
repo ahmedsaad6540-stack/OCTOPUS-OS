@@ -1,0 +1,11 @@
+
+> @workspace/octopus-os@0.0.0 dev /home/runner/work/OCTOPUS-OS/OCTOPUS-OS/artifacts/octopus-os
+> vite --config vite.config.ts --host 0.0.0.0
+
+◇ injected env (0) from .env // tip: ⌘ multiple files { path: ['.env.local', '.env'] }
+
+  [32m[1mVITE[22m v7.3.5[39m  [2mready in [0m[1m372[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m8081[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://10.1.0.15:[1m8081[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://172.18.0.1:[1m8081[22m/[39m

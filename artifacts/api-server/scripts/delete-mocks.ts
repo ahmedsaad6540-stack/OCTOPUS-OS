@@ -1,0 +1,1 @@
+import { db } from "@workspace/db"; import { sql } from "drizzle-orm"; async function run() { await db.execute(sql`DELETE FROM social_accounts WHERE connection_source = 'mock'`); console.log("Deleted mocks"); process.exit(0); } run();

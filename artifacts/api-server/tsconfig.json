@@ -1,0 +1,61 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuildinfo",
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "include": ["src"],
+  "references": [
+    {
+      "path": "../../lib/db"
+    },
+    {
+      "path": "../../lib/api-zod"
+    },
+    {
+      "path": "../../lib/event-bus"
+    },
+    {
+      "path": "../../lib/task-queue"
+    },
+    {
+      "path": "../../lib/brain"
+    },
+    {
+      "path": "../../lib/decision-engine"
+    },
+    {
+      "path": "../../lib/rule-engine"
+    },
+    {
+      "path": "../../lib/agent-manager"
+    },
+    {
+      "path": "../../lib/ai-provider-manager"
+    },
+    {
+      "path": "../../lib/tool-manager"
+    },
+    {
+      "path": "../../lib/workflow-engine"
+    },
+    {
+      "path": "../../lib/scheduler"
+    },
+    {
+      "path": "../../lib/notification-system"
+    },
+    {
+      "path": "../../lib/audit-observability"
+    },
+    {
+      "path": "../../lib/settings"
+    },
+    {
+      "path": "../../lib/profit-engine"
+    }
+  ]
+}

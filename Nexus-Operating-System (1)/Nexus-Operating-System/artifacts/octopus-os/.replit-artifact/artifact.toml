@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "OCTOPUS NEXUS OS v7"
+version = "1.0.0"
+id = "artifacts/octopus-os"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20610
+
+[services.development]
+run = "pnpm --filter @workspace/octopus-os run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/octopus-os", "run", "build" ]
+publicDir = "artifacts/octopus-os/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20610"
+BASE_PATH = "/"

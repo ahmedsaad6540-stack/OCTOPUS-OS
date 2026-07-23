@@ -1,0 +1,786 @@
+
+> @workspace/api-server@0.0.0 start /home/runner/work/OCTOPUS-OS/OCTOPUS-OS/artifacts/api-server
+> cross-env PORT=5002 node -r dotenv/config --enable-source-maps ./dist/index.mjs
+
+[SecretsManager] CREDENTIAL_ENCRYPTION_KEY not set or invalid. Using dev fallback key. Set a 64-char hex key in production!
+DEBUG DATABASE_URL: postgresql://postgres:postgres@localhost:5432/octopus_test
+[11:28:13.128] [32mINFO[39m (6039): [36mrule_engine.loaded[39m
+    [35mcount[39m: 0
+[11:28:13.128] [32mINFO[39m (6039): [36mRegistered real tool handlers: render_video_handler, generate_voiceover_handler, upload_youtube_video_handler, upload_tiktok_video_handler[39m
+[11:28:13.132] [32mINFO[39m (6039): [36mSeeded real tool definition into DB[39m
+    [35mtoolName[39m: "render_video"
+[11:28:13.135] [32mINFO[39m (6039): [36mSeeded real tool definition into DB[39m
+    [35mtoolName[39m: "generate_voiceover"
+[11:28:13.139] [32mINFO[39m (6039): [36mSeeded real tool definition into DB[39m
+    [35mtoolName[39m: "upload_youtube_video"
+[11:28:13.144] [32mINFO[39m (6039): [36mSeeded real tool definition into DB[39m
+    [35mtoolName[39m: "upload_tiktok_video"
+[11:28:13.147] [32mINFO[39m (6039): [36mSeeded real tool definition into DB[39m
+    [35mtoolName[39m: "tavily_search"
+[11:28:13.150] [32mINFO[39m (6039): [36mSeeded real tool definition into DB[39m
+    [35mtoolName[39m: "web_scraper"
+[11:28:13.152] [32mINFO[39m (6039): [36mSeeded real tool definition into DB[39m
+    [35mtoolName[39m: "system_stats"
+[11:28:13.576] [32mINFO[39m (6039): [36mDefault admin user Ahmed Saad seeded successfully into PostgreSQL.[39m
+[11:28:13.577] [32mINFO[39m (6039): [36m🐙 Starting Autonomous 24/7 Production & Monetization Daemon loop...[39m
+    [35mintervalMs[39m: 30000
+[11:28:13.577] [32mINFO[39m (6039): [36mcampaign_worker.started[39m
+[11:28:13.579] [32mINFO[39m (6039): [36mServer listening successfully[39m
+    [35mport[39m: 5002
+    [35mbootDurationMs[39m: 486
+    [35mmemoryUsageMB[39m: 101
+[11:28:13.589] [32mINFO[39m (6039): [36mevent.published[39m
+    [35meventId[39m: "4252e321-1e92-49e0-aac9-17de8dab9030"
+    [35mtype[39m: "system.startup"
+    [35msource[39m: "api-server"
+    [35mcorrelationId[39m: "ef7bb332-2df9-4790-ac7c-c350e496cf05"
+[11:28:25.463] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 1,
+      "method": "POST",
+      "url": "/api/auth/register"
+    }
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 371
+[11:28:27.423] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 2,
+      "method": "OPTIONS",
+      "url": "/api/auth/login"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 1
+[11:28:27.818] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 3,
+      "method": "POST",
+      "url": "/api/auth/login"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 393
+[11:28:27.867] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 4,
+      "method": "OPTIONS",
+      "url": "/api/system/status"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:27.870] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 5,
+      "method": "OPTIONS",
+      "url": "/api/agents"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 1
+[11:28:27.874] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 7,
+      "method": "OPTIONS",
+      "url": "/api/tasks"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:27.883] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 9,
+      "method": "OPTIONS",
+      "url": "/api/campaigns"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:27.894] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 11,
+      "method": "GET",
+      "url": "/api/campaigns"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 5
+[11:28:27.907] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 10,
+      "method": "GET",
+      "url": "/api/tasks"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 23
+[11:28:27.908] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 8,
+      "method": "GET",
+      "url": "/api/agents"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 33
+[11:28:27.918] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 6,
+      "method": "GET",
+      "url": "/api/system/status"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 46
+[11:28:28.315] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 13,
+      "method": "GET",
+      "url": "/api/agents"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 10
+[11:28:28.317] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 14,
+      "method": "GET",
+      "url": "/api/tasks"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 13
+[11:28:28.319] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 15,
+      "method": "GET",
+      "url": "/api/campaigns"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 14
+[11:28:28.337] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 12,
+      "method": "GET",
+      "url": "/api/system/status"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 34
+[11:28:28.343] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 16,
+      "method": "OPTIONS",
+      "url": "/api/affiliate/connections"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 1
+[11:28:28.345] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 17,
+      "method": "OPTIONS",
+      "url": "/api/affiliate/products"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 1
+[11:28:28.351] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 18,
+      "method": "GET",
+      "url": "/api/affiliate/connections"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 5
+[11:28:28.352] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 19,
+      "method": "GET",
+      "url": "/api/affiliate/products"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 6
+[11:28:28.422] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 20,
+      "method": "OPTIONS",
+      "url": "/api/affiliate/connections/digistore24"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:28.431] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 21,
+      "method": "POST",
+      "url": "/api/affiliate/connections/digistore24"
+    }
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 7
+[11:28:28.437] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 22,
+      "method": "GET",
+      "url": "/api/affiliate/connections"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 4
+[11:28:28.562] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 23,
+      "method": "OPTIONS",
+      "url": "/api/affiliate/products/import"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:28.581] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 24,
+      "method": "POST",
+      "url": "/api/affiliate/products/import"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 12
+[11:28:28.604] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 25,
+      "method": "GET",
+      "url": "/api/affiliate/products"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 3
+[11:28:34.611] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 26,
+      "method": "POST",
+      "url": "/api/auth/register"
+    }
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 381
+[11:28:35.750] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 27,
+      "method": "OPTIONS",
+      "url": "/api/auth/login"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:36.153] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 28,
+      "method": "POST",
+      "url": "/api/auth/login"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 399
+[11:28:36.213] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 29,
+      "method": "OPTIONS",
+      "url": "/api/system/status"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:36.214] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 30,
+      "method": "OPTIONS",
+      "url": "/api/agents"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:36.215] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 31,
+      "method": "OPTIONS",
+      "url": "/api/tasks"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:36.216] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 32,
+      "method": "OPTIONS",
+      "url": "/api/campaigns"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:36.230] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 34,
+      "method": "GET",
+      "url": "/api/agents"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 8
+[11:28:36.231] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 35,
+      "method": "GET",
+      "url": "/api/tasks"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 8
+[11:28:36.233] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 36,
+      "method": "GET",
+      "url": "/api/campaigns"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 9
+[11:28:36.240] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 33,
+      "method": "GET",
+      "url": "/api/system/status"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 21
+[11:28:36.694] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 38,
+      "method": "GET",
+      "url": "/api/agents"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 9
+[11:28:36.695] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 39,
+      "method": "GET",
+      "url": "/api/tasks"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 9
+[11:28:36.696] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 40,
+      "method": "GET",
+      "url": "/api/campaigns"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 9
+[11:28:36.707] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 37,
+      "method": "GET",
+      "url": "/api/system/status"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 22
+[11:28:36.729] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 41,
+      "method": "OPTIONS",
+      "url": "/api/affiliate/connections"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 1
+[11:28:36.730] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 42,
+      "method": "OPTIONS",
+      "url": "/api/affiliate/products"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:36.735] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 43,
+      "method": "GET",
+      "url": "/api/affiliate/connections"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 4
+[11:28:36.738] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 44,
+      "method": "GET",
+      "url": "/api/affiliate/products"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 4
+[11:28:36.860] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 45,
+      "method": "OPTIONS",
+      "url": "/api/affiliate/connections/digistore24"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 2
+[11:28:36.865] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 46,
+      "method": "POST",
+      "url": "/api/affiliate/connections/digistore24"
+    }
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 4
+[11:28:36.878] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 47,
+      "method": "GET",
+      "url": "/api/affiliate/connections"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 2
+[11:28:37.064] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 48,
+      "method": "OPTIONS",
+      "url": "/api/affiliate/products/import"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:37.071] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 49,
+      "method": "POST",
+      "url": "/api/affiliate/products/import"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 6
+[11:28:37.092] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 50,
+      "method": "GET",
+      "url": "/api/affiliate/products"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 4
+[11:28:43.504] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 51,
+      "method": "POST",
+      "url": "/api/auth/register"
+    }
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 371
+[11:28:44.361] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 52,
+      "method": "OPTIONS",
+      "url": "/api/auth/login"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 1
+[11:28:44.759] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 53,
+      "method": "POST",
+      "url": "/api/auth/login"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 397
+[11:28:44.809] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 54,
+      "method": "OPTIONS",
+      "url": "/api/system/status"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:44.814] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 56,
+      "method": "OPTIONS",
+      "url": "/api/agents"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 1
+[11:28:44.814] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 57,
+      "method": "OPTIONS",
+      "url": "/api/tasks"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:44.815] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 58,
+      "method": "OPTIONS",
+      "url": "/api/campaigns"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:44.825] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 59,
+      "method": "GET",
+      "url": "/api/agents"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 6
+[11:28:44.826] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 60,
+      "method": "GET",
+      "url": "/api/tasks"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 7
+[11:28:44.826] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 61,
+      "method": "GET",
+      "url": "/api/campaigns"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 6
+[11:28:44.834] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 55,
+      "method": "GET",
+      "url": "/api/system/status"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 21
+[11:28:45.322] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 63,
+      "method": "GET",
+      "url": "/api/agents"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 13
+[11:28:45.332] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 64,
+      "method": "GET",
+      "url": "/api/tasks"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 20
+[11:28:45.339] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 65,
+      "method": "GET",
+      "url": "/api/campaigns"
+    }
+    [35mres[39m: {
+      "statusCode": 304
+    }
+    [35mresponseTime[39m: 27
+[11:28:45.352] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 62,
+      "method": "GET",
+      "url": "/api/system/status"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 44
+[11:28:45.365] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 66,
+      "method": "OPTIONS",
+      "url": "/api/affiliate/connections"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:45.366] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 67,
+      "method": "OPTIONS",
+      "url": "/api/affiliate/products"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:45.389] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 68,
+      "method": "GET",
+      "url": "/api/affiliate/connections"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 12
+[11:28:45.393] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 69,
+      "method": "GET",
+      "url": "/api/affiliate/products"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 16
+[11:28:45.452] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 70,
+      "method": "OPTIONS",
+      "url": "/api/affiliate/connections/digistore24"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 1
+[11:28:45.458] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 71,
+      "method": "POST",
+      "url": "/api/affiliate/connections/digistore24"
+    }
+    [35mres[39m: {
+      "statusCode": 201
+    }
+    [35mresponseTime[39m: 5
+[11:28:45.490] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 72,
+      "method": "GET",
+      "url": "/api/affiliate/connections"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 6
+[11:28:45.630] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 73,
+      "method": "OPTIONS",
+      "url": "/api/affiliate/products/import"
+    }
+    [35mres[39m: {
+      "statusCode": 204
+    }
+    [35mresponseTime[39m: 0
+[11:28:45.638] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 74,
+      "method": "POST",
+      "url": "/api/affiliate/products/import"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 6
+[11:28:45.661] [32mINFO[39m (6039): [36mrequest completed[39m
+    [35mreq[39m: {
+      "id": 75,
+      "method": "GET",
+      "url": "/api/affiliate/products"
+    }
+    [35mres[39m: {
+      "statusCode": 200
+    }
+    [35mresponseTime[39m: 5

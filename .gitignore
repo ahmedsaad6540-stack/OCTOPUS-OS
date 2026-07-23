@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.vite-temp/
+.env
+postgres_data/
+postgres.log
+.vercel
+
+.env.test.local
+.env*.local

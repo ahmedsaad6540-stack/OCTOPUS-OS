@@ -1,0 +1,1 @@
+- [OCTOPUS NEXUS OS Architecture](octopus-os.md) — Full-stack Business OS; frontend in mockup-sandbox, backend in api-server; JWT auth + 4 DB tables.

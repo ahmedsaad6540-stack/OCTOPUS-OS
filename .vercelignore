@@ -1,0 +1,16 @@
+node_modules
+.git
+.github
+.replit
+.vercel
+dist
+postgres_data
+postgres.log
+Nexus-Operating-System (1)
+packages/*/node_modules
+lib/*/node_modules
+artifacts/*/node_modules
+**/node_modules
+**/dist
+**/.cache
+**/.next

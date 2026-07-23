@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "references": [
+    { "path": "../db" },
+    { "path": "../profit-memory" },
+    { "path": "../profit-twin" },
+    { "path": "../knowledge-graph" },
+    { "path": "../strategy-engine" },
+    { "path": "../goal-engine" },
+    { "path": "../budget-manager" },
+    { "path": "../experiment-engine" },
+    { "path": "../network-adapters" },
+    { "path": "../viral-detector" },
+    { "path": "../self-evolution" },
+    { "path": "../business-policy" }
+  ],
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
+}

@@ -1,0 +1,1 @@
+import { db } from "@workspace/db"; import { sql } from "drizzle-orm"; async function run() { const res = await db.execute(sql`SELECT id, platform, status, connection_source FROM social_accounts`); console.log(JSON.stringify(res, null, 2)); process.exit(0); } run();

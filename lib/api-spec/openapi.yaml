@@ -1,0 +1,3308 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: system
+    description: OS Core observability (Event Bus history)
+  - name: tasks
+    description: OS Core Task Manager + Queue Manager
+  - name: brain
+    description: OS Core Brain (decision maker) observability
+  - name: rules
+    description: Rule Engine — data-defined rules on top of the Brain
+  - name: agents
+    description: Agent Manager — agent registration, lifecycle, and run history
+  - name: provider-configs
+    description: >
+      AI Provider Manager — provider configurations powering the Agent
+      Manager's AgentExecutor. Distinct from the legacy /providers
+      endpoints, which predate OS Core.
+  - name: tools
+    description: Tool Manager — tool registration, schema-validated invocation, and handler registry
+  - name: workflows
+    description: Workflow Engine — ordered multi-step orchestration across tools, agents, tasks, and events
+  - name: scheduled-jobs
+    description: Scheduler — cron/interval-triggered workflow runs and task enqueues
+  - name: notifications
+    description: Notification System — channel configuration, delivery, and in-app inbox
+  - name: observability
+    description: Audit & Observability — cross-cutting audit trail and aggregated system health
+  - name: settings
+    description: Settings — generic key-value settings at system and per-user scope
+paths:
+  /system/events:
+    get:
+      operationId: listSystemEvents
+      tags: [system]
+      summary: List event history
+      description: >
+        Read-only view over the Event Bus's durable event history. Non-admin
+        callers only see events scoped to their own account.
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: correlationId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: before
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Event history page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [events]
+                properties:
+                  events:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OctopusEvent"
+  /system/events/{id}:
+    get:
+      operationId: getSystemEvent
+      tags: [system]
+      summary: Get a single event
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The event
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [event]
+                properties:
+                  event:
+                    $ref: "#/components/schemas/OctopusEvent"
+        "404":
+          description: Not found
+  /tasks:
+    get:
+      operationId: listTasks
+      tags: [tasks]
+      summary: List tasks
+      description: >
+        Query the Task Manager's task history. Non-admin callers only see
+        tasks scoped to their own account.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/TaskStatus"
+        - name: type
+          in: query
+          schema:
+            type: string
+        - name: queue
+          in: query
+          schema:
+            type: string
+        - name: correlationId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Task page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tasks]
+                properties:
+                  tasks:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/OctopusTask"
+    post:
+      operationId: createTask
+      tags: [tasks]
+      summary: Enqueue a task
+      description: >
+        Creates a new task in the `queued` state and publishes a
+        `task.created` event. The task is not executed by this call — a
+        worker claims it via POST /tasks/claim.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTaskRequest"
+      responses:
+        "201":
+          description: The created task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task]
+                properties:
+                  task:
+                    $ref: "#/components/schemas/OctopusTask"
+        "400":
+          description: Invalid request body
+  /tasks/{id}:
+    get:
+      operationId: getTask
+      tags: [tasks]
+      summary: Get a single task
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task]
+                properties:
+                  task:
+                    $ref: "#/components/schemas/OctopusTask"
+        "404":
+          description: Not found
+  /tasks/{id}/cancel:
+    post:
+      operationId: cancelTask
+      tags: [tasks]
+      summary: Cancel a task
+      description: >
+        Cancels a task that is still `queued` or `running`, and publishes a
+        `task.cancelled` event. No-op error if the task is already in a
+        terminal state.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The cancelled task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task]
+                properties:
+                  task:
+                    $ref: "#/components/schemas/OctopusTask"
+        "404":
+          description: Not found
+        "409":
+          description: Task is already in a terminal state
+  /tasks/claim:
+    post:
+      operationId: claimTask
+      tags: [tasks]
+      summary: Claim the next available task
+      description: >
+        Queue Manager operation: atomically claims the next eligible queued
+        task for the caller, marks it `running`, and publishes a
+        `task.started` event. Intended for worker/agent clients. Returns 204
+        (no body) if no task is currently eligible.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                queue:
+                  type: string
+                  description: Defaults to "default"
+      responses:
+        "200":
+          description: The claimed task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task]
+                properties:
+                  task:
+                    $ref: "#/components/schemas/OctopusTask"
+        "204":
+          description: No eligible task to claim
+  /tasks/{id}/complete:
+    post:
+      operationId: completeTask
+      tags: [tasks]
+      summary: Mark a claimed task completed
+      description: >
+        Queue Manager operation: marks a task this caller currently holds
+        the claim on as `completed`, and publishes a `task.completed` event.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                result: {}
+      responses:
+        "200":
+          description: The completed task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task]
+                properties:
+                  task:
+                    $ref: "#/components/schemas/OctopusTask"
+        "404":
+          description: Not found
+        "409":
+          description: Task is not currently claimed by this caller
+  /tasks/{id}/fail:
+    post:
+      operationId: failTask
+      tags: [tasks]
+      summary: Report a claimed task as failed
+      description: >
+        Queue Manager operation: reports failure for a task this caller
+        currently holds the claim on. If retries remain (and `retry` isn't
+        `false`), reschedules the task with exponential backoff and
+        publishes `task.retrying`; otherwise marks it permanently `failed`
+        and publishes `task.failed`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [error]
+              properties:
+                error:
+                  type: string
+                retry:
+                  type: boolean
+                  description: Defaults to true
+      responses:
+        "200":
+          description: The failed or retry-scheduled task
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [task]
+                properties:
+                  task:
+                    $ref: "#/components/schemas/OctopusTask"
+        "400":
+          description: Invalid request body
+        "404":
+          description: Not found
+        "409":
+          description: Task is not currently claimed by this caller
+  /brain/decisions:
+    get:
+      operationId: listBrainDecisions
+      tags: [brain]
+      summary: List the Brain's decisions
+      description: >
+        Read-only view over OS Core's decision trail: every event a
+        registered decision rule matched, whether or not it led to an
+        action. Non-admin callers only see decisions scoped to their own
+        account.
+      parameters:
+        - name: ruleName
+          in: query
+          schema:
+            type: string
+        - name: eventType
+          in: query
+          schema:
+            type: string
+        - name: outcome
+          in: query
+          schema:
+            $ref: "#/components/schemas/DecisionOutcome"
+        - name: correlationId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Decision history page
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [decisions]
+                properties:
+                  decisions:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/BrainDecision"
+        "400":
+          description: Invalid query parameter
+  /brain/decisions/{id}:
+    get:
+      operationId: getBrainDecision
+      tags: [brain]
+      summary: Get a single decision
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The decision
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [decision]
+                properties:
+                  decision:
+                    $ref: "#/components/schemas/BrainDecision"
+        "404":
+          description: Not found
+  /rules:
+    post:
+      operationId: createRule
+      tags: [rules]
+      summary: Create a data-defined rule
+      description: Admin-only. Compiles immediately and registers against the Brain if `enabled` (default true).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRuleRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rule]
+                properties:
+                  rule:
+                    $ref: "#/components/schemas/RuleDefinition"
+        "400":
+          description: Invalid rule definition
+        "403":
+          description: Only admins can create rules
+    get:
+      operationId: listRules
+      tags: [rules]
+      summary: List rule definitions
+      parameters:
+        - name: eventPattern
+          in: query
+          schema:
+            type: string
+        - name: enabled
+          in: query
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Rule definitions
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rules]
+                properties:
+                  rules:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/RuleDefinition"
+  /rules/{id}:
+    get:
+      operationId: getRule
+      tags: [rules]
+      summary: Get a single rule definition
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The rule
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rule]
+                properties:
+                  rule:
+                    $ref: "#/components/schemas/RuleDefinition"
+        "404":
+          description: Not found
+    put:
+      operationId: updateRule
+      tags: [rules]
+      summary: Update a rule definition
+      description: Admin-only. Always re-registers the compiled rule against the Brain.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRuleRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rule]
+                properties:
+                  rule:
+                    $ref: "#/components/schemas/RuleDefinition"
+        "400":
+          description: Invalid update
+        "403":
+          description: Only admins can update rules
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteRule
+      tags: [rules]
+      summary: Delete a rule definition
+      description: Admin-only. Unregisters from the Brain first.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete rules
+        "404":
+          description: Not found
+  /rules/{id}/enable:
+    post:
+      operationId: enableRule
+      tags: [rules]
+      summary: Enable a rule
+      description: Admin-only. Registers the compiled rule against the Brain.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rule]
+                properties:
+                  rule:
+                    $ref: "#/components/schemas/RuleDefinition"
+        "403":
+          description: Only admins can enable rules
+        "404":
+          description: Not found
+  /rules/{id}/disable:
+    post:
+      operationId: disableRule
+      tags: [rules]
+      summary: Disable a rule
+      description: Admin-only. Unregisters the compiled rule from the Brain without deleting the definition.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [rule]
+                properties:
+                  rule:
+                    $ref: "#/components/schemas/RuleDefinition"
+        "403":
+          description: Only admins can disable rules
+        "404":
+          description: Not found
+  /agents:
+    post:
+      operationId: createAgent
+      tags: [agents]
+      summary: Register a new agent
+      description: Admin-only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateAgentRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agent]
+                properties:
+                  agent:
+                    $ref: "#/components/schemas/Agent"
+        "400":
+          description: Invalid agent definition
+        "403":
+          description: Only admins can create agents
+    get:
+      operationId: listAgents
+      tags: [agents]
+      summary: List agents
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/AgentStatus"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Agents
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agents]
+                properties:
+                  agents:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Agent"
+  /agents/{id}:
+    get:
+      operationId: getAgent
+      tags: [agents]
+      summary: Get a single agent
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The agent
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agent]
+                properties:
+                  agent:
+                    $ref: "#/components/schemas/Agent"
+        "404":
+          description: Not found
+    put:
+      operationId: updateAgent
+      tags: [agents]
+      summary: Update an agent
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateAgentRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agent]
+                properties:
+                  agent:
+                    $ref: "#/components/schemas/Agent"
+        "400":
+          description: Invalid update
+        "403":
+          description: Only admins can update agents
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteAgent
+      tags: [agents]
+      summary: Delete an agent
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete agents
+        "404":
+          description: Not found
+  /agents/{id}/enable:
+    post:
+      operationId: enableAgent
+      tags: [agents]
+      summary: Enable an agent
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agent]
+                properties:
+                  agent:
+                    $ref: "#/components/schemas/Agent"
+        "403":
+          description: Only admins can enable agents
+        "404":
+          description: Not found
+  /agents/{id}/disable:
+    post:
+      operationId: disableAgent
+      tags: [agents]
+      summary: Disable an agent
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [agent]
+                properties:
+                  agent:
+                    $ref: "#/components/schemas/Agent"
+        "403":
+          description: Only admins can disable agents
+        "404":
+          description: Not found
+  /agents/{id}/invoke:
+    post:
+      operationId: invokeAgent
+      tags: [agents]
+      summary: Invoke an agent synchronously
+      description: >
+        Any authenticated user may invoke an existing, enabled agent.
+        Returns 501 if no `AgentExecutor` is configured yet (the AI
+        Provider Manager supplies one).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "202":
+          description: Run recorded (check `run.status` for the outcome)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [run]
+                properties:
+                  run:
+                    $ref: "#/components/schemas/AgentRun"
+        "404":
+          description: Agent not found or disabled
+        "501":
+          description: No AgentExecutor configured yet
+  /agents/{id}/runs:
+    get:
+      operationId: listAgentRuns
+      tags: [agents]
+      summary: List an agent's run history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Run history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runs]
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AgentRun"
+  /provider-configs:
+    post:
+      operationId: createProviderConfig
+      tags: [provider-configs]
+      summary: Register an AI provider configuration
+      description: >
+        Admin-only. `apiKeyEnvVar` must be the NAME of an environment
+        variable holding the credential, never the credential itself —
+        this table never stores a raw key.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProviderConfigRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [config]
+                properties:
+                  config:
+                    $ref: "#/components/schemas/ProviderConfig"
+        "400":
+          description: Invalid provider config
+        "403":
+          description: Only admins can create provider configs
+    get:
+      operationId: listProviderConfigs
+      tags: [provider-configs]
+      summary: List provider configurations
+      description: Admin-only.
+      parameters:
+        - name: providerType
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ProviderStatus"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Provider configs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [configs]
+                properties:
+                  configs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProviderConfig"
+        "403":
+          description: Only admins can view provider configs
+  /provider-configs/{id}:
+    get:
+      operationId: getProviderConfig
+      tags: [provider-configs]
+      summary: Get a single provider config
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The config
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [config]
+                properties:
+                  config:
+                    $ref: "#/components/schemas/ProviderConfig"
+        "403":
+          description: Only admins can view provider configs
+        "404":
+          description: Not found
+    put:
+      operationId: updateProviderConfig
+      tags: [provider-configs]
+      summary: Update a provider config
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateProviderConfigRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [config]
+                properties:
+                  config:
+                    $ref: "#/components/schemas/ProviderConfig"
+        "400":
+          description: Invalid update
+        "403":
+          description: Only admins can update provider configs
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteProviderConfig
+      tags: [provider-configs]
+      summary: Delete a provider config
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete provider configs
+        "404":
+          description: Not found
+  /tools:
+    post:
+      operationId: createTool
+      tags: [tools]
+      summary: Register a new tool
+      description: Admin-only. `handlerName` is not validated to have a registered handler at this point — only at invoke time.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateToolRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tool]
+                properties:
+                  tool:
+                    $ref: "#/components/schemas/Tool"
+        "400":
+          description: Invalid tool definition
+        "403":
+          description: Only admins can register tools
+    get:
+      operationId: listTools
+      tags: [tools]
+      summary: List tools
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ToolStatus"
+        - name: handlerName
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Tools
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tools]
+                properties:
+                  tools:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Tool"
+  /tools/{id}:
+    get:
+      operationId: getTool
+      tags: [tools]
+      summary: Get a single tool
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The tool
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tool]
+                properties:
+                  tool:
+                    $ref: "#/components/schemas/Tool"
+        "404":
+          description: Not found
+    put:
+      operationId: updateTool
+      tags: [tools]
+      summary: Update a tool
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateToolRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tool]
+                properties:
+                  tool:
+                    $ref: "#/components/schemas/Tool"
+        "400":
+          description: Invalid update
+        "403":
+          description: Only admins can update tools
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteTool
+      tags: [tools]
+      summary: Delete a tool
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete tools
+        "404":
+          description: Not found
+  /tools/{id}/enable:
+    post:
+      operationId: enableTool
+      tags: [tools]
+      summary: Enable a tool
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tool]
+                properties:
+                  tool:
+                    $ref: "#/components/schemas/Tool"
+        "403":
+          description: Only admins can enable tools
+        "404":
+          description: Not found
+  /tools/{id}/disable:
+    post:
+      operationId: disableTool
+      tags: [tools]
+      summary: Disable a tool
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [tool]
+                properties:
+                  tool:
+                    $ref: "#/components/schemas/Tool"
+        "403":
+          description: Only admins can disable tools
+        "404":
+          description: Not found
+  /tools/{name}/invoke:
+    post:
+      operationId: invokeTool
+      tags: [tools]
+      summary: Invoke a tool by name
+      description: >
+        Any authenticated user may invoke an existing, enabled tool. Input
+        is validated against the tool's `inputSchema` before its handler
+        runs. Returns 501 if the tool's `handlerName` has no handler
+        registered in this process.
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "200":
+          description: Tool output
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [output]
+                properties:
+                  output: {}
+        "400":
+          description: Input failed schema validation
+        "404":
+          description: Tool not found
+        "409":
+          description: Tool is disabled
+        "501":
+          description: No handler registered for this tool
+  /workflows:
+    post:
+      operationId: createWorkflow
+      tags: [workflows]
+      summary: Register a new workflow
+      description: Admin-only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workflow]
+                properties:
+                  workflow:
+                    $ref: "#/components/schemas/Workflow"
+        "400":
+          description: Invalid workflow definition
+        "403":
+          description: Only admins can create workflows
+    get:
+      operationId: listWorkflows
+      tags: [workflows]
+      summary: List workflows
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/WorkflowStatus"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Workflows
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workflows]
+                properties:
+                  workflows:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Workflow"
+  /workflows/{id}:
+    get:
+      operationId: getWorkflow
+      tags: [workflows]
+      summary: Get a single workflow
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The workflow
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workflow]
+                properties:
+                  workflow:
+                    $ref: "#/components/schemas/Workflow"
+        "404":
+          description: Not found
+    put:
+      operationId: updateWorkflow
+      tags: [workflows]
+      summary: Update a workflow
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workflow]
+                properties:
+                  workflow:
+                    $ref: "#/components/schemas/Workflow"
+        "400":
+          description: Invalid update
+        "403":
+          description: Only admins can update workflows
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteWorkflow
+      tags: [workflows]
+      summary: Delete a workflow
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete workflows
+        "404":
+          description: Not found
+  /workflows/{id}/enable:
+    post:
+      operationId: enableWorkflow
+      tags: [workflows]
+      summary: Enable a workflow
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workflow]
+                properties:
+                  workflow:
+                    $ref: "#/components/schemas/Workflow"
+        "403":
+          description: Only admins can enable workflows
+        "404":
+          description: Not found
+  /workflows/{id}/disable:
+    post:
+      operationId: disableWorkflow
+      tags: [workflows]
+      summary: Disable a workflow
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [workflow]
+                properties:
+                  workflow:
+                    $ref: "#/components/schemas/Workflow"
+        "403":
+          description: Only admins can disable workflows
+        "404":
+          description: Not found
+  /workflows/{id}/run:
+    post:
+      operationId: runWorkflow
+      tags: [workflows]
+      summary: Run a workflow synchronously
+      description: >
+        Any authenticated user may run an existing, enabled workflow. Steps
+        execute in order; the response reflects the final run state
+        (`completed` or `failed`) regardless of HTTP status, which is 202
+        as long as the workflow itself was found and enabled.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: {}
+      responses:
+        "202":
+          description: Run recorded (check `run.status` for the outcome)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [run]
+                properties:
+                  run:
+                    $ref: "#/components/schemas/WorkflowRun"
+        "404":
+          description: Workflow not found
+        "409":
+          description: Workflow is disabled
+  /workflows/{id}/runs:
+    get:
+      operationId: listWorkflowRuns
+      tags: [workflows]
+      summary: List a workflow's run history
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Run history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runs]
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/WorkflowRun"
+  /scheduled-jobs:
+    post:
+      operationId: createScheduledJob
+      tags: [scheduled-jobs]
+      summary: Create a scheduled job
+      description: Admin-only. `nextRunAt` is computed automatically from `schedule`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateScheduledJobRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job]
+                properties:
+                  job:
+                    $ref: "#/components/schemas/ScheduledJob"
+        "400":
+          description: Invalid job definition
+        "403":
+          description: Only admins can create scheduled jobs
+    get:
+      operationId: listScheduledJobs
+      tags: [scheduled-jobs]
+      summary: List scheduled jobs
+      description: Admin-only.
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/ScheduledJobStatus"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Scheduled jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [jobs]
+                properties:
+                  jobs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ScheduledJob"
+        "403":
+          description: Only admins can view scheduled jobs
+  /scheduled-jobs/{id}:
+    get:
+      operationId: getScheduledJob
+      tags: [scheduled-jobs]
+      summary: Get a single scheduled job
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The job
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job]
+                properties:
+                  job:
+                    $ref: "#/components/schemas/ScheduledJob"
+        "403":
+          description: Only admins can view scheduled jobs
+        "404":
+          description: Not found
+    put:
+      operationId: updateScheduledJob
+      tags: [scheduled-jobs]
+      summary: Update a scheduled job
+      description: Admin-only. `nextRunAt` is recomputed if `schedule` changes.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateScheduledJobRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job]
+                properties:
+                  job:
+                    $ref: "#/components/schemas/ScheduledJob"
+        "400":
+          description: Invalid update
+        "403":
+          description: Only admins can update scheduled jobs
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteScheduledJob
+      tags: [scheduled-jobs]
+      summary: Delete a scheduled job
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete scheduled jobs
+        "404":
+          description: Not found
+  /scheduled-jobs/{id}/enable:
+    post:
+      operationId: enableScheduledJob
+      tags: [scheduled-jobs]
+      summary: Enable a scheduled job
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job]
+                properties:
+                  job:
+                    $ref: "#/components/schemas/ScheduledJob"
+        "403":
+          description: Only admins can enable scheduled jobs
+        "404":
+          description: Not found
+  /scheduled-jobs/{id}/disable:
+    post:
+      operationId: disableScheduledJob
+      tags: [scheduled-jobs]
+      summary: Disable a scheduled job
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Disabled
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job]
+                properties:
+                  job:
+                    $ref: "#/components/schemas/ScheduledJob"
+        "403":
+          description: Only admins can disable scheduled jobs
+        "404":
+          description: Not found
+  /scheduled-jobs/{id}/runs:
+    get:
+      operationId: listScheduledJobRuns
+      tags: [scheduled-jobs]
+      summary: List a scheduled job's run history
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Run history
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [runs]
+                properties:
+                  runs:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ScheduledJobRun"
+        "403":
+          description: Only admins can view scheduled job runs
+  /notification-channels:
+    post:
+      operationId: createNotificationChannel
+      tags: [notifications]
+      summary: Register a notification channel
+      description: Admin-only.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateNotificationChannelRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [channel]
+                properties:
+                  channel:
+                    $ref: "#/components/schemas/NotificationChannel"
+        "400":
+          description: Invalid channel definition
+        "403":
+          description: Only admins can create notification channels
+    get:
+      operationId: listNotificationChannels
+      tags: [notifications]
+      summary: List notification channels
+      description: Admin-only.
+      parameters:
+        - name: channelType
+          in: query
+          schema:
+            type: string
+        - name: status
+          in: query
+          schema:
+            $ref: "#/components/schemas/NotificationChannelStatus"
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Channels
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [channels]
+                properties:
+                  channels:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NotificationChannel"
+        "403":
+          description: Only admins can view notification channels
+  /notification-channels/{id}:
+    get:
+      operationId: getNotificationChannel
+      tags: [notifications]
+      summary: Get a single notification channel
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The channel
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [channel]
+                properties:
+                  channel:
+                    $ref: "#/components/schemas/NotificationChannel"
+        "403":
+          description: Only admins can view notification channels
+        "404":
+          description: Not found
+    put:
+      operationId: updateNotificationChannel
+      tags: [notifications]
+      summary: Update a notification channel
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationChannelRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [channel]
+                properties:
+                  channel:
+                    $ref: "#/components/schemas/NotificationChannel"
+        "400":
+          description: Invalid update
+        "403":
+          description: Only admins can update notification channels
+        "404":
+          description: Not found
+    delete:
+      operationId: deleteNotificationChannel
+      tags: [notifications]
+      summary: Delete a notification channel
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete notification channels
+        "404":
+          description: Not found
+  /notifications/send:
+    post:
+      operationId: sendNotification
+      tags: [notifications]
+      summary: Send a notification through a channel
+      description: >
+        Any authenticated user may call this. Non-admins can only target
+        their own `recipientUserId` (or omit it, which defaults to
+        themselves); admins may target any user or omit it entirely for a
+        broadcast-style channel like a shared webhook.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SendNotificationRequest"
+      responses:
+        "202":
+          description: Delivery recorded (check `delivery.status` for the outcome)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [delivery]
+                properties:
+                  delivery:
+                    $ref: "#/components/schemas/NotificationDelivery"
+        "400":
+          description: Invalid request
+        "403":
+          description: Non-admins can only send to themselves
+        "404":
+          description: Channel not found
+        "409":
+          description: Channel is disabled
+        "501":
+          description: No factory registered for the channel's type
+  /notifications:
+    get:
+      operationId: listNotifications
+      tags: [notifications]
+      summary: List notifications (the caller's inbox, or all deliveries for admins)
+      parameters:
+        - name: read
+          in: query
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deliveries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [deliveries]
+                properties:
+                  deliveries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NotificationDelivery"
+  /notifications/{id}/read:
+    post:
+      operationId: markNotificationRead
+      tags: [notifications]
+      summary: Mark a notification read
+      description: Non-admins may only mark their own notifications read.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Marked read
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [delivery]
+                properties:
+                  delivery:
+                    $ref: "#/components/schemas/NotificationDelivery"
+        "404":
+          description: Not found
+  /system/status:
+    get:
+      operationId: getSystemStatus
+      tags: [observability]
+      summary: Aggregated system health snapshot
+      description: >
+        Admin-only. Each section under `sections` comes from a
+        `MetricsProbe` registered against a specific OS Core module; a
+        probe that failed appears under `errors` instead, without
+        preventing the others from reporting. Counts are page sizes from
+        each module's own `list()`, not exact totals past that page.
+      responses:
+        "200":
+          description: System status
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status:
+                    $ref: "#/components/schemas/SystemStatus"
+        "403":
+          description: Only admins can view system status
+  /audit-log:
+    get:
+      operationId: listAuditLog
+      tags: [observability]
+      summary: List audit log entries
+      description: >
+        Admin-only. Populated automatically for every successful mutating
+        request across the whole system — no individual route writes to
+        this directly.
+      parameters:
+        - name: action
+          in: query
+          schema:
+            type: string
+        - name: resourceType
+          in: query
+          schema:
+            type: string
+        - name: resourceId
+          in: query
+          schema:
+            type: string
+        - name: actorUserId
+          in: query
+          schema:
+            type: string
+            format: uuid
+        - name: limit
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Audit log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entries]
+                properties:
+                  entries:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEntry"
+        "403":
+          description: Only admins can view the audit log
+  /audit-log/{id}:
+    get:
+      operationId: getAuditLogEntry
+      tags: [observability]
+      summary: Get a single audit log entry
+      description: Admin-only.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: The entry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [entry]
+                properties:
+                  entry:
+                    $ref: "#/components/schemas/AuditEntry"
+        "403":
+          description: Only admins can view the audit log
+        "404":
+          description: Not found
+  /settings/system:
+    get:
+      operationId: listSystemSettings
+      tags: [settings]
+      summary: List system-wide settings
+      description: Readable by any authenticated user (e.g. feature flags).
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [settings]
+                properties:
+                  settings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Setting"
+  /settings/system/{key}:
+    get:
+      operationId: getSystemSetting
+      tags: [settings]
+      summary: Get a single system setting
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The setting
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [setting]
+                properties:
+                  setting:
+                    $ref: "#/components/schemas/Setting"
+        "404":
+          description: Not found
+    put:
+      operationId: setSystemSetting
+      tags: [settings]
+      summary: Set a system setting
+      description: Admin-only. Upserts.
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: {}
+      responses:
+        "200":
+          description: Set
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [setting]
+                properties:
+                  setting:
+                    $ref: "#/components/schemas/Setting"
+        "400":
+          description: Invalid body
+        "403":
+          description: Only admins can set system settings
+    delete:
+      operationId: deleteSystemSetting
+      tags: [settings]
+      summary: Delete a system setting
+      description: Admin-only.
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "403":
+          description: Only admins can delete system settings
+        "404":
+          description: Not found
+  /settings/me:
+    get:
+      operationId: listMySettings
+      tags: [settings]
+      summary: List the caller's own settings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [settings]
+                properties:
+                  settings:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Setting"
+  /settings/me/{key}:
+    get:
+      operationId: getMySetting
+      tags: [settings]
+      summary: Get one of the caller's own settings
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The setting
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [setting]
+                properties:
+                  setting:
+                    $ref: "#/components/schemas/Setting"
+        "404":
+          description: Not found
+    put:
+      operationId: setMySetting
+      tags: [settings]
+      summary: Set one of the caller's own settings
+      description: Upserts.
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: {}
+      responses:
+        "200":
+          description: Set
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [setting]
+                properties:
+                  setting:
+                    $ref: "#/components/schemas/Setting"
+        "400":
+          description: Invalid body
+    delete:
+      operationId: deleteMySetting
+      tags: [settings]
+      summary: Delete one of the caller's own settings
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "404":
+          description: Not found
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    OctopusEvent:
+      type: object
+      description: >
+        Envelope for every event published on the OS Core Event Bus. This is
+        the only shape any client ever sees when observing system activity.
+      required: [id, type, version, source, payload, metadata, occurredAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          description: Dot-namespaced event type, e.g. "campaign.created"
+        version:
+          type: integer
+        source:
+          type: string
+          description: Identity of the publisher, e.g. "os-core", "agent:prophet"
+        payload:
+          description: Event-type-specific payload
+        metadata:
+          type: object
+          required: [correlationId]
+          properties:
+            correlationId:
+              type: string
+              format: uuid
+            causationId:
+              type: string
+              format: uuid
+            userId:
+              type: string
+              format: uuid
+        occurredAt:
+          type: string
+          format: date-time
+    TaskStatus:
+      type: string
+      enum: [queued, running, completed, failed, cancelled]
+    OctopusTask:
+      type: object
+      description: >
+        A unit of work tracked by OS Core's Task Manager + Queue Manager.
+        This is the shape every client sees; none of them ever touch the
+        `tasks` table directly.
+      required:
+        - id
+        - type
+        - queue
+        - status
+        - priority
+        - payload
+        - attempts
+        - maxAttempts
+        - availableAt
+        - source
+        - correlationId
+        - createdAt
+        - updatedAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          description: Dot-namespaced task type, e.g. "campaign.publish"
+        queue:
+          type: string
+        status:
+          $ref: "#/components/schemas/TaskStatus"
+        priority:
+          type: integer
+        payload:
+          description: Task-type-specific input
+        result:
+          description: Task-type-specific output, set once completed
+          nullable: true
+        error:
+          type: string
+          nullable: true
+        attempts:
+          type: integer
+        maxAttempts:
+          type: integer
+        availableAt:
+          type: string
+          format: date-time
+        lockedBy:
+          type: string
+          nullable: true
+        lockedAt:
+          type: string
+          format: date-time
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+          nullable: true
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+        source:
+          type: string
+          description: Identity of the enqueuer, e.g. "api-server", "os-core"
+        correlationId:
+          type: string
+          format: uuid
+        causationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateTaskRequest:
+      type: object
+      required: [type, payload]
+      properties:
+        type:
+          type: string
+          description: Dot-namespaced task type, e.g. "campaign.publish"
+        payload:
+          description: Task-type-specific input
+        queue:
+          type: string
+          description: Defaults to "default"
+        priority:
+          type: integer
+          description: Higher is claimed first. Defaults to 0.
+        maxAttempts:
+          type: integer
+          description: Defaults to 3
+        delayMs:
+          type: integer
+          description: Delay before the task becomes claimable. Defaults to 0.
+        correlationId:
+          type: string
+          format: uuid
+
+    DecisionAction:
+      type: string
+      enum: [enqueue_task, publish_event, noop]
+    DecisionOutcome:
+      type: string
+      enum: [actioned, noop, action_failed, superseded]
+    BrainDecision:
+      type: object
+      description: >
+        A durable record of one decision the Brain made about one event on
+        the Event Bus, and what happened when it acted on it. This is OS
+        Core's "why did this happen" trail.
+      required:
+        - id
+        - ruleName
+        - eventId
+        - eventType
+        - action
+        - reason
+        - outcome
+        - correlationId
+        - createdAt
+      properties:
+        id:
+          type: string
+          format: uuid
+        ruleName:
+          type: string
+          description: Name of the DecisionRule that produced this decision
+        eventId:
+          type: string
+          format: uuid
+          description: The event this decision is about
+        eventType:
+          type: string
+        action:
+          $ref: "#/components/schemas/DecisionAction"
+        reason:
+          type: string
+        actionPayload:
+          description: >
+            Action-specific payload: the task enqueued, or the event
+            published. Absent for "noop" decisions.
+        outcome:
+          $ref: "#/components/schemas/DecisionOutcome"
+        outcomeDetail:
+          description: >
+            Result of carrying out the action, e.g. { taskId } or
+            { error }.
+        correlationId:
+          type: string
+          format: uuid
+        causationId:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+
+
+    Condition:
+      description: >
+        A node in the Rule Engine's condition tree. Recursive: `and`/`or`
+        contain nested conditions, `not` wraps one.
+      oneOf:
+        - $ref: "#/components/schemas/ComparisonCondition"
+        - $ref: "#/components/schemas/ExistsCondition"
+        - $ref: "#/components/schemas/AndCondition"
+        - $ref: "#/components/schemas/OrCondition"
+        - $ref: "#/components/schemas/NotCondition"
+    ComparisonCondition:
+      type: object
+      required: [op, field, value]
+      properties:
+        op:
+          type: string
+          enum: [eq, neq, gt, gte, lt, lte, contains]
+        field:
+          type: string
+          description: Dot-path into the event, e.g. "payload.taskId"
+        value: {}
+    ExistsCondition:
+      type: object
+      required: [op, field]
+      properties:
+        op:
+          type: string
+          enum: [exists]
+        field:
+          type: string
+    AndCondition:
+      type: object
+      required: [op, conditions]
+      properties:
+        op:
+          type: string
+          enum: [and]
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Condition"
+    OrCondition:
+      type: object
+      required: [op, conditions]
+      properties:
+        op:
+          type: string
+          enum: [or]
+        conditions:
+          type: array
+          items:
+            $ref: "#/components/schemas/Condition"
+    NotCondition:
+      type: object
+      required: [op, condition]
+      properties:
+        op:
+          type: string
+          enum: [not]
+        condition:
+          $ref: "#/components/schemas/Condition"
+
+    ActionTemplate:
+      oneOf:
+        - $ref: "#/components/schemas/EnqueueTaskTemplate"
+        - $ref: "#/components/schemas/PublishEventTemplate"
+    EnqueueTaskTemplate:
+      type: object
+      required: [kind, taskType, payload]
+      properties:
+        kind:
+          type: string
+          enum: [enqueue_task]
+        taskType:
+          type: string
+        payload:
+          description: >
+            Any string exactly matching "{{dot.path}}" is replaced with the
+            value resolved from that path against the triggering event.
+        queue:
+          type: string
+        priority:
+          type: integer
+        maxAttempts:
+          type: integer
+    PublishEventTemplate:
+      type: object
+      required: [kind, eventType, payload]
+      properties:
+        kind:
+          type: string
+          enum: [publish_event]
+        eventType:
+          type: string
+        payload: {}
+
+    RuleDefinition:
+      type: object
+      required: [id, name, eventPattern, condition, action, priority, enabled, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        eventPattern:
+          type: string
+        condition:
+          $ref: "#/components/schemas/Condition"
+        action:
+          $ref: "#/components/schemas/ActionTemplate"
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateRuleRequest:
+      type: object
+      required: [name, eventPattern, condition, action]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        eventPattern:
+          type: string
+        condition:
+          $ref: "#/components/schemas/Condition"
+        action:
+          $ref: "#/components/schemas/ActionTemplate"
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+    UpdateRuleRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        eventPattern:
+          type: string
+        condition:
+          $ref: "#/components/schemas/Condition"
+        action:
+          $ref: "#/components/schemas/ActionTemplate"
+        priority:
+          type: integer
+        enabled:
+          type: boolean
+
+    AgentStatus:
+      type: string
+      enum: [active, disabled]
+    AgentRunStatus:
+      type: string
+      enum: [running, completed, failed]
+    Agent:
+      type: object
+      required: [id, name, instructions, capabilities, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        instructions:
+          type: string
+          description: System prompt / operating instructions.
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: Names of tools/capabilities this agent may use.
+        status:
+          $ref: "#/components/schemas/AgentStatus"
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateAgentRequest:
+      type: object
+      required: [name, instructions]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        instructions:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: "#/components/schemas/AgentStatus"
+    UpdateAgentRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        instructions:
+          type: string
+        capabilities:
+          type: array
+          items:
+            type: string
+        status:
+          $ref: "#/components/schemas/AgentStatus"
+    AgentRun:
+      type: object
+      required: [id, agentId, status, input, output, error, startedAt, completedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        agentId:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/AgentRunStatus"
+        input: {}
+        output: {}
+        error:
+          type: string
+          nullable: true
+        userId:
+          type: string
+          format: uuid
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ProviderStatus:
+      type: string
+      enum: [active, disabled]
+    ProviderConfig:
+      type: object
+      required: [id, name, providerType, model, apiKeyEnvVar, isDefault, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        providerType:
+          type: string
+          description: e.g. "anthropic". Determines which ProviderClient factory handles this config.
+        model:
+          type: string
+        apiKeyEnvVar:
+          type: string
+          description: Name of the environment variable holding the API key. The key itself is never stored or returned.
+        baseUrl:
+          type: string
+        isDefault:
+          type: boolean
+        status:
+          $ref: "#/components/schemas/ProviderStatus"
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateProviderConfigRequest:
+      type: object
+      required: [name, providerType, model, apiKeyEnvVar]
+      properties:
+        name:
+          type: string
+        providerType:
+          type: string
+        model:
+          type: string
+        apiKeyEnvVar:
+          type: string
+        baseUrl:
+          type: string
+        isDefault:
+          type: boolean
+        status:
+          $ref: "#/components/schemas/ProviderStatus"
+    UpdateProviderConfigRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        providerType:
+          type: string
+        model:
+          type: string
+        apiKeyEnvVar:
+          type: string
+        baseUrl:
+          type: string
+        isDefault:
+          type: boolean
+        status:
+          $ref: "#/components/schemas/ProviderStatus"
+
+    ToolStatus:
+      type: string
+      enum: [active, disabled]
+    JsonSchemaDefinition:
+      type: object
+      description: >
+        A minimal JSON-Schema-like structure: type, optional enum,
+        properties/required for objects, items for arrays. Recursive via
+        `properties` and `items`.
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [string, number, boolean, object, array]
+        description:
+          type: string
+        enum:
+          type: array
+          items: {}
+        properties:
+          type: object
+          additionalProperties:
+            $ref: "#/components/schemas/JsonSchemaDefinition"
+        required:
+          type: array
+          items:
+            type: string
+        items:
+          $ref: "#/components/schemas/JsonSchemaDefinition"
+    Tool:
+      type: object
+      required: [id, name, description, inputSchema, handlerName, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        inputSchema:
+          $ref: "#/components/schemas/JsonSchemaDefinition"
+        handlerName:
+          type: string
+        status:
+          $ref: "#/components/schemas/ToolStatus"
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateToolRequest:
+      type: object
+      required: [name, description, inputSchema, handlerName]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        inputSchema:
+          $ref: "#/components/schemas/JsonSchemaDefinition"
+        handlerName:
+          type: string
+        status:
+          $ref: "#/components/schemas/ToolStatus"
+    UpdateToolRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        inputSchema:
+          $ref: "#/components/schemas/JsonSchemaDefinition"
+        handlerName:
+          type: string
+        status:
+          $ref: "#/components/schemas/ToolStatus"
+
+    WorkflowStatus:
+      type: string
+      enum: [active, disabled]
+    WorkflowStepType:
+      type: string
+      enum: [tool, agent, task, event]
+    WorkflowStep:
+      type: object
+      description: >
+        A single workflow step. Shape depends on `type`: `tool` needs
+        `toolName`+`input`; `agent` needs `agentId`+`input`; `task` needs
+        `taskType`+`payload` (+optional queue/priority/maxAttempts); `event`
+        needs `eventType`+`payload`. Any string value anywhere in
+        `input`/`payload` that is exactly `"{{dot.path}}"` is resolved
+        against `{ input, steps: { <name>: { output } } }` from earlier
+        steps in the same run.
+      required: [type, name]
+      properties:
+        type:
+          $ref: "#/components/schemas/WorkflowStepType"
+        name:
+          type: string
+          description: Unique within the workflow — how later steps reference this one's output.
+        toolName:
+          type: string
+        agentId:
+          type: string
+          format: uuid
+        taskType:
+          type: string
+        eventType:
+          type: string
+        input: {}
+        payload: {}
+        queue:
+          type: string
+        priority:
+          type: integer
+        maxAttempts:
+          type: integer
+    Workflow:
+      type: object
+      required: [id, name, steps, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowStep"
+        status:
+          $ref: "#/components/schemas/WorkflowStatus"
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateWorkflowRequest:
+      type: object
+      required: [name, steps]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowStep"
+        status:
+          $ref: "#/components/schemas/WorkflowStatus"
+    UpdateWorkflowRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowStep"
+        status:
+          $ref: "#/components/schemas/WorkflowStatus"
+    StepResult:
+      type: object
+      required: [stepName, status, output, error]
+      properties:
+        stepName:
+          type: string
+        status:
+          type: string
+          enum: [completed, failed]
+        output: {}
+        error:
+          type: string
+          nullable: true
+    WorkflowRun:
+      type: object
+      required: [id, workflowId, status, input, stepResults, error, startedAt, completedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        workflowId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [running, completed, failed]
+        input: {}
+        stepResults:
+          type: array
+          items:
+            $ref: "#/components/schemas/StepResult"
+        error:
+          type: string
+          nullable: true
+        userId:
+          type: string
+          format: uuid
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ScheduledJobStatus:
+      type: string
+      enum: [active, disabled]
+    ScheduleSpec:
+      type: object
+      description: >
+        Either `{ type: "interval", intervalMs }` or
+        `{ type: "cron", expression }` (standard 5-field cron:
+        minute hour day-of-month month day-of-week).
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [interval, cron]
+        intervalMs:
+          type: integer
+        expression:
+          type: string
+    ScheduledJobTarget:
+      type: object
+      description: >
+        Either `{ type: "workflow", workflowId, input }` or
+        `{ type: "task", taskType, payload, queue?, priority?, maxAttempts? }`.
+      required: [type]
+      properties:
+        type:
+          type: string
+          enum: [workflow, task]
+        workflowId:
+          type: string
+          format: uuid
+        input: {}
+        taskType:
+          type: string
+        payload: {}
+        queue:
+          type: string
+        priority:
+          type: integer
+        maxAttempts:
+          type: integer
+    ScheduledJob:
+      type: object
+      required: [id, name, schedule, target, status, nextRunAt, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+        schedule:
+          $ref: "#/components/schemas/ScheduleSpec"
+        target:
+          $ref: "#/components/schemas/ScheduledJobTarget"
+        status:
+          $ref: "#/components/schemas/ScheduledJobStatus"
+        nextRunAt:
+          type: string
+          format: date-time
+        lastRunAt:
+          type: string
+          format: date-time
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateScheduledJobRequest:
+      type: object
+      required: [name, schedule, target]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        schedule:
+          $ref: "#/components/schemas/ScheduleSpec"
+        target:
+          $ref: "#/components/schemas/ScheduledJobTarget"
+        status:
+          $ref: "#/components/schemas/ScheduledJobStatus"
+    UpdateScheduledJobRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        schedule:
+          $ref: "#/components/schemas/ScheduleSpec"
+        target:
+          $ref: "#/components/schemas/ScheduledJobTarget"
+        status:
+          $ref: "#/components/schemas/ScheduledJobStatus"
+    ScheduledJobRun:
+      type: object
+      required: [id, jobId, status, output, error, startedAt, completedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        jobId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [completed, failed]
+        output: {}
+        error:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+        completedAt:
+          type: string
+          format: date-time
+
+    NotificationChannelStatus:
+      type: string
+      enum: [active, disabled]
+    NotificationChannel:
+      type: object
+      required: [id, name, channelType, config, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        channelType:
+          type: string
+          description: "\"in_app\", \"webhook\", or a custom registered type"
+        config:
+          description: 'Channel-specific settings, e.g. { "webhookUrl": "..." } for webhook'
+        status:
+          $ref: "#/components/schemas/NotificationChannelStatus"
+        userId:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    CreateNotificationChannelRequest:
+      type: object
+      required: [name, channelType, config]
+      properties:
+        name:
+          type: string
+        channelType:
+          type: string
+        config: {}
+        status:
+          $ref: "#/components/schemas/NotificationChannelStatus"
+    UpdateNotificationChannelRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        channelType:
+          type: string
+        config: {}
+        status:
+          $ref: "#/components/schemas/NotificationChannelStatus"
+    NotificationMessage:
+      type: object
+      required: [title, body]
+      properties:
+        title:
+          type: string
+        body:
+          type: string
+        data: {}
+    SendNotificationRequest:
+      type: object
+      required: [channelConfigId, message]
+      properties:
+        channelConfigId:
+          type: string
+          format: uuid
+        message:
+          $ref: "#/components/schemas/NotificationMessage"
+        recipientUserId:
+          type: string
+          format: uuid
+    NotificationDelivery:
+      type: object
+      required: [id, channelConfigId, channelType, message, status, error, read, sentAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        channelConfigId:
+          type: string
+          format: uuid
+        channelType:
+          type: string
+        message:
+          $ref: "#/components/schemas/NotificationMessage"
+        recipientUserId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum: [sent, failed]
+        error:
+          type: string
+          nullable: true
+        read:
+          type: boolean
+        sentAt:
+          type: string
+          format: date-time
+
+    AuditEntry:
+      type: object
+      required: [id, action, resourceType, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        action:
+          type: string
+          description: '"<resourceType>.<verb>" by convention, e.g. "rules.post"'
+        resourceType:
+          type: string
+        resourceId:
+          type: string
+        actorUserId:
+          type: string
+          format: uuid
+        actorRole:
+          type: string
+        ipAddress:
+          type: string
+        metadata: {}
+        createdAt:
+          type: string
+          format: date-time
+    SystemStatus:
+      type: object
+      required: [timestamp, uptimeSeconds, sections, errors]
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        uptimeSeconds:
+          type: number
+        sections:
+          type: object
+          description: One entry per successfully-collected probe, keyed by probe name.
+          additionalProperties:
+            type: object
+        errors:
+          type: object
+          description: One entry per probe that threw, keyed by probe name, mapping to its error message.
+          additionalProperties:
+            type: string
+
+    Setting:
+      type: object
+      required: [id, scope, key, value, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        scope:
+          type: string
+          enum: [system, user]
+        key:
+          type: string
+        userId:
+          type: string
+          format: uuid
+        value: {}
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time

@@ -1,0 +1,91 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    {
+      "path": "./lib/db"
+    },
+    {
+      "path": "./lib/api-client-react"
+    },
+    {
+      "path": "./lib/api-zod"
+    },
+    {
+      "path": "./lib/event-bus"
+    },
+    {
+      "path": "./lib/task-queue"
+    },
+    {
+      "path": "./lib/brain"
+    },
+    {
+      "path": "./lib/decision-engine"
+    },
+    {
+      "path": "./lib/rule-engine"
+    },
+    {
+      "path": "./lib/agent-manager"
+    },
+    {
+      "path": "./lib/ai-provider-manager"
+    },
+    {
+      "path": "./lib/tool-manager"
+    },
+    {
+      "path": "./lib/workflow-engine"
+    },
+    {
+      "path": "./lib/scheduler"
+    },
+    {
+      "path": "./lib/notification-system"
+    },
+    {
+      "path": "./lib/audit-observability"
+    },
+    {
+      "path": "./lib/settings"
+    },
+    {
+      "path": "./lib/profit-memory"
+    },
+    {
+      "path": "./lib/profit-twin"
+    },
+    {
+      "path": "./lib/knowledge-graph"
+    },
+    {
+      "path": "./lib/strategy-engine"
+    },
+    {
+      "path": "./lib/goal-engine"
+    },
+    {
+      "path": "./lib/budget-manager"
+    },
+    {
+      "path": "./lib/experiment-engine"
+    },
+    {
+      "path": "./lib/network-adapters"
+    },
+    {
+      "path": "./lib/viral-detector"
+    },
+    {
+      "path": "./lib/self-evolution"
+    },
+    {
+      "path": "./lib/business-policy"
+    },
+    {
+      "path": "./lib/profit-engine"
+    }
+  ]
+}
