@@ -16,6 +16,15 @@ export async function executeRealAgentAction(agentName: string, agentId: string,
   const logs: string[] = [];
   let actionResult: Record<string, unknown> = {};
 
+  let parsedPayload: any = null;
+  if (typeof baseOutput === "string") {
+    try {
+      parsedPayload = JSON.parse(baseOutput);
+    } catch(e) {}
+  } else if (typeof baseOutput === "object" && baseOutput !== null) {
+    parsedPayload = baseOutput;
+  }
+
   try {
     // 1. TrendHunter / Trend Agent (صيد الاتجاهات)
     if (nameLower.includes("trend") || nameLower.includes("hunter") || nameLower.includes("صيد") || nameLower.includes("اتجاه")) {
@@ -97,11 +106,16 @@ export async function executeRealAgentAction(agentName: string, agentId: string,
       const targetPlatform = targetCampaign?.platform === "youtube" ? "YouTube Shorts" : "TikTok";
       const targetLink = targetCampaign?.productUrl || "https://octopuslab.ai/shorts";
 
+      let customProductName = targetName;
+      if (parsedPayload && parsedPayload.params && parsedPayload.params.productName) {
+        customProductName = parsedPayload.params.productName;
+      }
+
       const jobId = randomUUID();
       let jobCreated = false;
       try {
         if (userId) {
-          const cleanTitle = targetName.replace(/^viral drop:\s*/i, "").split("-")[0].trim();
+          const cleanTitle = customProductName.replace(/^viral drop:\s*/i, "").split("-")[0].trim();
           
           const autoStyles = [
             { tmpl: "🎨 3D Animated Cartoon & Motion Graphics", vc: "Leo (3D Animated Character) | ElevenLabs Expressive Animation" },
@@ -171,7 +185,12 @@ export async function executeRealAgentAction(agentName: string, agentId: string,
       logs.push("🚀 [Campaign Manager] Setting up new autonomous marketing campaign...");
       
       let campaignName = "AI Auto-Generated Campaign";
-      if (typeof baseOutput === "string") {
+      let budget = 50;
+      
+      if (parsedPayload && parsedPayload.params) {
+         if (parsedPayload.params.name) campaignName = parsedPayload.params.name;
+         if (parsedPayload.params.budget) budget = Number(parsedPayload.params.budget) || 50;
+      } else if (typeof baseOutput === "string") {
          const match = baseOutput.match(/حملة\s+([a-zA-Z\s]+)/i);
          if (match && match[1]) campaignName = match[1].trim();
       }
@@ -184,11 +203,11 @@ export async function executeRealAgentAction(agentName: string, agentId: string,
           productName: "Selected by TrendHunter",
           platform: "tiktok",
           status: "active",
-          budget: 50,
+          budget: budget,
           createdAt: new Date(),
           updatedAt: new Date()
         });
-        logs.push(`✅ [Campaign Manager] Successfully created new campaign '${campaignName}' in the database.`);
+        logs.push(`✅ [Campaign Manager] Successfully created new campaign '${campaignName}' with budget $${budget} in the database.`);
       }
 
       actionResult = {

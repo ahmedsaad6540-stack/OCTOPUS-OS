@@ -29,53 +29,29 @@ router.post("/chat", requireAuth, async (req: AuthRequest, res) => {
       return;
     }
 
-    // 1. Simple Intent Recognition: Trigger internal system agents BEFORE Gemini call
-    let thoughtLog: string[] | undefined = undefined;
-    try {
-      const msgLower = message.toLowerCase();
-      // Import dynamically to avoid circular dependencies
-      const { executeRealAgentAction } = await import("../lib/agent-action-executor.js");
-      
-      if (msgLower.includes("فيديو") || msgLower.includes("video") || msgLower.includes("صنع") || msgLower.includes("render")) {
-        const actionResult = await executeRealAgentAction("Creator Agent", "chat", "chat-run", message, req.user?.userId) as any;
-        thoughtLog = [
-          "🎬 " + (actionResult?.taskExecuted || "Started Video Generation"),
-          `Product: ${actionResult?.product || "Unknown"}`,
-          `Job Status: ${actionResult?.status || "Queued"}`
-        ];
-      } else if (msgLower.includes("منتج") || msgLower.includes("product") || msgLower.includes("تريند") || msgLower.includes("trend")) {
-        const actionResult = await executeRealAgentAction("TrendHunter", "chat", "chat-run", message, req.user?.userId) as any;
-        thoughtLog = [
-          "🔥 " + (actionResult?.taskExecuted || "Scanned Amazon & Digistore24"),
-          `Discovered: ${actionResult?.discoveredCount || 0} products`,
-          `Unlaunched: ${actionResult?.unlaunchedCount || 0} products`
-        ];
-      } else if (msgLower.includes("حمل") || msgLower.includes("campaign") || msgLower.includes("اعمل حملة") || msgLower.includes("انشئ حملة")) {
-        // Campaign intent
-        const actionResult = await executeRealAgentAction("Campaign Manager", "chat", "chat-run", message, req.user?.userId) as any;
-        thoughtLog = [
-          "🚀 " + (actionResult?.taskExecuted || "Campaign Management"),
-          `Campaign: ${actionResult?.campaignName || "AI Campaign"}`,
-          `Status: ${actionResult?.status || "Active"}`
-        ];
-      } else if (msgLower.includes("حساب") || msgLower.includes("حسابات") || msgLower.includes("نمي") || msgLower.includes("تنمية") || msgLower.includes("grow") || msgLower.includes("social") || msgLower.includes("انشر")) {
-        // Publisher/Social intent
-        const actionResult = await executeRealAgentAction("Publisher Agent", "chat", "chat-run", message, req.user?.userId) as any;
-        thoughtLog = [
-          "📢 " + (actionResult?.taskExecuted || "Social Media Automation"),
-          `Action: ${actionResult?.action || "Scheduling assets"}`,
-          `Target: ${actionResult?.platforms?.join(", ") || "All connected accounts"}`
-        ];
-      }
-    } catch (err) {
-      console.error("Agent execution error:", err);
-      thoughtLog = ["⚠️ Failed to execute system agent command."];
-    }
-
     // 2. Call Gemini
-    const systemContext = agentName
+    const baseContext = agentName
       ? `You are ${agentName}, an AI agent in OCTOPUS NEXUS OS — an autonomous AI marketing operating system. You help with affiliate marketing, social media growth, content creation, campaign strategy, and profit optimization. Be concise, strategic, and action-oriented. Respond in the same language as the user.`
       : `You are OCTOPUS Brain — the central AI intelligence of OCTOPUS NEXUS OS. You help with affiliate marketing, content creation, social media strategy, and automated profit systems. Be direct, smart, and practical. Respond in the same language as the user.`;
+
+    const systemContext = `${baseContext}
+    
+CRITICAL SYSTEM PRIVILEGES: You have full control over the application's database. If the user explicitly asks you to perform an action (e.g., create a campaign, generate videos, hunt for trends, or grow social accounts), you MUST execute it by appending a JSON block at the very end of your response, wrapped in triple backticks \`\`\`json.
+Valid Agents: "Campaign Manager", "TrendHunter", "Creator Agent", "Publisher Agent", "Brain/CEO".
+Example:
+\`\`\`json
+{
+  "execute": true,
+  "agent": "Campaign Manager",
+  "action": "CREATE_CAMPAIGN",
+  "params": {
+    "name": "Coffee Gadgets Campaign",
+    "budget": 100
+  }
+}
+\`\`\`
+Only output this JSON if a real system action is requested. If the user is just asking a general question, do not output the JSON.
+`;
 
     const contents: any[] = [];
     if (history && history.length > 0) {
@@ -92,9 +68,9 @@ router.post("/chat", requireAuth, async (req: AuthRequest, res) => {
       system_instruction: { parts: [{ text: systemContext }] },
       contents,
       generationConfig: { temperature: 0.8, maxOutputTokens: 1024, topP: 0.95 }
-    };
-
-    let reply = "";
+        let reply = "";
+    let thoughtLog: string[] | undefined = undefined;
+    let usedModel = GEMINI_MODEL;
     
     try {
       const geminiRes = await fetch(GEMINI_URL, {
@@ -103,76 +79,89 @@ router.post("/chat", requireAuth, async (req: AuthRequest, res) => {
         body: JSON.stringify(payload),
       });
 
-        if (geminiRes.status === 429 || !geminiRes.ok) {
-          console.warn(`[AI Router] Gemini failed with status ${geminiRes.status}. Attempting OpenAI fallback...`);
-          const OPENAI_API_KEY = process.env["OPENAI_API_KEY"];
-          
-          if (OPENAI_API_KEY) {
-            // Transform history for OpenAI
-            const openAiMessages = [{ role: "system", content: systemContext }];
-            if (history && history.length > 0) {
-              for (const h of history.slice(-10)) {
-                openAiMessages.push({
-                  role: h.role === "agent" ? "assistant" : "user",
-                  content: h.text
-                });
-              }
-            }
-            openAiMessages.push({ role: "user", content: message });
-
-            const openAiRes = await fetch("https://api.openai.com/v1/chat/completions", {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "Authorization": `Bearer ${OPENAI_API_KEY}`
-              },
-              body: JSON.stringify({
-                model: "gpt-4o-mini", // Fast and cheap fallback
-                messages: openAiMessages,
-                temperature: 0.8,
-                max_tokens: 1024
-              })
-            });
-
-            if (openAiRes.ok) {
-              const openAiData = await openAiRes.json() as any;
-              reply = openAiData.choices?.[0]?.message?.content || "عذراً، لم أتلق ردًا من OpenAI.";
-              
-              res.json({
-                reply,
-                thoughtLog: thoughtLog ? [...thoughtLog, "🔄 Switched to OpenAI (GPT-4o) automatically due to Gemini limits."] : ["🔄 Switched to OpenAI (GPT-4o) automatically due to Gemini limits."],
-                model: "gpt-4o-mini (Fallback)",
-                agentName: agentName || "OCTOPUS Brain",
-                timestamp: new Date().toISOString(),
+      if (geminiRes.status === 429 || !geminiRes.ok) {
+        console.warn(`[AI Router] Gemini failed with status ${geminiRes.status}. Attempting OpenAI fallback...`);
+        const OPENAI_API_KEY = process.env["OPENAI_API_KEY"];
+        
+        if (OPENAI_API_KEY) {
+          const openAiMessages = [{ role: "system", content: systemContext }];
+          if (history && history.length > 0) {
+            for (const h of history.slice(-10)) {
+              openAiMessages.push({
+                role: h.role === "agent" ? "assistant" : "user",
+                content: h.text
               });
-              return;
             }
           }
+          openAiMessages.push({ role: "user", content: message });
 
-          // If no fallback succeeded
-          if (geminiRes.status === 429 && thoughtLog && thoughtLog.length > 0) {
-            reply = "لقد وصلت للحد الأقصى المجاني من محادثات Gemini، ولكنني قمت بتنفيذ طلبك بنجاح في الخلفية.";
+          const openAiRes = await fetch("https://api.openai.com/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${OPENAI_API_KEY}`
+            },
+            body: JSON.stringify({
+              model: "gpt-4o-mini",
+              messages: openAiMessages,
+              temperature: 0.8,
+              max_tokens: 1024
+            })
+          });
+
+          if (openAiRes.ok) {
+            const openAiData = await openAiRes.json() as any;
+            reply = openAiData.choices?.[0]?.message?.content || "عذراً، لم أتلق ردًا من OpenAI.";
+            usedModel = "gpt-4o-mini (Fallback)";
+            thoughtLog = ["🔄 Switched to OpenAI (GPT-4o) automatically due to Gemini limits."];
           } else {
-            const errText = await geminiRes.text();
-            res.status(502).json({ error: `Gemini API error (${geminiRes.status}): ${errText}` });
-            return;
+            throw new Error(`OpenAI Fallback failed with status ${openAiRes.status}`);
           }
         } else {
-          const geminiData = await geminiRes.json() as any;
-          reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "عذراً، لم أتلق ردًا من Gemini.";
+          throw new Error(`Gemini failed (${geminiRes.status}) and no OPENAI_API_KEY for fallback.`);
         }
-    } catch (networkErr) {
-      if (thoughtLog && thoughtLog.length > 0) {
-        reply = "حدث خطأ في الاتصال بنموذج Gemini، ولكن تم تنفيذ أمرك بنجاح في النظام.";
       } else {
-        throw networkErr;
+        const geminiData = await geminiRes.json() as any;
+        reply = geminiData?.candidates?.[0]?.content?.parts?.[0]?.text || "عذراً، لم أتلق ردًا من Gemini.";
       }
+    } catch (networkErr) {
+      console.error("AI API Error:", networkErr);
+      res.status(502).json({ error: String(networkErr) });
+      return;
+    }
+
+    // --- JSON INTENT ROUTER PARSING ---
+    try {
+      const jsonMatch = reply.match(/```json\n([\s\S]*?)\n```/);
+      if (jsonMatch && jsonMatch[1]) {
+        const parsed = JSON.parse(jsonMatch[1]);
+        if (parsed.execute && parsed.agent) {
+          // Remove the JSON block from the text sent to the user
+          reply = reply.replace(/```json\n[\s\S]*?\n```/, "").trim();
+          
+          // Execute the dynamic intent
+          const { executeRealAgentAction } = await import("../lib/agent-action-executor.js");
+          // We pass the parsed JSON directly into the message or baseOutput parameter
+          // stringifying it so executor can read it easily
+          const actionResult = await executeRealAgentAction(parsed.agent, "chat", "chat-run", JSON.stringify(parsed), req.user?.userId) as any;
+          
+          const logs = thoughtLog || [];
+          logs.push(`⚡ Executed OS Command: ${parsed.action}`);
+          if (parsed.params) logs.push(`Params: ${JSON.stringify(parsed.params)}`);
+          if (actionResult?.status) logs.push(`Status: ${actionResult.status}`);
+          if (actionResult?.campaignName) logs.push(`Campaign: ${actionResult.campaignName}`);
+          
+          thoughtLog = logs;
+        }
+      }
+    } catch (parseErr) {
+      console.error("Failed to parse or execute LLM JSON intent:", parseErr);
     }
 
     res.json({
       reply,
       thoughtLog,
-      model: GEMINI_MODEL,
+      model: usedModel,
       agentName: agentName || "OCTOPUS Brain",
       timestamp: new Date().toISOString(),
     });
