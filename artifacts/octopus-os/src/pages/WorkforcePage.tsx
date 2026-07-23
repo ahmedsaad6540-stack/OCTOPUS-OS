@@ -73,27 +73,17 @@ export function WorkforcePage() {
       if (data.length > 0) {
         setWorkers(data.map(mapAgent));
       } else {
-        // Seed initial agents in the database
-        for (const agent of DEFAULT_AGENTS) {
-          await fetch(`${API_BASE}/agents`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-            body: JSON.stringify({
-              name: agent.name,
-              instructions: agent.instructions,
-              description: agent.role,
-              status: "active",
-            }),
-          });
-        }
-        const reFetch = await fetch(`${API_BASE}/agents`, {
-          headers: { "Authorization": `Bearer ${token}` },
-        });
-        if (reFetch.ok) {
-          const freshRaw = await reFetch.json();
-          const freshData: any[] = Array.isArray(freshRaw) ? freshRaw : (freshRaw.agents || freshRaw.data || []);
-          setWorkers(freshData.map(mapAgent));
-        }
+        // Fallback to default UI display if API returns 0 agents
+        setWorkers(DEFAULT_AGENTS.map((a, i) => ({
+          id: `local-${i}`,
+          name: a.name,
+          role: a.role,
+          icon: a.icon,
+          status: "active" as const,
+          workload: "Monitoring operations loop",
+          instructions: a.instructions,
+          performance: "Active"
+        })));
       }
     } catch (err) {
       console.error("WorkforcePage: error fetching agents:", err);

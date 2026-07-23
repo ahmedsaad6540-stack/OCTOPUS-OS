@@ -118,41 +118,17 @@ export function AgentsPage() {
           instructions: w.instructions || ""
         })));
       } else {
-        // Seed default agents in database
-        for (const agent of DEFAULT_AGENTS) {
-          await fetch(`${API_BASE}/agents`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${token}`
-            },
-            body: JSON.stringify({
-              name: agent.name,
-              instructions: agent.desc,
-              description: agent.desc,
-              status: "active"
-            })
-          });
-        }
-        // Fetch again
-        const reFetch = await fetch(`${API_BASE}/agents`, {
-          headers: { "Authorization": `Bearer ${token}` }
-        });
-        if (reFetch.ok) {
-          const freshRaw = await reFetch.json();
-          const freshData = Array.isArray(freshRaw) ? freshRaw : (freshRaw.agents || freshRaw.data || []);
-          setAgents(freshData.map((w: any) => ({
-            id: w.id,
-            name: w.name,
-            icon: getIconForAgent(w.name),
-            status: w.status === "active" ? "active" : "disabled",
-            task: w.status === "active" ? (w.lastTaskType || "Running operations loop") : "Idle",
-            cpu: w.cpuUsage ?? (w.status === "active" ? 22 : 0),
-            requests: w.requestCount ?? (w.status === "active" ? 18 : 0),
-            description: w.description || "Virtual Agent",
-            instructions: w.instructions || ""
-          })));
-        }
+        // If API returns 0 agents, fallback to default UI display without polluting database
+        setAgents(DEFAULT_AGENTS.map((a, i) => ({
+          id: `local-${i}`,
+          name: a.name,
+          icon: a.icon,
+          status: "active" as const,
+          task: a.task,
+          cpu: a.cpu,
+          requests: a.requests,
+          description: a.desc
+        })));
       }
     } catch (err) {
       console.error(err);

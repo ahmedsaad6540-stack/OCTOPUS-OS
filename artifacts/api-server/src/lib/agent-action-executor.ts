@@ -81,83 +81,8 @@ export async function executeRealAgentAction(agentName: string, agentId: string,
     }
     // 2. Creator Agent (صناعة المحتوى / كتابة النصوص)
     else if (nameLower.includes("creator") || nameLower.includes("script") || nameLower.includes("صناع") || nameLower.includes("محتوى")) {
-      logs.push("🎬 [Creator Agent] Analyzing active campaigns to generate viral scripts & trigger Video Factory jobs...");
-      
-      const activeCampaigns = await db.select().from(campaignsTable);
-      const existingJobs = await db.select().from(videoJobsTable);
-      const jobsByProduct = new Map<string, number>();
-      for (const j of existingJobs) {
-        const p = (j.productName || "").trim().toLowerCase();
-        jobsByProduct.set(p, (jobsByProduct.get(p) || 0) + 1);
-      }
-
-      // Pick an active campaign that has NO video jobs or the fewest video jobs
-      let targetCampaign = activeCampaigns[0];
-      if (activeCampaigns.length > 0) {
-        const sorted = [...activeCampaigns].sort((a, b) => {
-          const countA = jobsByProduct.get((a.name || "").trim().toLowerCase()) || 0;
-          const countB = jobsByProduct.get((b.name || "").trim().toLowerCase()) || 0;
-          return countA - countB;
-        });
-        targetCampaign = sorted[0];
-      }
-
-      const targetName = targetCampaign ? (targetCampaign.name || "AI Viral Product") : "Amazon Echo Spot & Smart Devices";
-      const targetPlatform = targetCampaign?.platform === "youtube" ? "YouTube Shorts" : "TikTok";
-      const targetLink = targetCampaign?.productUrl || "https://octopuslab.ai/shorts";
-
-      let customProductName = targetName;
-      if (parsedPayload && parsedPayload.params && parsedPayload.params.productName) {
-        customProductName = parsedPayload.params.productName;
-      }
-
-      const jobId = randomUUID();
-      let jobCreated = false;
-      try {
-        if (userId) {
-          const cleanTitle = customProductName.replace(/^viral drop:\s*/i, "").split("-")[0].trim();
-          
-          const autoStyles = [
-            { tmpl: "🎨 3D Animated Cartoon & Motion Graphics", vc: "Leo (3D Animated Character) | ElevenLabs Expressive Animation" },
-            { tmpl: "📦 Pure Product Showcase & Zoom Demos (No Talking Head)", vc: "Product Showcase B-Roll Mode | Studio Narrator (Ultra-Clean AI Pro)" },
-            { tmpl: "🎭 Charismatic Tech Reviewer (David)", vc: "David (Charismatic Tech Presenter) | David (HeyGen Natural Tech)" },
-            { tmpl: "✨ Lifestyle Influencer & Vlogger (Sarah)", vc: "Sarah (Lifestyle Influencer) | Sarah (HeyGen Casual Vlog)" },
-            { tmpl: "👔 Executive Coach & Authority Presenter (Marcus)", vc: "Marcus (Executive Authority Presenter) | Marcus (HeyGen Deep Executive)" },
-            { tmpl: "🧪 Animated Motion Guide (Maya v2)", vc: "Maya (Animated Motion Guide) | Maya (ElevenLabs Vibrant Animation)" }
-          ];
-          const chosen = autoStyles[Math.floor(Math.random() * autoStyles.length)];
-
-          await db.insert(videoJobsTable).values({
-            id: jobId,
-            userId: userId,
-            productName: targetName,
-            title: `AI Short: ${cleanTitle} Review`,
-            hook: `🛑 Stop scrolling! If you want to master ${cleanTitle} in 2026, watch this 30-second breakdown...`,
-            script: `Here is why ${cleanTitle} is going viral right now. It automates everything for you in seconds. Check the official link in bio or pinned comment right now: ${targetLink}`,
-            platform: targetPlatform,
-            template: chosen.tmpl,
-            voice: chosen.vc,
-            status: "rendering_video",
-            progress: 35,
-            createdAt: new Date(),
-            updatedAt: new Date()
-          });
-          jobCreated = true;
-          logs.push(`✅ [Creator Agent] Generated customized script for "${targetName}" & queued Multi-Style Video job: ${chosen.tmpl} (${jobId.slice(0, 8)}...).`);
-        } else {
-          logs.push(`ℹ️ [Creator Agent] Generated script successfully for ${targetName}.`);
-        }
-      } catch (e) {
-        logs.push(`ℹ️ [Creator Agent] Video production pipeline already active for ${targetName}.`);
-      }
-
-      actionResult = {
-        taskExecuted: "Viral Script Generation & Video Factory Queue",
-        jobId: jobCreated ? jobId : "existing_queue",
-        scriptTitle: `AI Short: ${targetName}`,
-        hook: `🛑 Stop scrolling! Watch this 30-second breakdown of ${targetName}...`,
-        platform: targetPlatform
-      };
+      const { CreatorService } = await import("./services/creator-service.js");
+      actionResult = await CreatorService.executeCreatorAgentPipeline(userId, parsedPayload, logs);
     }
     // 3. Publisher Agent / Social Account Manager (وكيل النشر / نمو الحسابات)
     else if (nameLower.includes("publisher") || nameLower.includes("نشر") || nameLower.includes("حساب") || nameLower.includes("نمي") || nameLower.includes("grow") || nameLower.includes("social")) {
@@ -196,25 +121,11 @@ export async function executeRealAgentAction(agentName: string, agentId: string,
       }
 
       if (userId) {
-        await db.insert(campaignsTable).values({
-          id: randomUUID(),
-          userId: userId,
-          name: campaignName,
-          productName: "Selected by TrendHunter",
-          platform: "tiktok",
-          status: "active",
-          budget: budget,
-          createdAt: new Date(),
-          updatedAt: new Date()
-        });
-        logs.push(`✅ [Campaign Manager] Successfully created new campaign '${campaignName}' with budget $${budget} in the database.`);
+        const { CampaignService } = await import("./services/campaign-service.js");
+        actionResult = await CampaignService.executeAutonomousPipeline(userId, campaignName, budget, logs);
+      } else {
+        logs.push("⚠️ [Campaign Manager] No userId provided, skipping real DB insertion for autonomous pipeline.");
       }
-
-      actionResult = {
-        taskExecuted: "Campaign Creation & Allocation",
-        campaignName: campaignName,
-        status: "Active & Monitored"
-      };
     }
     // 4. Brain / CEO / Optimizer (المخ / الإدارة العليا / التحسين)
     else if (nameLower.includes("brain") || nameLower.includes("ceo") || nameLower.includes("optimizer") || nameLower.includes("مخ") || nameLower.includes("إدارة")) {

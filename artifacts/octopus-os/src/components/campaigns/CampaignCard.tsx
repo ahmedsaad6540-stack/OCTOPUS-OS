@@ -11,6 +11,7 @@ export function CampaignCard({ campaign: c }: { campaign: Campaign }) {
   
   const isToggling = toggleCampaignStatus.isPending && toggleCampaignStatus.variables?.id === c.id;
   const isDeleting = deleteCampaign.isPending && deleteCampaign.variables === c.id;
+  const isActive = ["active", "running", "queued"].includes(c.status);
 
   return (
     <div className="group relative glass-card rounded-2xl border border-purple-500/10 hover:border-purple-500/40 transition-all duration-300 hover:-translate-y-1 overflow-hidden">
@@ -22,7 +23,7 @@ export function CampaignCard({ campaign: c }: { campaign: Campaign }) {
               <span>{SOCIAL_ICONS[c.platform] || "🌐"}</span> {c.platform} · {c.affiliateNetwork}
             </p>
           </div>
-          <span className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black tracking-wide ${c.status === "active" ? "bg-emerald-950/60 text-emerald-400 border border-emerald-500/30" : "bg-yellow-950/60 text-yellow-400 border border-yellow-500/30"}`}>
+          <span className={`shrink-0 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black tracking-wide ${isActive ? "bg-emerald-950/60 text-emerald-400 border border-emerald-500/30" : "bg-yellow-950/60 text-yellow-400 border border-yellow-500/30"}`}>
             {c.status.toUpperCase()}
           </span>
         </div>
@@ -96,11 +97,11 @@ export function CampaignCard({ campaign: c }: { campaign: Campaign }) {
         )}
 
         <div className="flex items-center gap-2 pt-3 border-t border-purple-500/10">
-          <button onClick={() => toggleCampaignStatus.mutate({ id: c.id, currentStatus: c.status })} disabled={isToggling}
+          <button onClick={() => toggleCampaignStatus.mutate({ id: c.id, currentStatus: isActive ? "active" : "paused" })} disabled={isToggling}
             className={`flex-1 px-3 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 ${
-              c.status === "active" ? "bg-yellow-950/30 text-yellow-400 border border-yellow-500/20" : "bg-emerald-950/30 text-emerald-400 border border-emerald-500/20"
+              isActive ? "bg-yellow-950/30 text-yellow-400 border border-yellow-500/20" : "bg-emerald-950/30 text-emerald-400 border border-emerald-500/20"
             }`}>
-            {isToggling ? "⏳..." : c.status === "active" ? "⏸ Pause" : "▶ Activate"}
+            {isToggling ? "⏳..." : isActive ? "⏸ Pause" : "▶ Activate"}
           </button>
           <a href={c.productUrl || "#"} target="_blank" rel="noopener noreferrer" className="flex-1 px-3 py-2 rounded-lg text-xs font-bold text-white bg-purple-900/30 border border-purple-500/20 text-center">
             🔗 Affiliate

@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useLocation } from "wouter";
 import { useCampaigns, useCampaignMutations } from "@/hooks/useCampaigns";
 import { CampaignToolbar } from "@/components/campaigns/CampaignToolbar";
 import { CampaignGrid } from "@/components/campaigns/CampaignGrid";
@@ -8,6 +9,7 @@ import { useAuth } from "@/context/AuthContext";
 const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5002/api";
 
 export function CampaignsPage() {
+  const [, setLocation] = useLocation();
   const { data: campaigns = [], isLoading, error } = useCampaigns();
   const { createCampaign, startProfitEngine } = useCampaignMutations();
   const { token } = useAuth();
@@ -100,7 +102,7 @@ export function CampaignsPage() {
           <p className="text-xs text-purple-400">بمجرد إنشاء الحملة، انقر على زر Start Profit Engine في الأعلى ليبدأ النظام بالعمل، ثم يمكنك متابعة حالة الفيديوهات من Video Factory.</p>
         </div>
         <button 
-          onClick={() => window.location.href = "/?page=video-factory"}
+          onClick={() => setLocation("/video-factory")}
           className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-sm font-bold rounded-lg shadow-[0_0_20px_rgba(16,185,129,0.4)] transition-all transform hover:scale-105">
           متابعة مصنع الفيديوهات 🎬
         </button>

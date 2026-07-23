@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { API_BASE } from "@/lib/api";
 import { useAuth } from "@/context/AuthContext";
 import { useLanguage } from "@/context/LanguageContext";
+import { useLocation } from "wouter";
 
 const NETWORK_META: Record<string, { icon: string; name: string; commission: string; fields: string[] }> = {
   digistore24: { icon: "🏦", name: "Digistore24", commission: "40-80%", fields: ["API Key", "Affiliate ID"] },
@@ -12,6 +13,7 @@ const NETWORK_META: Record<string, { icon: string; name: string; commission: str
 };
 
 export function AffiliatesPage() {
+  const [, setLocation] = useLocation();
   const { token } = useAuth();
   const { t } = useLanguage();
   const [selected, setSelected] = useState("digistore24");
@@ -205,7 +207,7 @@ export function AffiliatesPage() {
         
         if (draftRes.ok && draftData.campaignDraftId) {
           sessionStorage.setItem("campaign_draft_id", draftData.campaignDraftId);
-          window.location.href = `/campaigns?draft=1`;
+          setLocation(`/campaigns?draft=1`);
         } else {
           alert("Failed to create campaign draft server-side");
         }
@@ -397,7 +399,7 @@ export function AffiliatesPage() {
           <p className="text-xs text-purple-400">بعد ربط شبكات التسويق، انتقل لربط حساباتك الاجتماعية لنشر المحتوى.</p>
         </div>
         <button 
-          onClick={() => window.location.href = "/?page=social"}
+          onClick={() => setLocation("/social")}
           className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white text-sm font-bold rounded-lg shadow-[0_0_20px_rgba(147,51,234,0.4)] transition-all transform hover:scale-105">
           الذهاب إلى Social Hub ➡️
         </button>

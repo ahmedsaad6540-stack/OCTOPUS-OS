@@ -47,7 +47,7 @@ export function CampaignDialog({ isOpen, onClose, onCreate, isCreating, initialD
             {NETWORKS.map(n => <option key={n} value={n}>{n}</option>)}
           </select>
         </div>
-        <input type="url" value={form.productUrl} onChange={e => setForm(f => ({ ...f, productUrl: e.target.value }))} placeholder="Affiliate URL" className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-800/40 text-white" />
+        <input type="url" required value={form.productUrl} onChange={e => setForm(f => ({ ...f, productUrl: e.target.value }))} placeholder="Affiliate URL" className="w-full px-4 py-3 rounded-xl bg-black/40 border border-purple-800/40 text-white" />
         <div className="flex justify-end gap-3">
           <button type="button" onClick={onClose} className="px-6 py-2.5 rounded-xl text-purple-300">Cancel</button>
           <button type="submit" disabled={isCreating} className="px-8 py-2.5 rounded-xl font-bold text-white bg-purple-600">
