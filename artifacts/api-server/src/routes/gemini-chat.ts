@@ -50,6 +50,22 @@ router.post("/chat", requireAuth, async (req: AuthRequest, res) => {
           `Discovered: ${actionResult?.discoveredCount || 0} products`,
           `Unlaunched: ${actionResult?.unlaunchedCount || 0} products`
         ];
+      } else if (msgLower.includes("حمل") || msgLower.includes("campaign") || msgLower.includes("اعمل حملة") || msgLower.includes("انشئ حملة")) {
+        // Campaign intent
+        const actionResult = await executeRealAgentAction("Campaign Manager", "chat", "chat-run", message, req.user?.userId) as any;
+        thoughtLog = [
+          "🚀 " + (actionResult?.taskExecuted || "Campaign Management"),
+          `Campaign: ${actionResult?.campaignName || "AI Campaign"}`,
+          `Status: ${actionResult?.status || "Active"}`
+        ];
+      } else if (msgLower.includes("حساب") || msgLower.includes("حسابات") || msgLower.includes("نمي") || msgLower.includes("تنمية") || msgLower.includes("grow") || msgLower.includes("social") || msgLower.includes("انشر")) {
+        // Publisher/Social intent
+        const actionResult = await executeRealAgentAction("Publisher Agent", "chat", "chat-run", message, req.user?.userId) as any;
+        thoughtLog = [
+          "📢 " + (actionResult?.taskExecuted || "Social Media Automation"),
+          `Action: ${actionResult?.action || "Scheduling assets"}`,
+          `Target: ${actionResult?.platforms?.join(", ") || "All connected accounts"}`
+        ];
       }
     } catch (err) {
       console.error("Agent execution error:", err);
