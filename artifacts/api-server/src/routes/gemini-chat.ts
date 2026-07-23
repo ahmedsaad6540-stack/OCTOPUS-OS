@@ -68,7 +68,9 @@ Only output this JSON if a real system action is requested. If the user is just 
       system_instruction: { parts: [{ text: systemContext }] },
       contents,
       generationConfig: { temperature: 0.8, maxOutputTokens: 1024, topP: 0.95 }
-        let reply = "";
+    };
+
+    let reply = "";
     let thoughtLog: string[] | undefined = undefined;
     let usedModel = GEMINI_MODEL;
     
